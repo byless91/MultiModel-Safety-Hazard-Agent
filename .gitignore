@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+*.local
+.pnpm-store/
+
+# Env & data
+.env
+backend/data/*.db
+backend/data/uploads/
+backend/data/faiss/
+backend/data/knowledge/chunks/
+backend/data/eval/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
