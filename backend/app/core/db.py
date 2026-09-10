@@ -30,6 +30,11 @@ def ensure_columns(db_engine) -> None:
             ("rectification_score", "FLOAT"),
             ("rectification_analysis_json", "TEXT"),
             ("rectified_at", "DATETIME"),
+            ("review_reasons_json", "TEXT"),
+            ("human_review_json", "TEXT"),
+            ("risk_result_json", "TEXT"),
+            ("evidence_judge_json", "TEXT"),
+            ("ensemble_judge_json", "TEXT"),
         ],
         "assessment_images": [("image_kind", "VARCHAR(32)")],
     }

@@ -27,13 +27,17 @@
 ---
 id: law-example-001
 title: 示例法规节选
+document: 示例法规名称
+article: 第XX条
+risk_type: 消防
+scene: 社区
 source: 官方来源名称或链接
 version: 版本/修正信息
 tags: [消防, 疏散通道]
+effective_date: 2026-01-01
 collected_at: 2026-09-05
 ---
 正文内容……
 ```
 
 当前目录内已有的节选仅用于开发验证，正式使用前必须对照官方原文逐条复核。
-

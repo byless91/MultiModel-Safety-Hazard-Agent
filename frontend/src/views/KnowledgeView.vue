@@ -108,7 +108,7 @@ async function upload() {
     title.value || selectedFile.value.name,
     source.value,
   )
-  ElMessage.success('文档已上传，可点击重新构建知识库生效')
+  ElMessage.success('文档已上传并已重建知识库')
   title.value = ''
   source.value = ''
   selectedFile.value = null
@@ -127,7 +127,7 @@ async function openPreview(id: string) {
 
 async function remove(id: string) {
   await store.deleteDocument(id)
-  ElMessage.success('文档已删除，请重新构建知识库生效')
+  ElMessage.success('文档已删除并已重建知识库')
   await load()
 }
 

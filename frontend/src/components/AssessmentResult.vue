@@ -58,6 +58,34 @@
         show-icon
       />
 
+      <el-card
+        v-if="assessment.risk_score !== undefined && assessment.risk_score !== null"
+        class="risk-card"
+      >
+        <template #header>
+          <div class="risk-head">
+            <span>风险引擎判定</span>
+            <el-tag :type="riskTag" effect="dark" class="risk-tag">{{ riskLabel }}</el-tag>
+          </div>
+        </template>
+        <div class="risk-main">
+          <span class="risk-score">风险分 {{ assessment.risk_score }} / 100</span>
+          <span v-if="assessment.risk_review_suggestion" class="risk-review-tip">建议人工复核</span>
+        </div>
+        <div v-if="assessment.risk_factors && Object.keys(assessment.risk_factors).length" class="factor-grid">
+          <div v-for="(value, key) in assessment.risk_factors" :key="key" class="factor-item">
+            <span class="factor-label">{{ key }}</span>
+            <span class="factor-value">{{ value }}</span>
+          </div>
+        </div>
+        <ul v-if="assessment.risk_triggered_rules && assessment.risk_triggered_rules.length" class="rule-list">
+          <li v-for="rule in assessment.risk_triggered_rules" :key="rule">{{ rule }}</li>
+        </ul>
+        <p v-if="assessment.risk_rule_version" class="risk-version">
+          规则版本：{{ assessment.risk_rule_version }}
+        </p>
+      </el-card>
+
       <div class="result-grid">
         <el-card class="result-card">
           <template #header>处置建议</template>
@@ -90,16 +118,71 @@
           <span>参考依据（{{ report.evidence_count }}）</span>
         </template>
         <el-empty v-if="!report.legal_basis.length" description="暂无检索到知识库依据" />
-        <div v-for="item in report.legal_basis" :key="item.source + item.text" class="evidence-item">
+        <div
+          v-for="item in report.legal_basis"
+          :key="item.source + (item.snippet || item.text || '')"
+          class="evidence-item"
+        >
           <div class="evidence-head">
             <span class="evidence-source">{{ item.source }}</span>
+            <span class="evidence-article">{{ item.article }}</span>
             <span class="evidence-score">相关度 {{ Math.round(item.score * 100) }}%</span>
           </div>
-          <p class="evidence-text">{{ item.text }}</p>
+          <p class="evidence-text">{{ item.snippet || item.text }}</p>
           <div class="tag-row">
             <el-tag v-for="tag in item.tags" :key="tag" size="small" type="info">{{ tag }}</el-tag>
           </div>
         </div>
+      </el-card>
+
+      <el-card
+        v-if="assessment.evidence_judge || assessment.findings?.length"
+        class="evidence-judge-card"
+      >
+        <template #header>
+          <div class="evidence-judge-head">
+            <span>证据链判定</span>
+            <el-tag
+              v-if="assessment.evidence_judge"
+              :type="assessment.evidence_judge.supported ? 'success' : 'warning'"
+              effect="light"
+            >
+              {{ assessment.evidence_judge.supported ? '证据支持' : '证据不足' }}
+            </el-tag>
+          </div>
+        </template>
+        <div v-for="finding in evidenceFindings" :key="finding.finding_id" class="judge-finding">
+          <div class="judge-finding-head">
+            <span class="finding-category">{{ finding.category }}</span>
+            <el-tag :type="finding.supported ? 'success' : 'warning'" size="small">
+              {{ finding.supported ? '支持' : '不足' }}
+            </el-tag>
+            <span v-if="finding.support_score !== undefined" class="support-score">
+              支持度 {{ Math.round((finding.support_score || 0) * 100) }}%
+            </span>
+          </div>
+          <div v-if="finding.evidence_ids?.length" class="evidence-ids">
+            依据：{{ finding.evidence_ids.join('、') }}
+          </div>
+          <ul v-if="finding.unsupported_claims?.length" class="unsupported-list">
+            <li v-for="claim in finding.unsupported_claims" :key="claim">{{ claim }}</li>
+          </ul>
+          <div v-if="findingLocations(finding).length" class="location-row">
+            <span
+              v-for="(loc, index) in findingLocations(finding)"
+              :key="loc.image_id || loc.location_text || `loc-${index}`"
+              class="location-chip"
+            >
+              <template v-if="loc.image_id">图片 {{ loc.image_id }}</template>
+              <template v-if="loc.location_text">：{{ loc.location_text }}</template>
+              <span v-if="loc.bbox"> bbox [{{ loc.bbox.join(', ') }}]</span>
+            </span>
+          </div>
+        </div>
+        <p v-if="assessment.evidence_judge" class="judge-counts">
+          视觉证据 {{ assessment.evidence_judge.visual_evidence_count }} 条，
+          法规证据 {{ assessment.evidence_judge.retrieval_evidence_count }} 条
+        </p>
       </el-card>
 
       <el-card class="rect-card">
@@ -228,7 +311,7 @@ import { ElMessage, type UploadFile } from 'element-plus'
 import { computed, ref } from 'vue'
 
 import { useAssessmentStore } from '../stores/assessment'
-import type { Assessment } from '../types'
+import type { Assessment, FindingLocation } from '../types'
 
 const props = defineProps<{
   assessment: Assessment
@@ -254,6 +337,21 @@ const rectImages = computed(() =>
   props.assessment.images.filter((image) => image.image_kind === 'rectification'),
 )
 
+const evidenceFindings = computed(() => {
+  const judgeFindings = props.assessment.evidence_judge?.findings ?? []
+  const finalById = new Map(
+    (props.assessment.findings ?? []).map((item) => [item.finding_id, item]),
+  )
+  return judgeFindings.map((item) => ({
+    ...item,
+    locations: finalById.get(item.finding_id)?.locations ?? [],
+  }))
+})
+
+function findingLocations(finding: { locations?: FindingLocation[] }) {
+  return finding.locations ?? []
+}
+
 const rectTag = computed<'success' | 'warning' | 'info'>(() => {
   const status = props.assessment.rectification_status
   return status === 'resolved' ? 'success' : status === 'under_review' ? 'warning' : 'info'
@@ -267,6 +365,16 @@ const rectLabel = computed(() => {
 const rectColor = computed(() => {
   const score = props.assessment.rectification_score ?? 0
   return score >= 0.8 ? '#16a34a' : score >= 0.5 ? '#d97706' : '#94a3b8'
+})
+
+const riskTag = computed<'success' | 'warning' | 'danger'>(() => {
+  const label = props.assessment.risk_label
+  return label === 'high' ? 'danger' : label === 'medium' ? 'warning' : 'success'
+})
+
+const riskLabel = computed(() => {
+  const map: Record<string, string> = { low: '低风险', medium: '中风险', high: '高风险' }
+  return map[props.assessment.risk_label || ''] || '未评分'
 })
 
 const levelTag = computed<'danger' | 'warning' | 'success'>(() => {
@@ -383,6 +491,71 @@ async function onRecompare() {
   margin: 14px 0;
 }
 
+.risk-card {
+  margin-top: 14px;
+}
+
+.risk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.risk-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.risk-score {
+  font-weight: 600;
+  color: #155e75;
+}
+
+.risk-review-tip {
+  color: #b45309;
+  font-size: 12px;
+}
+
+.factor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.factor-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.factor-label {
+  color: #64748b;
+}
+
+.factor-value {
+  font-weight: 600;
+}
+
+.rule-list {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.risk-version {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .result-card {
   min-width: 0;
 }
@@ -440,6 +613,78 @@ async function onRecompare() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.evidence-judge-card {
+  margin-top: 14px;
+}
+
+.evidence-judge-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.judge-finding {
+  padding: 10px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.judge-finding:last-child {
+  border-bottom: 0;
+}
+
+.judge-finding-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.finding-category {
+  font-weight: 600;
+  color: #334155;
+}
+
+.support-score {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.evidence-ids {
+  margin-top: 6px;
+  color: #475569;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.unsupported-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #b45309;
+  font-size: 13px;
+}
+
+.location-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.location-chip {
+  padding: 3px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+}
+
+.judge-counts {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .footer-actions {

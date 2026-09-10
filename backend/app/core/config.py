@@ -29,8 +29,17 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-v3"
     zhipu_api_key: str = ""
     zhipu_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
+    zhipu_vision_model: str = "glm-4v-flash"
+    zhipu_text_model: str = "glm-4-flash"
+    zhipu_embedding_model: str = "embedding-2"
+    model_timeout: float = 60.0
+    model_max_retries: int = 1
+    model_retry_backoff: float = 0.5
+    risk_rule_version: str = "risk-engine-v1"
+    refine_with_evidence: bool = True
 
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    api_bearer_token: str = ""
     max_images: int = 3
     max_followups: int = 2
     conf_weights: str = "0.3,0.3,0.2,0.2"

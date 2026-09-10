@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
@@ -19,6 +20,14 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+
+    @app.middleware("http")
+    async def require_api_token(request, call_next):
+        token = get_settings().api_bearer_token
+        if token and request.headers.get("Authorization") != f"Bearer {token}":
+            return JSONResponse(status_code=401, content={"detail": "未授权"})
+        return await call_next(request)
+
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 

@@ -9,6 +9,7 @@
           <el-option label="已完成" value="completed" />
           <el-option label="待复核" value="needs_review" />
           <el-option label="待补充" value="needs_more_info" />
+          <el-option label="待人工复核" value="awaiting_human_review" />
           <el-option label="已确认" value="confirmed" />
         </el-select>
         <el-button type="primary" plain @click="load">
@@ -30,6 +31,12 @@
         </el-table-column>
         <el-table-column label="置信度" width="100" align="center">
           <template #default="{ row }">{{ formatPercent(row.confidence) }}</template>
+        </el-table-column>
+        <el-table-column label="风险分" width="90" align="center">
+          <template #default="{ row }">
+            <span v-if="row.risk_score !== undefined && row.risk_score !== null">{{ row.risk_score }}</span>
+            <span v-else>-</span>
+          </template>
         </el-table-column>
         <el-table-column label="状态" width="110" align="center">
           <template #default="{ row }">
@@ -83,6 +90,7 @@ function levelType(level: number) {
 function statusType(status: string) {
   if (status === 'completed') return 'success'
   if (status === 'confirmed') return 'primary'
+  if (status === 'awaiting_human_review') return 'warning'
   if (status === 'needs_review') return 'warning'
   if (status === 'needs_more_info') return 'info'
   return 'info'
@@ -93,6 +101,7 @@ function statusLabel(status: string) {
     completed: '已完成',
     confirmed: '已确认',
     needs_review: '待复核',
+    awaiting_human_review: '待人工复核',
     needs_more_info: '待补充',
     processing: '处理中',
   }
@@ -107,4 +116,3 @@ function statusLabel(status: string) {
   margin-bottom: 14px;
 }
 </style>
-

@@ -90,7 +90,11 @@ def summarize(results: list[dict]) -> dict:
             sum(r["confidence"] or 0 for r in results) / total, 4
         ),
         "avg_latency_s": round(sum(r["latency_s"] for r in results) / total, 3),
-        "needs_review_count": sum(1 for r in results if r["status"] == "needs_review"),
+        "needs_review_count": sum(
+            1
+            for r in results
+            if r["status"] in ("needs_review", "awaiting_human_review")
+        ),
         "completed_count": sum(1 for r in results if r["status"] == "completed"),
     }
 

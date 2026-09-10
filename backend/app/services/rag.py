@@ -5,12 +5,38 @@ import numpy as np
 from app.core.config import get_settings
 from app.services.providers import get_provider, hash_embed
 
+DEMO_SOURCE_MARKERS = ("演示",)
+DEMO_VERSION_MARKERS = ("demo",)
+
+
 try:
     import faiss
 
     HAS_FAISS = True
 except Exception:  # faiss is optional; numpy fallback covers small demo corpora
     HAS_FAISS = False
+
+
+def is_demo_chunk(item: dict) -> bool:
+    """Return True for demo rows that must never be treated as legal evidence."""
+    if not isinstance(item, dict):
+        return False
+    if bool(item.get("is_demo")):
+        return True
+    version = str(item.get("version") or "").strip().lower()
+    if version in DEMO_VERSION_MARKERS:
+        return True
+    source = str(item.get("source") or "")
+    if any(marker in source for marker in DEMO_SOURCE_MARKERS):
+        return True
+    return str(item.get("id") or "").lower().startswith("demo-")
+
+
+def is_regulatory_evidence(item: dict) -> bool:
+    """Only rows carrying article/document provenance count as legal evidence."""
+    if is_demo_chunk(item):
+        return False
+    return bool(item.get("article") or item.get("document"))
 
 
 class RAGService:
@@ -47,6 +73,12 @@ class RAGService:
                 "version": item.get("version") or "",
                 "tags": item.get("tags", []) or [],
                 "collected_at": item.get("collected_at") or "",
+                "article": item.get("article") or "",
+                "document": item.get("document") or "",
+                "risk_type": item.get("risk_type") or "",
+                "scene": item.get("scene") or "",
+                "effective_date": item.get("effective_date") or "",
+                "is_demo": is_demo_chunk(item),
             }
             for item in chunks
         ]
@@ -73,7 +105,14 @@ class RAGService:
             index.add(self.vectors)
             self._index = index
 
-    def search(self, query: str, top_k: int = 5, tags: list[str] | None = None) -> list[dict]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        tags: list[str] | None = None,
+        *,
+        include_demo: bool = False,
+    ) -> list[dict]:
         if not self.texts:
             return []
         try:
@@ -97,6 +136,8 @@ class RAGService:
         results: list[dict] = []
         seen: set[str] = set()
         for index, score in pairs:
+            if not include_demo and self.metas[index].get("is_demo"):
+                continue
             meta = self.metas[index]
             if tags and not (set(tags) & set(meta.get("tags", []))):
                 continue
@@ -130,3 +171,36 @@ def get_rag() -> RAGService:
 def reset_rag() -> None:
     global _rag
     _rag = None
+
+
+def build_evidence_context(evidence: list[dict], max_items: int = 3) -> str:
+    """Compact traceable evidence block used inside model prompts."""
+    lines = []
+    for item in evidence[:max_items]:
+        label = str(item.get("source") or "未标注来源")
+        article = str(item.get("article") or "")
+        if article:
+            label = f"{label} {article}"
+        lines.append(f"- [{label}] {str(item.get('text') or '')[:200]}")
+    return "\n".join(lines)
+
+
+def retrieval_as_evidence(retrieval: list[dict]) -> list[dict]:
+    """Convert raw RAG retrieval rows into the evidence shape used downstream."""
+    return [
+        {
+            "id": item.get("id") or "",
+            "source": item.get("source", "未标注来源"),
+            "text": item.get("text", ""),
+            "version": item.get("version", ""),
+            "tags": item.get("tags", []),
+            "score": item.get("score", 0),
+            "article": item.get("article", ""),
+            "document": item.get("document", ""),
+            "effective_date": item.get("effective_date", ""),
+            "risk_type": item.get("risk_type", ""),
+            "scene": item.get("scene", ""),
+            "is_demo": bool(item.get("is_demo") or is_demo_chunk(item)),
+        }
+        for item in retrieval
+    ]

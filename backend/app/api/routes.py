@@ -20,15 +20,22 @@ from app.schemas.assessment import (
     ProviderInfo,
     RectificationConfirmIn,
 )
-from app.services.providers import ImageInput, get_provider
+from app.services.providers import ImageInput, get_provider, get_providers
 from app.services.rag import get_rag
 from app.services.knowledge import rebuild_knowledge
 from app.services.workflow import run_workflow
+from app.services.guardrail import (
+    detect_image_type,
+    inspect_ocr_texts,
+    inspect_text,
+    validate_uploaded_input,
+)
 
 from app.models.entities import utcnow
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+ALLOWED_DOCUMENT_SUFFIXES = {".txt", ".md"}
 
 router = APIRouter(prefix="/api/v1")
 settings = get_settings()
@@ -51,6 +58,9 @@ def to_out(item: Assessment) -> AssessmentOut:
         except ValueError:
             return None
 
+    risk = parse_json(item.risk_result_json) or {}
+    evidence_judge = parse_json(item.evidence_judge_json)
+    ensemble_judge = parse_json(item.ensemble_judge_json) or {}
     return AssessmentOut(
         id=item.id,
         description=item.description,
@@ -61,6 +71,8 @@ def to_out(item: Assessment) -> AssessmentOut:
         confidence=item.confidence,
         conclusion=item.conclusion,
         evidence=parse_json(item.evidence_json) or [],
+        evidence_judge=evidence_judge,
+        findings=ensemble_judge.get("final_findings") or [],
         report=parse_json(item.report_json),
         followup_questions=parse_json(item.followup_questions_json) or [],
         followup_used=item.followup_used,
@@ -70,6 +82,18 @@ def to_out(item: Assessment) -> AssessmentOut:
         rectification_score=item.rectification_score,
         rectification_analysis=parse_json(item.rectification_analysis_json),
         rectified_at=item.rectified_at,
+        review_reasons=parse_json(item.review_reasons_json) or [],
+        awaiting_human_review=item.status == "awaiting_human_review",
+        human_review=parse_json(item.human_review_json),
+        risk_result=risk or None,
+        risk_score=risk.get("risk_score"),
+        risk_label=risk.get("risk_level"),
+        risk_operational_level=risk.get("operational_level"),
+        risk_rule_version=risk.get("rule_version"),
+        risk_factors=risk.get("factor_scores") or {},
+        risk_evidence_used=risk.get("evidence_used") or [],
+        risk_triggered_rules=risk.get("triggered_rules") or [],
+        risk_review_suggestion=bool(risk.get("review_suggestion")),
         created_at=item.created_at,
         updated_at=item.updated_at,
         images=[
@@ -114,9 +138,71 @@ def _apply_state(assessment: Assessment, state: dict, db: Session) -> None:
     assessment.report_json = (
         json.dumps(state.get("report"), ensure_ascii=False) if state.get("report") else None
     )
+    assessment.review_reasons_json = json.dumps(
+        state.get("review_reasons", []), ensure_ascii=False
+    )
+    assessment.human_review_json = (
+        json.dumps(state.get("human_review"), ensure_ascii=False)
+        if state.get("human_review")
+        else None
+    )
+    risk_result = state.get("risk_result")
+    assessment.risk_result_json = (
+        json.dumps(risk_result, ensure_ascii=False) if risk_result else None
+    )
+    if isinstance(risk_result, dict) and risk_result.get("operational_level"):
+        assessment.risk_level = int(risk_result["operational_level"])
+    assessment.evidence_judge_json = (
+        json.dumps(state.get("evidence_judge"), ensure_ascii=False)
+        if state.get("evidence_judge")
+        else None
+    )
+    assessment.ensemble_judge_json = (
+        json.dumps(state.get("ensemble_judge"), ensure_ascii=False)
+        if state.get("ensemble_judge")
+        else None
+    )
     assessment.followup_questions_json = json.dumps(
         state.get("followup_questions", []), ensure_ascii=False
     )
+
+
+def _reject_uploaded_input(description: str, image_datas: list[bytes]) -> None:
+    result = validate_uploaded_input(description, image_datas)
+    errors = [item for item in result.violations if item.severity == "error"]
+    if errors:
+        detail = "；".join(f"{item.code}: {item.message}" for item in errors)
+        raise HTTPException(status_code=400, detail=detail)
+
+
+def _parse_ocr_texts(raw: str) -> list[str]:
+    if not raw.strip():
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="ocr_texts 必须为 JSON 字符串数组") from None
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise HTTPException(status_code=400, detail="ocr_texts 必须为 JSON 字符串数组")
+    return [item for item in parsed if item.strip()]
+
+
+def _reject_ocr_texts(ocr_texts: list[str]) -> None:
+    errors = [
+        item
+        for item in inspect_ocr_texts(ocr_texts)
+        if item.severity == "error"
+    ]
+    if errors:
+        detail = "；".join(f"{item.code}: {item.message}" for item in errors)
+        raise HTTPException(status_code=400, detail=detail)
+
+
+def _reject_text(text: str) -> None:
+    errors = [item for item in inspect_text(text or "") if item.severity == "error"]
+    if errors:
+        detail = "；".join(f"{item.code}: {item.message}" for item in errors)
+        raise HTTPException(status_code=400, detail=detail)
 
 
 def _run_rectification_compare(item: Assessment, db: Session) -> None:
@@ -158,12 +244,14 @@ def health() -> HealthOut:
 
 @router.get("/system/provider", response_model=ProviderInfo)
 def provider_info() -> ProviderInfo:
-    provider = get_provider()
+    providers = get_providers()
+    primary = providers[0]
     return ProviderInfo(
-        provider=provider.name,
-        vision_model=getattr(provider, "vision_model", "mock"),
-        text_model=getattr(provider, "text_model", "mock"),
-        embedding_model=getattr(provider, "embedding_model", "hash-embedding"),
+        provider=primary.name,
+        vision_model=getattr(primary, "vision_model", "mock"),
+        text_model=getattr(primary, "text_model", "mock"),
+        embedding_model=getattr(primary, "embedding_model", "hash-embedding"),
+        models=[item.describe() for item in providers],
     )
 
 
@@ -171,12 +259,23 @@ def provider_info() -> ProviderInfo:
 async def create_assessment(
     description: Annotated[str, Form()] = "",
     followup_answer: Annotated[str, Form()] = "",
+    ocr_texts: Annotated[str, Form()] = "",
     files: Annotated[list[UploadFile] | None, File()] = None,
     db: Session = Depends(get_db),
 ) -> AssessmentOut:
     file_list = files or []
     if len(file_list) > settings.max_images:
         raise HTTPException(status_code=400, detail=f"最多上传 {settings.max_images} 张图片")
+
+    staged: list[tuple[UploadFile, bytes]] = []
+    for upload in file_list:
+        data = await upload.read()
+        if len(data) > MAX_FILE_BYTES:
+            raise HTTPException(status_code=400, detail="单张图片不能超过 10MB")
+        staged.append((upload, data))
+    ocr_list = _parse_ocr_texts(ocr_texts)
+    _reject_ocr_texts(ocr_list)
+    _reject_uploaded_input(description, [data for _, data in staged])
 
     assessment = Assessment(description=description)
     db.add(assessment)
@@ -185,10 +284,7 @@ async def create_assessment(
     upload_root = settings.upload_dir / assessment.id
     upload_root.mkdir(parents=True, exist_ok=True)
     images: list[ImageInput] = []
-    for upload in file_list:
-        data = await upload.read()
-        if len(data) > MAX_FILE_BYTES:
-            raise HTTPException(status_code=400, detail="单张图片不能超过 10MB")
+    for upload, data in staged:
         original_name = Path(upload.filename or "image.jpg").name
         stored_name = f"{uuid4().hex}_{original_name}"
         target = upload_root / stored_name
@@ -210,6 +306,7 @@ async def create_assessment(
             images=images,
             followup_answer=followup_answer or None,
             followup_used=0,
+            ocr_texts=ocr_list,
         )
     except Exception as exc:
         assessment.status = "failed"
@@ -252,6 +349,7 @@ def followup_assessment(
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
+    _reject_text(payload.answer)
     if item.followup_used >= settings.max_followups:
         raise HTTPException(status_code=400, detail="已达追问上限")
     try:
@@ -305,12 +403,17 @@ async def submit_rectification(
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
-    upload_root = settings.upload_dir / assessment_id
-    upload_root.mkdir(parents=True, exist_ok=True)
+    staged: list[tuple[UploadFile, bytes]] = []
     for upload in files or []:
         data = await upload.read()
         if len(data) > MAX_FILE_BYTES:
             raise HTTPException(status_code=400, detail="单张图片不能超过 10MB")
+        staged.append((upload, data))
+    _reject_uploaded_input("", [data for _, data in staged])
+
+    upload_root = settings.upload_dir / assessment_id
+    upload_root.mkdir(parents=True, exist_ok=True)
+    for upload, data in staged:
         original_name = Path(upload.filename or "rectification.jpg").name
         stored_name = f"rect_{uuid4().hex}_{original_name}"
         target = upload_root / stored_name
@@ -414,7 +517,11 @@ async def upload_knowledge_document(
     data = await file.read()
     if len(data) > MAX_DOCUMENT_BYTES:
         raise HTTPException(status_code=400, detail="文档不能超过 20MB")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ALLOWED_DOCUMENT_SUFFIXES:
+        raise HTTPException(status_code=400, detail="仅支持 .txt 或 .md 文本文件")
     text = data.decode("utf-8", errors="ignore")
+    _reject_text(text)
     doc = KnowledgeDocument(
         title=title or Path(file.filename or "document.txt").name,
         source=source,
@@ -422,6 +529,21 @@ async def upload_knowledge_document(
         content_text=text.strip(),
         meta_json=json.dumps({"filename": file.filename}, ensure_ascii=False),
     )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    try:
+        rebuild_knowledge(db=db)
+        doc.status = "indexed"
+    except Exception as exc:
+        doc.status = "index_error"
+        doc.meta_json = json.dumps(
+            {
+                **(parse_json(doc.meta_json) or {}),
+                "index_error": str(exc)[:200],
+            },
+            ensure_ascii=False,
+        )
     db.add(doc)
     db.commit()
     db.refresh(doc)
@@ -456,12 +578,17 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
         raise HTTPException(status_code=404, detail="知识文档不存在")
     db.delete(item)
     db.commit()
+    try:
+        rebuild_knowledge(db=db)
+    except Exception:
+        # Deletion is committed; keep the API response stable even if reindex fails.
+        pass
     return Response(status_code=204)
 
 
 @router.post("/knowledge/rebuild")
-def rebuild_knowledge_endpoint():
-    result = rebuild_knowledge()
+def rebuild_knowledge_endpoint(db: Session = Depends(get_db)):
+    result = rebuild_knowledge(db=db)
     return {
         "chunks": result["chunks"],
         "records": result["records"],

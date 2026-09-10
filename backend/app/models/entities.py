@@ -36,6 +36,11 @@ class Assessment(Base):
     rectification_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     rectification_analysis_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     rectified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_reasons_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    human_review_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    risk_result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_judge_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ensemble_judge_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

@@ -14,6 +14,7 @@ sys.path.insert(0, str(BACKEND))
 DEFAULT_INPUT = BACKEND / "data" / "knowledge" / "source_raw"
 DEFAULT_OUTPUT = BACKEND / "data" / "knowledge" / "chunks"
 SENTENCE_END = re.compile(r"(?<=[。！？；])")
+ARTICLE_RE = re.compile(r"第\s*[一二三四五六七八九十百千零〇0-9]+\s*条")
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -46,6 +47,11 @@ def split_sentences(text: str) -> list[str]:
     return [part.strip() for part in parts if part and part.strip()]
 
 
+def extract_article(text: str) -> str:
+    match = ARTICLE_RE.search(text)
+    return match.group(0).replace(" ", "") if match else ""
+
+
 def chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> list[str]:
     chunks: list[str] = []
     buffer = ""
@@ -74,6 +80,12 @@ def ingest(input_dir: Path, output_dir: Path, chunk_size: int, overlap: int) -> 
             continue
         item_id = meta.get("id") or path.stem
         title = meta.get("title") or path.stem
+        tags = meta.get("tags") or []
+        article = meta.get("article") or extract_article(body)
+        document = meta.get("document") or title
+        risk_type = meta.get("risk_type") or (tags[0] if tags else "")
+        scene = meta.get("scene") or (tags[1] if len(tags) > 1 else "")
+        effective_date = meta.get("effective_date") or meta.get("collected_at") or ""
         source = meta.get("source") or "未标注来源"
         version = meta.get("version") or ""
         collected_at = meta.get("collected_at") or ""
@@ -83,6 +95,11 @@ def ingest(input_dir: Path, output_dir: Path, chunk_size: int, overlap: int) -> 
                 {
                     "id": f"{item_id}-chunk-{index}",
                     "title": title,
+                    "document": document,
+                    "article": article,
+                    "risk_type": risk_type,
+                    "scene": scene,
+                    "effective_date": effective_date,
                     "text": chunk,
                     "source": source,
                     "version": version,
@@ -130,4 +147,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

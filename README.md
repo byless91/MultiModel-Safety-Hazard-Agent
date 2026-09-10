@@ -5,7 +5,7 @@
 ## 技术栈
 
 - 后端：Python 3.11+、FastAPI、SQLAlchemy、SQLite
-- 智能体：LangGraph StateGraph 六节点工作流，模型失败自动回退 Mock
+- 智能体：LangGraph StateGraph 条件路由工作流（分析、追问、检索、二次研判、融合研判、证据判定、生成/人工复核），模型失败自动回退 Mock
 - 模型：Qwen2.5-VL / GLM-4V-Flash（OpenAI 兼容 API），Mock 模式无需 Key
 - 检索：FAISS 或 NumPy 兜底向量检索（知识库数据来自 `backend/data/knowledge`）
 - 前端：Vue 3、TypeScript、Vite、Element Plus、Pinia
@@ -142,7 +142,7 @@ cd backend
 - 条款命中率：预期条款关键词出现在检索证据中的比例
 - 幻觉率：检索证据未覆盖预期条款关键词的比例，作为无依据输出的代理指标
 
-当前 Mock 模式下 30 条评测结果：类别准确率 100%，等级容差准确率 100%，条款命中率约 63%（条款命中率会随真实知识库扩充而提升）。
+当前 Mock 模式下 31 条评测结果：类别准确率 100%，等级容差准确率 100%，条款命中率约 63%（条款命中率会随真实知识库扩充而提升）。
 
 ## 下一步
 

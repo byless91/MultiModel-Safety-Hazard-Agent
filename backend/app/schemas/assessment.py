@@ -25,6 +25,8 @@ class AssessmentOut(BaseModel):
     confidence: float | None = None
     conclusion: str | None = None
     evidence: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_judge: dict[str, Any] | None = None
+    findings: list[dict[str, Any]] = Field(default_factory=list)
     report: dict[str, Any] | None = None
     followup_questions: list[str] = Field(default_factory=list)
     followup_used: int = 0
@@ -34,6 +36,18 @@ class AssessmentOut(BaseModel):
     rectification_score: float | None = None
     rectification_analysis: dict[str, Any] | None = None
     rectified_at: datetime | None = None
+    review_reasons: list[str] = Field(default_factory=list)
+    awaiting_human_review: bool = False
+    human_review: dict[str, Any] | None = None
+    risk_result: dict[str, Any] | None = None
+    risk_score: int | None = None
+    risk_label: str | None = None
+    risk_operational_level: int | None = None
+    risk_rule_version: str | None = None
+    risk_factors: dict[str, int] = Field(default_factory=dict)
+    risk_evidence_used: list[str] = Field(default_factory=list)
+    risk_triggered_rules: list[str] = Field(default_factory=list)
+    risk_review_suggestion: bool = False
     created_at: datetime
     updated_at: datetime
     images: list[ImageOut] = Field(default_factory=list)
@@ -65,6 +79,7 @@ class ProviderInfo(BaseModel):
     vision_model: str
     text_model: str
     embedding_model: str
+    models: list[dict[str, str]] = Field(default_factory=list)
 
 
 class DocumentOut(BaseModel):

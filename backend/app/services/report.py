@@ -50,7 +50,9 @@ def build_report(state: dict[str, Any]) -> dict[str, Any]:
         "evidence_count": len(evidence),
         "legal_basis": [
             {
+                "id": item.get("id", ""),
                 "source": item.get("source", "未标注来源"),
+                "article": item.get("article", ""),
                 "snippet": item.get("text", ""),
                 "version": item.get("version", ""),
                 "tags": item.get("tags", []),
@@ -63,4 +65,3 @@ def build_report(state: dict[str, Any]) -> dict[str, Any]:
         "work_order": work_order,
         "disclaimer": "本报告由 AI 辅助生成，仅供研判参考，需人工确认后使用。",
     }
-
