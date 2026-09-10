@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import re
 import time
 from typing import Any
@@ -21,6 +22,9 @@ from app.services.guardrail.input_guard import (
     GUARD_STATEMENT,
     build_external_text,
 )
+from app.core.logging import mask_secrets
+
+logger = logging.getLogger("safety_hazard.providers")
 
 VISION_PROMPT = (
     "你是基层安全隐患研判助手。请分析现场照片和文字描述，只输出 JSON，"
@@ -95,12 +99,15 @@ class OpenAICompatibleProvider(BaseProvider):
                 status = exc.response.status_code
                 if 400 <= status < 500 and status != 429:
                     self.last_retry_count = 0
+                    detail = mask_secrets(exc.response.text[:200])
+                    logger.warning("%s HTTP %s rejected: %s", self.name, status, detail)
                     raise ModelUnavailableError(
-                        f"{self.name} HTTP {status}: {exc.response.text[:200]}"
+                        f"{self.name} HTTP {status}: {detail}"
                     ) from exc
                 last_error = exc
             except httpx.TransportError as exc:
                 last_error = exc
+                logger.warning("%s transport error: %s", self.name, mask_secrets(str(exc)[:160]))
             if attempt < self.max_retries:
                 time.sleep(self.retry_backoff * (attempt + 1))
         if isinstance(last_error, httpx.TimeoutException):

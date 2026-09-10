@@ -1,0 +1,867 @@
+{
+  "dataset_version": "v1",
+  "title": "安全隐患多模态研判人工标注评测集",
+  "dataset_case_count": 30,
+  "source_type_counts": {
+    "curated": 30
+  },
+  "category_counts": {
+    "占用疏散通道": 9,
+    "消防器材失效": 6,
+    "电气线路隐患": 4,
+    "危险化学品存储不规范": 3,
+    "公共区域安全隐患": 3,
+    "野外用火风险": 5
+  },
+  "severity_counts": {
+    "1": 12,
+    "2": 16,
+    "3": 2
+  },
+  "scenario_breakdown": {
+    "消防": {
+      "total": 10,
+      "category_accuracy": 1.0,
+      "level_accuracy": 0.8,
+      "review_rate": 1.0,
+      "clause_hit_rate": 0.4
+    },
+    "生产安全": {
+      "total": 7,
+      "category_accuracy": 1.0,
+      "level_accuracy": 0.7143,
+      "review_rate": 1.0,
+      "clause_hit_rate": 0.2857
+    },
+    "社区": {
+      "total": 7,
+      "category_accuracy": 1.0,
+      "level_accuracy": 0.5714,
+      "review_rate": 1.0,
+      "clause_hit_rate": 0.5714
+    },
+    "林区": {
+      "total": 6,
+      "category_accuracy": 1.0,
+      "level_accuracy": 0.8333,
+      "review_rate": 1.0,
+      "clause_hit_rate": 0.3333
+    }
+  },
+  "evaluation_mode": "mock",
+  "evaluation_timestamp": "2026-09-10T12:20:32.254113+00:00",
+  "system_version": "eval-runner-3",
+  "total": 30,
+  "category_accuracy": 1.0,
+  "level_accuracy": 0.7333,
+  "severity_mae": 0.2667,
+  "level_accuracy_tolerance1": 1.0,
+  "clause_hit_rate": 0.4,
+  "evidence_hit_rate": 0.4,
+  "evidence_support_rate": 0.2667,
+  "unsupported_claim_rate": 0.7667,
+  "model_conflict_rate": 0.0,
+  "human_review_rate": 1.0,
+  "human_review_count": 30,
+  "unsafe_auto_pass_count": 0,
+  "unsafe_auto_pass_rate": 0.0,
+  "unsafe_hazard_base_count": 30,
+  "false_positive_count": 0,
+  "false_negative_count": 0,
+  "evidence_failure_count": 22,
+  "severity_error_count": 8,
+  "model_conflict_count": 0,
+  "avg_latency_s": 0.001,
+  "dataset_overview": {
+    "case_count": 30,
+    "dataset_version": "v1",
+    "source_type_counts": {
+      "curated": 30
+    },
+    "category_counts": {
+      "占用疏散通道": 9,
+      "消防器材失效": 6,
+      "电气线路隐患": 4,
+      "危险化学品存储不规范": 3,
+      "公共区域安全隐患": 3,
+      "野外用火风险": 5
+    },
+    "severity_counts": {
+      "1": 12,
+      "2": 16,
+      "3": 2
+    },
+    "scenario_counts": {
+      "林区": 6,
+      "消防": 10,
+      "生产安全": 7,
+      "社区": 7
+    },
+    "hazard_case_count": 30,
+    "safe_negative_case_count": 0,
+    "image_case_count": 0,
+    "evidence_labeled_count": 0,
+    "limitation_notes": [
+      "当前数据集缺少无隐患负样本，FP 与正确自动通过能力无法完整评估",
+      "当前数据集全部为文本场景，尚未验证真实图片输入链路",
+      "未标注 expected_evidence_supported，证据支持率按系统 Evidence Judge 结果统计"
+    ]
+  },
+  "model_family_performance": [
+    {
+      "family": "mock",
+      "attempts": 30,
+      "category_accuracy": 0.0,
+      "level_accuracy": 0.0
+    }
+  ],
+  "review_and_risk_stats": {
+    "high_risk_case_count": 18,
+    "risk_review_suggestion_count": 18,
+    "risk_review_suggestion_rate": 0.6,
+    "average_risk_score": 76.17
+  },
+  "evidence_stats_summary": {
+    "supported_count": 8,
+    "insufficient_count": 22,
+    "supported_rate": 0.2667,
+    "insufficient_rate": 0.7333
+  },
+  "ablation_study": {
+    "dataset_version": "v1",
+    "case_count": 30,
+    "provider_mode": "mock",
+    "evaluation_mode": "mock",
+    "source_type_counts": {
+      "curated": 30
+    },
+    "partitions": {
+      "curated": 30
+    },
+    "variants": {
+      "qwen": {
+        "label": "Qwen only",
+        "metrics": {
+          "total": 30,
+          "category_accuracy": 1.0,
+          "level_accuracy": 0.0,
+          "severity_mae": null,
+          "level_accuracy_tolerance1": 0.0,
+          "clause_hit_rate": 0.0,
+          "evidence_hit_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "unsupported_claim_rate": 1.0,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 1.0,
+          "human_review_count": 30,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_auto_pass_rate": 0.0,
+          "unsafe_hazard_base_count": 30,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "evidence_failure_count": 30,
+          "severity_error_count": 30,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.001
+        },
+        "mode": "mock"
+      },
+      "glm": {
+        "label": "GLM only",
+        "metrics": {
+          "total": 30,
+          "category_accuracy": 1.0,
+          "level_accuracy": 0.0,
+          "severity_mae": null,
+          "level_accuracy_tolerance1": 0.0,
+          "clause_hit_rate": 0.0,
+          "evidence_hit_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "unsupported_claim_rate": 1.0,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 1.0,
+          "human_review_count": 30,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_auto_pass_rate": 0.0,
+          "unsafe_hazard_base_count": 30,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "evidence_failure_count": 30,
+          "severity_error_count": 30,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.0
+        },
+        "mode": "mock"
+      },
+      "ensemble": {
+        "label": "Qwen+GLM",
+        "metrics": {
+          "total": 30,
+          "category_accuracy": 1.0,
+          "level_accuracy": 0.0,
+          "severity_mae": null,
+          "level_accuracy_tolerance1": 0.0,
+          "clause_hit_rate": 0.0,
+          "evidence_hit_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "unsupported_claim_rate": 1.0,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 1.0,
+          "human_review_count": 30,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_auto_pass_rate": 0.0,
+          "unsafe_hazard_base_count": 30,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "evidence_failure_count": 30,
+          "severity_error_count": 30,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.0
+        },
+        "mode": "mock"
+      },
+      "plus_risk": {
+        "label": "Qwen+GLM+Risk",
+        "metrics": {
+          "total": 30,
+          "category_accuracy": 1.0,
+          "level_accuracy": 0.7333,
+          "severity_mae": 0.2667,
+          "level_accuracy_tolerance1": 1.0,
+          "clause_hit_rate": 0.0,
+          "evidence_hit_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "unsupported_claim_rate": 1.0,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 1.0,
+          "human_review_count": 30,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_auto_pass_rate": 0.0,
+          "unsafe_hazard_base_count": 30,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "evidence_failure_count": 30,
+          "severity_error_count": 8,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.0
+        },
+        "mode": "mock"
+      },
+      "plus_rag": {
+        "label": "Qwen+GLM+Risk+RAG",
+        "metrics": {
+          "total": 30,
+          "category_accuracy": 1.0,
+          "level_accuracy": 0.7333,
+          "severity_mae": 0.2667,
+          "level_accuracy_tolerance1": 1.0,
+          "clause_hit_rate": 0.4,
+          "evidence_hit_rate": 0.4,
+          "evidence_support_rate": 0.2667,
+          "unsupported_claim_rate": 0.7667,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 1.0,
+          "human_review_count": 30,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_auto_pass_rate": 0.0,
+          "unsafe_hazard_base_count": 30,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "evidence_failure_count": 22,
+          "severity_error_count": 8,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.0
+        },
+        "mode": "mock"
+      },
+      "full": {
+        "label": "Full system",
+        "metrics": {
+          "total": 30,
+          "category_accuracy": 1.0,
+          "level_accuracy": 0.7333,
+          "severity_mae": 0.2667,
+          "level_accuracy_tolerance1": 1.0,
+          "clause_hit_rate": 0.4,
+          "evidence_hit_rate": 0.4,
+          "evidence_support_rate": 0.2667,
+          "unsupported_claim_rate": 0.7667,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 1.0,
+          "human_review_count": 30,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_auto_pass_rate": 0.0,
+          "unsafe_hazard_base_count": 30,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "evidence_failure_count": 22,
+          "severity_error_count": 8,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.001
+        },
+        "mode": "mock"
+      }
+    }
+  },
+  "error_summary": {
+    "counts": {
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 22,
+      "severity_error": 8
+    },
+    "total_error_occurrences": 30,
+    "cases_with_error": 25
+  },
+  "error_by_category": {
+    "占用疏散通道": {
+      "total": 9,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 4
+    },
+    "消防器材失效": {
+      "total": 6,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 6,
+      "severity_error": 0
+    },
+    "电气线路隐患": {
+      "total": 4,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 4,
+      "severity_error": 1
+    },
+    "危险化学品存储不规范": {
+      "total": 3,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 3,
+      "severity_error": 0
+    },
+    "公共区域安全隐患": {
+      "total": 3,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 3,
+      "severity_error": 2
+    },
+    "野外用火风险": {
+      "total": 5,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 5,
+      "severity_error": 1
+    }
+  },
+  "error_by_scenario": {
+    "消防": {
+      "total": 10,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 7,
+      "severity_error": 2
+    },
+    "生产安全": {
+      "total": 7,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 5,
+      "severity_error": 2
+    },
+    "社区": {
+      "total": 7,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 4,
+      "severity_error": 3
+    },
+    "林区": {
+      "total": 6,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 6,
+      "severity_error": 1
+    }
+  },
+  "error_analysis_count": 25,
+  "error_analysis": [
+    {
+      "case_id": "eval-fire-003",
+      "category": "占用疏散通道",
+      "scenario": "消防",
+      "expected": "占用疏散通道/2",
+      "predicted": "占用疏散通道/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-004",
+      "category": "占用疏散通道",
+      "scenario": "消防",
+      "expected": "占用疏散通道/2",
+      "predicted": "占用疏散通道/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure",
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：占用疏散通道"
+        },
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-005",
+      "category": "消防器材失效",
+      "scenario": "消防",
+      "expected": "消防器材失效/2",
+      "predicted": "消防器材失效/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“灭火器”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-006",
+      "category": "消防器材失效",
+      "scenario": "消防",
+      "expected": "消防器材失效/2",
+      "predicted": "消防器材失效/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“灭火器”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-007",
+      "category": "消防器材失效",
+      "scenario": "消防",
+      "expected": "消防器材失效/2",
+      "predicted": "消防器材失效/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“消防栓”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-008",
+      "category": "电气线路隐患",
+      "scenario": "消防",
+      "expected": "电气线路隐患/2",
+      "predicted": "电气线路隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-009",
+      "category": "电气线路隐患",
+      "scenario": "消防",
+      "expected": "电气线路隐患/2",
+      "predicted": "电气线路隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“配电箱”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-fire-010",
+      "category": "电气线路隐患",
+      "scenario": "消防",
+      "expected": "电气线路隐患/2",
+      "predicted": "电气线路隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“超负荷”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-factory-001",
+      "category": "危险化学品存储不规范",
+      "scenario": "生产安全",
+      "expected": "危险化学品存储不规范/1",
+      "predicted": "危险化学品存储不规范/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“危化品”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-factory-002",
+      "category": "危险化学品存储不规范",
+      "scenario": "生产安全",
+      "expected": "危险化学品存储不规范/1",
+      "predicted": "危险化学品存储不规范/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-factory-003",
+      "category": "危险化学品存储不规范",
+      "scenario": "生产安全",
+      "expected": "危险化学品存储不规范/1",
+      "predicted": "危险化学品存储不规范/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-factory-005",
+      "category": "占用疏散通道",
+      "scenario": "生产安全",
+      "expected": "占用疏散通道/2",
+      "predicted": "占用疏散通道/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-factory-006",
+      "category": "消防器材失效",
+      "scenario": "生产安全",
+      "expected": "消防器材失效/2",
+      "predicted": "消防器材失效/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“灭火器”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-factory-007",
+      "category": "公共区域安全隐患",
+      "scenario": "生产安全",
+      "expected": "公共区域安全隐患/3",
+      "predicted": "公共区域安全隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure",
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        },
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 3，预测 2）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-community-001",
+      "category": "电气线路隐患",
+      "scenario": "社区",
+      "expected": "电气线路隐患/2",
+      "predicted": "电气线路隐患/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure",
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“电表箱”缺少法规依据"
+        },
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-community-002",
+      "category": "消防器材失效",
+      "scenario": "社区",
+      "expected": "消防器材失效/2",
+      "predicted": "消防器材失效/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：消防器材失效"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-community-004",
+      "category": "公共区域安全隐患",
+      "scenario": "社区",
+      "expected": "公共区域安全隐患/2",
+      "predicted": "公共区域安全隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-community-005",
+      "category": "占用疏散通道",
+      "scenario": "社区",
+      "expected": "占用疏散通道/2",
+      "predicted": "占用疏散通道/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-community-006",
+      "category": "公共区域安全隐患",
+      "scenario": "社区",
+      "expected": "公共区域安全隐患/3",
+      "predicted": "公共区域安全隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure",
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        },
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 3，预测 2）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-forest-001",
+      "category": "野外用火风险",
+      "scenario": "林区",
+      "expected": "野外用火风险/1",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-forest-002",
+      "category": "野外用火风险",
+      "scenario": "林区",
+      "expected": "野外用火风险/1",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-forest-003",
+      "category": "野外用火风险",
+      "scenario": "林区",
+      "expected": "野外用火风险/1",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-forest-004",
+      "category": "野外用火风险",
+      "scenario": "林区",
+      "expected": "野外用火风险/2",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure",
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        },
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-forest-005",
+      "category": "野外用火风险",
+      "scenario": "林区",
+      "expected": "野外用火风险/1",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        }
+      ]
+    },
+    {
+      "case_id": "eval-forest-006",
+      "category": "消防器材失效",
+      "scenario": "林区",
+      "expected": "消防器材失效/2",
+      "predicted": "消防器材失效/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：消防器材失效"
+        }
+      ]
+    }
+  ],
+  "provider": "mock",
+  "variant": "F_full"
+}

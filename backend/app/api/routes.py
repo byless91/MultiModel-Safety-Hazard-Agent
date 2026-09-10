@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
@@ -43,12 +44,17 @@ from app.services.guardrail import (
 
 from app.models.entities import utcnow
 
-MAX_FILE_BYTES = 10 * 1024 * 1024
-MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+settings = get_settings()
+
+MAX_FILE_BYTES = settings.max_file_bytes
+MAX_DOCUMENT_BYTES = settings.max_document_bytes
 ALLOWED_DOCUMENT_SUFFIXES = {".txt", ".md"}
+ALLOWED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+UNSAFE_FILENAME_RE = re.compile(
+    r"(\.\./|\.\.\\|[/\\]{2}|[\x00-\x1f]|^[A-Za-z]:[\\/])"
+)
 
 router = APIRouter(prefix="/api/v1")
-settings = get_settings()
 
 
 def parse_json(text: str | None):
@@ -206,6 +212,25 @@ def _reject_uploaded_input(description: str, image_datas: list[bytes]) -> None:
     if errors:
         detail = "；".join(f"{item.code}: {item.message}" for item in errors)
         raise HTTPException(status_code=400, detail=detail)
+
+
+def _safe_filename(filename: str, *, allowed_suffixes: set[str], default: str) -> tuple[str, str]:
+    """Return (safe basename, suffix); raise 400 on traversal/odd filenames."""
+    raw = filename or ""
+    if not raw or raw in (".", ".."):
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+    if UNSAFE_FILENAME_RE.search(raw):
+        raise HTTPException(status_code=400, detail="文件名包含不安全字符或路径穿越")
+    name = Path(raw).name
+    if name in (".", ".."):
+        raise HTTPException(status_code=400, detail="文件名不能包含路径穿越")
+    suffix = Path(name).suffix.lower()
+    if suffix not in allowed_suffixes:
+        allowed = "、".join(sorted(allowed_suffixes))
+        raise HTTPException(status_code=400, detail=f"文件类型不支持，仅允许 {allowed}")
+    if not name.replace(suffix, "").strip():
+        raise HTTPException(status_code=400, detail="文件名不能只有扩展名")
+    return name, suffix
 
 
 def _parse_ocr_texts(raw: str) -> list[str]:
@@ -378,6 +403,51 @@ def provider_info() -> ProviderInfo:
     )
 
 
+def load_evaluation_reports(eval_dir: Path | None = None) -> dict | None:
+    """Load latest evaluation reports; None when nothing has been generated."""
+    eval_dir = eval_dir or (Path(__file__).resolve().parents[2] / "data" / "eval")
+    evaluation_report = eval_dir / "report.json"
+    ablation_report = eval_dir / "ablation_report.json"
+    evaluation_results = eval_dir / "results.jsonl"
+    ablation_results = eval_dir / "ablation_results.jsonl"
+
+    def _load_json(path: Path) -> dict | None:
+        if not path.exists():
+            return None
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _file_modified(path: Path) -> str | None:
+        if not path.exists():
+            return None
+        from datetime import datetime
+
+        return datetime.fromtimestamp(path.stat().st_mtime).isoformat()
+
+    payload = {
+        "evaluation_report": _load_json(evaluation_report),
+        "ablation_report": _load_json(ablation_report),
+        "evaluation_report_modified_at": _file_modified(evaluation_report),
+        "ablation_report_modified_at": _file_modified(ablation_report),
+        "has_trace_results": evaluation_results.exists() or ablation_results.exists(),
+        "source_dir": str(eval_dir),
+    }
+    if not payload["evaluation_report"] and not payload["ablation_report"]:
+        return None
+    return payload
+
+
+@router.get("/evaluation/reports")
+def evaluation_reports() -> dict:
+    """Serve the latest formal evaluation reports (read-only)."""
+    payload = load_evaluation_reports()
+    if payload is None:
+        raise HTTPException(status_code=404, detail="尚未生成评测报告，请先运行评测脚本")
+    return payload
+
+
 @router.post("/assessments", response_model=AssessmentOut, status_code=201)
 async def create_assessment(
     description: Annotated[str, Form()] = "",
@@ -408,7 +478,11 @@ async def create_assessment(
     upload_root.mkdir(parents=True, exist_ok=True)
     images: list[ImageInput] = []
     for upload, data in staged:
-        original_name = Path(upload.filename or "image.jpg").name
+        original_name, _suffix = _safe_filename(
+            upload.filename or "image.jpg",
+            allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
+            default="image.jpg",
+        )
         stored_name = f"{uuid4().hex}_{original_name}"
         target = upload_root / stored_name
         target.write_bytes(data)
@@ -554,7 +628,11 @@ async def submit_rectification(
     upload_root = settings.upload_dir / assessment_id
     upload_root.mkdir(parents=True, exist_ok=True)
     for upload, data in staged:
-        original_name = Path(upload.filename or "rectification.jpg").name
+        original_name, _suffix = _safe_filename(
+            upload.filename or "rectification.jpg",
+            allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
+            default="rectification.jpg",
+        )
         stored_name = f"rect_{uuid4().hex}_{original_name}"
         target = upload_root / stored_name
         target.write_bytes(data)
@@ -695,17 +773,19 @@ async def upload_knowledge_document(
     data = await file.read()
     if len(data) > MAX_DOCUMENT_BYTES:
         raise HTTPException(status_code=400, detail="文档不能超过 20MB")
-    suffix = Path(file.filename or "").suffix.lower()
-    if suffix not in ALLOWED_DOCUMENT_SUFFIXES:
-        raise HTTPException(status_code=400, detail="仅支持 .txt 或 .md 文本文件")
+    original_name, suffix = _safe_filename(
+        file.filename or "document.txt",
+        allowed_suffixes=ALLOWED_DOCUMENT_SUFFIXES,
+        default="document.txt",
+    )
     text = data.decode("utf-8", errors="ignore")
     _reject_text(text)
     doc = KnowledgeDocument(
-        title=title or Path(file.filename or "document.txt").name,
+        title=title or original_name,
         source=source,
         status="parsed",
         content_text=text.strip(),
-        meta_json=json.dumps({"filename": file.filename}, ensure_ascii=False),
+        meta_json=json.dumps({"filename": original_name}, ensure_ascii=False),
     )
     db.add(doc)
     db.commit()

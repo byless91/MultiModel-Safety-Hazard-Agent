@@ -10,6 +10,7 @@
           <router-link to="/" class="nav-link">现场研判</router-link>
           <router-link to="/history" class="nav-link">历史记录</router-link>
           <router-link to="/knowledge" class="nav-link">知识库</router-link>
+          <router-link to="/evaluation" class="nav-link">评测总览</router-link>
         </nav>
         <el-tag v-if="provider" size="small" :type="provider === 'mock' ? 'info' : 'success'">
           {{ provider === 'mock' ? 'Mock 演示模式' : '真实模型模式' }}

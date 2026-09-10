@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import evaluate as evaluate_pipeline
+from app.eval.metrics import compute_metrics, metric_definitions
 
 
 def _fabricated_result(
@@ -79,3 +80,64 @@ def test_build_markdown_contains_metrics_and_rows():
     assert "高风险复核率" in text
     assert "不安全自动通过率" in text
     assert "eval-001" in text
+
+
+def test_formal_metrics_compute_from_trace_flags():
+    results = [
+        {
+            "case": {
+                "case_id": "eval-trace-001",
+                "scenario": "消防",
+                "expected_category": "占用疏散通道",
+                "expected_level": 1,
+            },
+            "predicted_category": "占用疏散通道",
+            "predicted_level": 1,
+            "metric_flags": {
+                "category_match": True,
+                "level_match": True,
+                "level_tolerance": True,
+                "severity_mae": 0,
+                "clause_hit": True,
+                "evidence_support": True,
+                "evidence_failure": False,
+                "unsupported_claims": False,
+                "model_conflict": False,
+                "multi_model_configured": True,
+                "human_review": True,
+                "unsafe_auto_pass": False,
+                "false_positive": False,
+                "false_negative": False,
+                "severity_error": False,
+                "hazard_present_ground_truth": True,
+            },
+            "evidence": {"supported": True, "evidence_count": 2},
+            "status": "awaiting_human_review",
+            "latency_s": 0.1,
+        }
+    ]
+    metrics = compute_metrics(results)
+    assert metrics["category_accuracy"] == 1.0
+    assert metrics["level_accuracy"] == 1.0
+    assert metrics["severity_mae"] == 0.0
+    assert metrics["evidence_support_rate"] == 1.0
+    assert metrics["human_review_rate"] == 1.0
+    assert metrics["unsafe_auto_pass_rate"] == 0.0
+
+
+def test_metrics_empty_and_definitions():
+    assert compute_metrics([]) == {"total": 0}
+    definitions = metric_definitions()
+    for key in (
+        "category_accuracy",
+        "level_accuracy",
+        "severity_mae",
+        "level_accuracy_tolerance1",
+        "clause_hit_rate",
+        "evidence_support_rate",
+        "unsupported_claim_rate",
+        "model_conflict_rate",
+        "human_review_rate",
+        "unsafe_auto_pass_rate",
+    ):
+        assert key in definitions

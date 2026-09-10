@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     api_bearer_token: str = ""
     max_images: int = 3
     max_followups: int = 2
+    max_file_bytes: int = 10 * 1024 * 1024
+    max_document_bytes: int = 20 * 1024 * 1024
     conf_weights: str = "0.3,0.3,0.2,0.2"
 
     @property

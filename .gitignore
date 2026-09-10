@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-tmp*/
 .venv/
 *.egg-info/
 
@@ -18,6 +19,7 @@ backend/data/uploads/
 backend/data/faiss/
 backend/data/knowledge/chunks/
 backend/data/eval/
+backend/data/logs/
 
 # IDE / OS
 .idea/

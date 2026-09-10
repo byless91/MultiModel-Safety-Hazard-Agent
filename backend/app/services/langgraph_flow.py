@@ -403,14 +403,18 @@ def run_langgraph(
     ocr_texts: list[str] | None = None,
     settings: Any | None = None,
     rag: Any | None = None,
+    providers: list | None = None,
 ) -> dict[str, Any]:
     if settings is None:
         settings = get_settings()
-        provider = get_provider()
-        providers = get_providers()
-        rag = get_rag()
+        if providers is None:
+            providers = get_providers()
+        provider = providers[0]
+        if rag is None:
+            rag = get_rag()
     else:
-        providers = build_providers(settings)
+        if providers is None:
+            providers = build_providers(settings)
         provider = providers[0]
         if rag is None:
             rag = RAGService(settings, provider)

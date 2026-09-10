@@ -34,13 +34,13 @@ frontend/
 ```bash
 cd backend
 cp .env.example .env
-python -m pip install -e ".[faiss]"
-uvicorn app.main:app --reload --port 8000
+..\.venv\Scripts\python.exe -m pip install -e ".[faiss]"
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8001
 ```
 
 也可以不安装 faiss-cpu，只安装基础依赖：`python -m pip install -e backend`，系统会自动回退到 NumPy 检索。
 
-接口文档：`http://localhost:8000/docs`
+接口文档：`http://localhost:8001/docs`
 
 ### 前端
 

@@ -38,6 +38,7 @@ def run_workflow(
     ocr_texts: list[str] | None = None,
     settings: Any | None = None,
     rag: Any | None = None,
+    providers: list | None = None,
 ) -> dict[str, Any]:
     if HAS_LANGGRAPH:
         return run_langgraph(
@@ -48,6 +49,7 @@ def run_workflow(
             ocr_texts=ocr_texts,
             settings=settings,
             rag=rag,
+            providers=providers,
         )
     return run_functional(
         description,
@@ -57,6 +59,7 @@ def run_workflow(
         ocr_texts=ocr_texts,
         settings=settings,
         rag=rag,
+        providers=providers,
     )
 
 
@@ -69,14 +72,18 @@ def run_functional(
     ocr_texts: list[str] | None = None,
     settings: Any | None = None,
     rag: Any | None = None,
+    providers: list | None = None,
 ) -> dict[str, Any]:
     if settings is None:
         settings = get_settings()
-        provider = get_provider()
-        providers = get_providers()
-        rag = get_rag()
+        if providers is None:
+            providers = get_providers()
+        provider = providers[0]
+        if rag is None:
+            rag = get_rag()
     else:
-        providers = build_providers(settings)
+        if providers is None:
+            providers = build_providers(settings)
         provider = providers[0]
         if rag is None:
             rag = RAGService(settings, provider)

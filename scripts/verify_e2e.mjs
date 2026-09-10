@@ -45,6 +45,38 @@ try {
     checked.push(section)
   }
 
+  // Phase 12: evaluation overview page smoke assertions (must be lightweight
+  // and data-driven; no invented metric values are asserted).
+  await page.getByRole('link', { name: '评测总览' }).click()
+  await page.waitForURL(/\/evaluation$/, { timeout: 15000 })
+  await page.getByText('评测总览').first().waitFor({ timeout: 15000 })
+  await page.getByRole('button', { name: /刷新/ }).waitFor({ timeout: 15000 })
+
+  const metricLabels = [
+    '类别准确率',
+    '等级准确率',
+    'Severity MAE',
+    '±1 容差',
+    '证据支持率',
+    '无依据结论率',
+    '模型分歧率',
+    '人工复核率',
+    'Unsafe Auto-Pass',
+  ]
+  for (const label of metricLabels) {
+    await page.getByText(label, { exact: true }).first().waitFor({ timeout: 15000 })
+  }
+
+  for (const column of ['变体', '模式', 'Unsafe']) {
+    await page.getByText(column, { exact: true }).first().waitFor({ timeout: 15000 })
+  }
+  await page.getByText('消融对比（A-F）').first().waitFor({ timeout: 15000 })
+  await page.getByText('失败案例清单').first().waitFor({ timeout: 15000 })
+  await page.getByText('Dataset Overview').first().waitFor({ timeout: 15000 })
+
+  const modeText = await page.locator('.meta-strip').innerText()
+  const modeOk = /Mock 模式|真实模型模式/.test(modeText)
+
   console.log(
     JSON.stringify({
       status: 'pass',
@@ -52,6 +84,8 @@ try {
       result,
       checked_p1_sections: checked.length,
       sections: checked,
+      checked_evaluation_page: true,
+      evaluation_mode_label_ok: modeOk,
     }),
   )
 } finally {

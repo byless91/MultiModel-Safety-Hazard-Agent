@@ -313,3 +313,122 @@ export interface KnowledgeDocument {
 export interface KnowledgeDocumentDetail extends KnowledgeDocument {
   content: string
 }
+
+export interface EvaluationMetrics {
+  total: number
+  category_accuracy?: number | null
+  level_accuracy?: number | null
+  severity_mae?: number | null
+  level_accuracy_tolerance1?: number | null
+  clause_hit_rate?: number | null
+  evidence_hit_rate?: number | null
+  evidence_support_rate?: number | null
+  unsupported_claim_rate?: number | null
+  model_conflict_rate?: number | null
+  human_review_rate?: number | null
+  human_review_count?: number
+  unsafe_auto_pass_count?: number
+  unsafe_auto_pass_rate?: number | null
+  unsafe_hazard_base_count?: number
+  false_positive_count?: number
+  false_negative_count?: number
+  evidence_failure_count?: number
+  severity_error_count?: number
+  model_conflict_count?: number
+  avg_latency_s?: number | null
+}
+
+export interface EvaluationFailureCase {
+  case_id: string
+  scenario?: string
+  expected?: string
+  predicted?: string
+  status?: string
+  flags: string[]
+  reasons?: Array<{ type: string; reason: string }>
+}
+
+export interface AblationVariant {
+  label: string
+  mode?: string
+  metrics: EvaluationMetrics
+}
+
+export interface AblationReport {
+  dataset_version?: string
+  case_count?: number
+  provider_mode?: string
+  evaluation_mode?: string
+  source_type_counts?: Record<string, number>
+  partitions?: Record<string, number>
+  variants: Record<string, AblationVariant>
+}
+
+export interface EvaluationReport {
+  dataset_version?: string
+  title?: string
+  dataset_case_count?: number
+  source_type_counts?: Record<string, number>
+  category_counts?: Record<string, number>
+  severity_counts?: Record<string, number>
+  scenario_breakdown?: Record<
+    string,
+    {
+      total: number
+      category_accuracy: number
+      level_accuracy: number
+      clause_hit_rate: number
+      review_rate: number
+    }
+  >
+  dataset_overview?: {
+    case_count: number
+    source_type_counts: Record<string, number>
+    category_counts: Record<string, number>
+    severity_counts: Record<string, number>
+    scenario_counts: Record<string, number>
+    hazard_case_count: number
+    safe_negative_case_count: number
+    image_case_count: number
+    limitation_notes: string[]
+  }
+  model_family_performance?: Array<{
+    family: string
+    attempts: number
+    category_accuracy: number
+    level_accuracy: number
+  }>
+  evidence_stats_summary?: {
+    supported_count: number
+    insufficient_count: number
+    supported_rate: number
+    insufficient_rate: number
+  }
+  review_and_risk_stats?: {
+    high_risk_case_count: number
+    risk_review_suggestion_count: number
+    risk_review_suggestion_rate: number
+    average_risk_score: number
+  }
+  error_summary?: {
+    counts: Record<string, number>
+    total_error_occurrences: number
+    cases_with_error: number
+  }
+  error_analysis?: EvaluationFailureCase[]
+  ablation_study?: AblationReport | null
+  evaluation_mode?: string
+  evaluation_timestamp?: string
+  provider?: string
+  variant?: string
+  metrics: EvaluationMetrics
+}
+
+export interface EvaluationReportsPayload {
+  evaluation_report: EvaluationReport | null
+  ablation_report: AblationReport | null
+  evaluation_report_modified_at?: string | null
+  ablation_report_modified_at?: string | null
+  has_trace_results?: boolean
+  source_dir?: string
+}
