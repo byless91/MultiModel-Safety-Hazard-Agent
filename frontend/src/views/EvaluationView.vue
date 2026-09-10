@@ -206,7 +206,15 @@ const payload = ref<EvaluationReportsPayload | null>(null)
 
 const report = computed<EvaluationReport | null>(() => payload.value?.evaluation_report ?? null)
 const ablation = computed<AblationReport | null>(() => payload.value?.ablation_report ?? null)
-const m = computed<EvaluationMetrics>(() => report.value?.metrics || { total: 0 })
+const m = computed<EvaluationMetrics>(() => {
+  const current = report.value
+  if (!current) return { total: 0 }
+  if (current.metrics && Object.keys(current.metrics).length > 0) {
+    return current.metrics
+  }
+  // 兼容旧的 report.json：指标位于顶层。
+  return current as unknown as EvaluationMetrics
+})
 const ablationVariants = computed(() =>
   Object.entries(ablation.value?.variants || {}).map(([key, item]) => ({ key, ...item })),
 )

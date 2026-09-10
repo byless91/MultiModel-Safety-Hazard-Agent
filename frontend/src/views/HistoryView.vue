@@ -6,10 +6,10 @@
     <el-card v-loading="store.loading">
       <div class="toolbar">
         <el-select v-model="statusFilter" placeholder="按状态筛选" clearable style="width: 200px">
-          <el-option label="已完成" value="completed" />
-          <el-option label="待复核" value="needs_review" />
-          <el-option label="待补充" value="needs_more_info" />
-          <el-option label="待人工复核" value="awaiting_human_review" />
+          <el-option label="自动完成" value="completed" />
+          <el-option label="需要重新研判" value="needs_review" />
+          <el-option label="需要补充信息" value="needs_more_info" />
+          <el-option label="需要人工复核" value="awaiting_human_review" />
           <el-option label="已确认" value="confirmed" />
         </el-select>
         <el-button type="primary" plain @click="load">
@@ -26,7 +26,7 @@
         <el-table-column prop="hazard_category" label="隐患类别" min-width="150" />
         <el-table-column label="等级" width="90" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.risk_level" :type="levelType(row.risk_level)">L{{ row.risk_level }}</el-tag>
+            <el-tag v-if="row.risk_level" :type="levelType(row.risk_level)">{{ levelLabel(row.risk_level) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="置信度" width="100" align="center">
@@ -87,6 +87,12 @@ function levelType(level: number) {
   return level === 1 ? 'danger' : level === 2 ? 'warning' : 'success'
 }
 
+function levelLabel(level: number) {
+  if (level === 1) return '高风险'
+  if (level === 2) return '中风险'
+  return '较低风险'
+}
+
 function statusType(status: string) {
   if (status === 'completed') return 'success'
   if (status === 'confirmed') return 'primary'
@@ -98,11 +104,11 @@ function statusType(status: string) {
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
-    completed: '已完成',
+    completed: '自动完成',
     confirmed: '已确认',
-    needs_review: '待复核',
-    awaiting_human_review: '待人工复核',
-    needs_more_info: '待补充',
+    needs_review: '需要重新研判',
+    awaiting_human_review: '需要人工复核',
+    needs_more_info: '需要补充信息',
     processing: '处理中',
   }
   return labels[status] || status

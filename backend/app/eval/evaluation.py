@@ -769,6 +769,7 @@ def build_evaluation_report(
         "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
         "system_version": "eval-runner-3",
         **metrics,
+        "metrics": metrics,
         "dataset_overview": overview,
         "model_family_performance": model_family_performance,
         "review_and_risk_stats": review_and_risk,

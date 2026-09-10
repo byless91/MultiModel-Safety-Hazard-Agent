@@ -256,8 +256,12 @@ def _reject_ocr_texts(ocr_texts: list[str]) -> None:
         raise HTTPException(status_code=400, detail=detail)
 
 
-def _reject_text(text: str) -> None:
-    errors = [item for item in inspect_text(text or "") if item.severity == "error"]
+def _reject_text(text: str, *, max_length: int | None = None) -> None:
+    errors = [
+        item
+        for item in inspect_text(text or "", max_length=max_length)
+        if item.severity == "error"
+    ]
     if errors:
         detail = "；".join(f"{item.code}: {item.message}" for item in errors)
         raise HTTPException(status_code=400, detail=detail)
@@ -426,8 +430,36 @@ def load_evaluation_reports(eval_dir: Path | None = None) -> dict | None:
 
         return datetime.fromtimestamp(path.stat().st_mtime).isoformat()
 
+    evaluation_payload = _load_json(evaluation_report)
+    if isinstance(evaluation_payload, dict) and not evaluation_payload.get("metrics"):
+        metric_keys = [
+            "total",
+            "category_accuracy",
+            "level_accuracy",
+            "severity_mae",
+            "level_accuracy_tolerance1",
+            "clause_hit_rate",
+            "evidence_hit_rate",
+            "evidence_support_rate",
+            "unsupported_claim_rate",
+            "model_conflict_rate",
+            "human_review_rate",
+            "human_review_count",
+            "unsafe_auto_pass_count",
+            "unsafe_auto_pass_rate",
+            "unsafe_hazard_base_count",
+            "false_positive_count",
+            "false_negative_count",
+            "evidence_failure_count",
+            "severity_error_count",
+            "model_conflict_count",
+            "avg_latency_s",
+        ]
+        evaluation_payload["metrics"] = {
+            key: evaluation_payload.get(key) for key in metric_keys
+        }
     payload = {
-        "evaluation_report": _load_json(evaluation_report),
+        "evaluation_report": evaluation_payload,
         "ablation_report": _load_json(ablation_report),
         "evaluation_report_modified_at": _file_modified(evaluation_report),
         "ablation_report_modified_at": _file_modified(ablation_report),
@@ -779,7 +811,9 @@ async def upload_knowledge_document(
         default="document.txt",
     )
     text = data.decode("utf-8", errors="ignore")
-    _reject_text(text)
+    # 知识库文档只做注入防护，不套用用户描述的 2000 字限制；
+    # 文件大小上限由 MAX_DOCUMENT_BYTES 控制。
+    _reject_text(text, max_length=None)
     doc = KnowledgeDocument(
         title=title or original_name,
         source=source,

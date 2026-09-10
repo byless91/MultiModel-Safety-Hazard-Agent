@@ -27,6 +27,10 @@ def test_evaluation_reports_endpoint_returns_structured_payload():
     assert data["evaluation_report"] is not None or data["ablation_report"] is not None
     assert "evaluation_report_modified_at" in data
     assert "has_trace_results" in data
+    if data["evaluation_report"]:
+        nested = data["evaluation_report"].get("metrics") or {}
+        assert "category_accuracy" in nested
+        assert "unsafe_auto_pass_rate" in nested
 
 
 def test_evaluation_reports_404_when_not_generated(monkeypatch):
@@ -192,6 +196,19 @@ def test_upload_knowledge_document_triggers_rebuild(monkeypatch):
     data = response.json()
     assert data["status"] == "indexed"
     assert calls["rebuild"] == 1
+
+
+def test_upload_long_knowledge_document_accepted():
+    long_text = "第二十八条 任何单位、个人不得损坏消防设施、器材。\n" * 500
+    assert len(long_text) > 5000
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/knowledge/documents",
+            data={"title": "消防法长文档"},
+            files=[("file", ("long_law.md", long_text.encode("utf-8"), "text/markdown"))],
+        )
+    assert response.status_code == 201
+    assert response.json()["status"] in ("indexed", "index_error")
 
 
 def test_delete_knowledge_document_triggers_rebuild(monkeypatch):

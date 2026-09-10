@@ -351,7 +351,7 @@ export interface EvaluationFailureCase {
 export interface AblationVariant {
   label: string
   mode?: string
-  metrics: EvaluationMetrics
+  metrics?: EvaluationMetrics
 }
 
 export interface AblationReport {

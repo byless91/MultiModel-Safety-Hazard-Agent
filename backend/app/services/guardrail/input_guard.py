@@ -57,16 +57,21 @@ class InputGuardResult(BaseModel):
     ocr_suspicious: bool = False
 
 
-def inspect_text(text: str, *, source: str = "user_input") -> list[GuardViolation]:
+def inspect_text(
+    text: str,
+    *,
+    source: str = "user_input",
+    max_length: int | None = MAX_DESCRIPTION_LENGTH,
+) -> list[GuardViolation]:
     violations: list[GuardViolation] = []
     if text is None:
         text = ""
-    if len(text) > MAX_DESCRIPTION_LENGTH:
+    if max_length is not None and len(text) > max_length:
         violations.append(
             GuardViolation(
                 code="text_too_long",
                 severity="error",
-                message=f"文本长度超过 {MAX_DESCRIPTION_LENGTH} 字符",
+                message=f"文本长度超过 {max_length} 字符",
                 source=source,
             )
         )

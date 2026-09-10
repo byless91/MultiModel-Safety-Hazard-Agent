@@ -50,6 +50,31 @@
         </div>
       </div>
 
+      <div class="plain-summary" :class="`plain-${assessment.status}`">
+        <div class="plain-summary-title">
+          <el-icon><InfoFilled /></el-icon>
+          结果怎么理解
+        </div>
+        <div class="plain-summary-grid">
+          <div class="plain-item">
+            <span class="plain-label">风险等级</span>
+            <span class="plain-value">{{ riskDesc }}</span>
+          </div>
+          <div class="plain-item">
+            <span class="plain-label">AI 把握程度</span>
+            <span class="plain-value">{{ confidenceText }}</span>
+          </div>
+          <div class="plain-item">
+            <span class="plain-label">法规依据</span>
+            <span class="plain-value">{{ evidenceText }}</span>
+          </div>
+          <div class="plain-item">
+            <span class="plain-label">下一步</span>
+            <span class="plain-value next-step">{{ nextStepText }}</span>
+          </div>
+        </div>
+      </div>
+
       <el-alert
         v-if="assessment.status === 'needs_review'"
         title="该结果需要人工复核"
@@ -624,6 +649,40 @@ const levelColor = computed(() => {
   return level === 1 ? '#dc2626' : level === 2 ? '#d97706' : '#16a34a'
 })
 
+const riskDesc = computed(() => {
+  const level = props.assessment.risk_level || 3
+  if (level === 1) return '高风险 · 应立即处置'
+  if (level === 2) return '中风险 · 尽快整改'
+  return '较低风险 · 建议改进'
+})
+
+const confidenceText = computed(() => {
+  const value = props.assessment.confidence
+  if (value === undefined || value === null) return '暂时无法判断'
+  const percent = Math.round(value * 100)
+  if (value >= 0.8) return `AI 把握较高（${percent}%）`
+  if (value >= 0.6) return `AI 把握一般（${percent}%）`
+  return `AI 把握较低（${percent}%），请以现场为准`
+})
+
+const evidenceText = computed(() => {
+  const judge = props.assessment.evidence_judge
+  if (judge && judge.supported) return '找到法规依据，可支撑结论'
+  if (judge && judge.unsupported_claims?.length) return '法规依据不足，需现场核实'
+  if (props.assessment.evidence.length) return '已列出参考资料，请结合现场判断'
+  return '暂无参考资料，需现场核实'
+})
+
+const nextStepText = computed(() => {
+  const status = props.assessment.status
+  if (status === 'confirmed') return '结果已确认，可据此开展整改'
+  if (status === 'awaiting_human_review' || status === 'needs_review') {
+    return '请工作人员现场复核后再定稿'
+  }
+  if (status === 'needs_more_info') return '请补充现场信息后继续研判'
+  return '建议再次现场核实后使用'
+})
+
 const humanReviewVisible = computed(
   () =>
     Boolean(
@@ -720,6 +779,56 @@ async function onRecompare() {
   gap: 16px;
   align-items: flex-start;
   margin-bottom: 16px;
+}
+
+.plain-summary {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.plain-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.plain-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px 16px;
+}
+
+.plain-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plain-label {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.plain-value {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.plain-value.next-step {
+  color: #155e75;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .plain-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .result-title {
