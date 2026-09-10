@@ -19,8 +19,18 @@ from app.services.ensemble import (
 )
 from app.services.ensemble.categories import rag_tags_for_category
 from app.services.evidence_refine import refine_with_evidence
-from app.services.providers import MockProvider, get_provider, get_providers
-from app.services.rag import build_evidence_context, get_rag, retrieval_as_evidence
+from app.services.providers import (
+    MockProvider,
+    build_providers,
+    get_provider,
+    get_providers,
+)
+from app.services.rag import (
+    RAGService,
+    build_evidence_context,
+    get_rag,
+    retrieval_as_evidence,
+)
 from app.services.report import build_report
 from app.services.risk_engine import apply_risk_to_judge, score_findings
 
@@ -86,6 +96,8 @@ def node_analyze(state: WorkflowState) -> dict[str, Any]:
         providers = state.get("providers") or [state["provider"]]
         rag = state["rag"]
         pre_evidence = rag.search(state["description"], top_k=3) if rag.texts else []
+        if not state["settings"].enable_evidence_rag:
+            pre_evidence = []
         rag_context = [item["text"] for item in pre_evidence]
         multi = run_parallel_analysis(
             providers,
@@ -185,6 +197,8 @@ def _keyword_overlap(query: str, texts: list[str]) -> float:
 
 
 def node_retrieve(state: WorkflowState) -> dict[str, Any]:
+    if not state["settings"].enable_evidence_rag:
+        return {"retrieval": [], "retrieval_conf": 0.0}
     query = f"{state['description']}\n{state['scene_summary']}"
     rule = state.get("rule", {}) or {}
     hint = state.get("hazard_hints") or []
@@ -248,26 +262,30 @@ def node_judge(state: WorkflowState) -> dict[str, Any]:
         else "待进一步确认"
     )
     scene_text = f"{state['description']}\n{state.get('scene_summary', '')}"
-    risk_result = score_findings(
-        preliminary.final_findings,
-        scene_text=scene_text,
-        observations=(state.get("analysis") or {}).get("observations", []),
-        severity_hint=preliminary.final_severity,
-        evidence_texts=[item.get("text", "") for item in evidence],
-    )
+    if state["settings"].enable_risk_engine:
+        risk_result = score_findings(
+            preliminary.final_findings,
+            scene_text=scene_text,
+            observations=(state.get("analysis") or {}).get("observations", []),
+            severity_hint=preliminary.final_severity,
+            evidence_texts=[item.get("text", "") for item in evidence],
+        )
+    else:
+        risk_result = None
     ensemble_judge = judge_ensemble(
         standardized,
         disagreement,
         risk_result=risk_result,
         evidence=evidence,
     )
-    apply_risk_to_judge(ensemble_judge, risk_result)
+    if risk_result is not None:
+        apply_risk_to_judge(ensemble_judge, risk_result)
     return {
         "hazard_category": category,
-        "risk_level": risk_result.operational_level,
+        "risk_level": risk_result.operational_level if risk_result else None,
         "confidence": confidence,
         "ensemble_judge": ensemble_judge.model_dump(),
-        "risk_result": risk_result.model_dump(),
+        "risk_result": risk_result.model_dump() if risk_result else None,
     }
 
 
@@ -383,8 +401,19 @@ def run_langgraph(
     followup_used: int = 0,
     *,
     ocr_texts: list[str] | None = None,
+    settings: Any | None = None,
+    rag: Any | None = None,
 ) -> dict[str, Any]:
-    settings = get_settings()
+    if settings is None:
+        settings = get_settings()
+        provider = get_provider()
+        providers = get_providers()
+        rag = get_rag()
+    else:
+        providers = build_providers(settings)
+        provider = providers[0]
+        if rag is None:
+            rag = RAGService(settings, provider)
     initial_state: WorkflowState = {
         "description": description,
         "ocr_texts": ocr_texts or [],
@@ -392,9 +421,9 @@ def run_langgraph(
         "followup_answer": followup_answer,
         "followup_used": followup_used,
         "settings": settings,
-        "provider": get_provider(),
-        "providers": get_providers(),
-        "rag": get_rag(),
+        "provider": provider,
+        "providers": providers,
+        "rag": rag,
     }
     if followup_answer:
         initial_state["description"] = f"{description}\n补充信息：{followup_answer}"

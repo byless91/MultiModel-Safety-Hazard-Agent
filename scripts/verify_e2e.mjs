@@ -26,10 +26,34 @@ try {
   await page.getByRole('button', { name: /开始研判/ }).click()
 
   await page.getByText('占用疏散通道').first().waitFor({ timeout: 30000 })
-  await page.getByText('参考依据').first().waitFor({ timeout: 10000 })
 
   const result = await page.locator('.result-title').innerText()
-  console.log(JSON.stringify({ status: 'pass', base: BASE, result }))
+
+  const sections = [
+    '模型 A/B 对比',
+    '分歧可视化',
+    '风险引擎判定与解释',
+    '法规证据',
+    '证据链',
+    '隐患定位（可选 Bounding Box）',
+    '人工复核',
+    '整改回传',
+  ]
+  const checked = []
+  for (const section of sections) {
+    await page.getByText(section).first().waitFor({ timeout: 15000 })
+    checked.push(section)
+  }
+
+  console.log(
+    JSON.stringify({
+      status: 'pass',
+      base: BASE,
+      result,
+      checked_p1_sections: checked.length,
+      sections: checked,
+    }),
+  )
 } finally {
   await browser.close()
 }

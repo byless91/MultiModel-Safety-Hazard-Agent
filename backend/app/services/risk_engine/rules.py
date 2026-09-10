@@ -87,3 +87,11 @@ IMMEDIATE_DANGER_KEYWORDS = [
 
 LOW_BAND = 40
 HIGH_BAND = 70
+
+RULE_WEIGHTS = {
+    "exposure": 0.30,
+    "hazard_source": 0.25,
+    "consequence": 0.20,
+    "violation": 0.15,
+    "severity_factor": 0.10,
+}

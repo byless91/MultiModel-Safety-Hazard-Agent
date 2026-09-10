@@ -10,6 +10,7 @@ class ImageOut(BaseModel):
     mime_type: str | None = None
     size_bytes: int
     image_kind: str = "original"
+    created_at: datetime
     url: str | None = None
 
     model_config = {"from_attributes": True}
@@ -26,6 +27,8 @@ class AssessmentOut(BaseModel):
     conclusion: str | None = None
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     evidence_judge: dict[str, Any] | None = None
+    multi_model: dict[str, Any] | None = None
+    disagreement: dict[str, Any] | None = None
     findings: list[dict[str, Any]] = Field(default_factory=list)
     report: dict[str, Any] | None = None
     followup_questions: list[str] = Field(default_factory=list)
@@ -35,6 +38,8 @@ class AssessmentOut(BaseModel):
     rectification_note: str | None = None
     rectification_score: float | None = None
     rectification_analysis: dict[str, Any] | None = None
+    rectification_meta: dict[str, Any] | None = None
+    rectification_next_states: list[str] = Field(default_factory=list)
     rectified_at: datetime | None = None
     review_reasons: list[str] = Field(default_factory=list)
     awaiting_human_review: bool = False
@@ -56,11 +61,19 @@ class AssessmentOut(BaseModel):
 class ConfirmIn(BaseModel):
     confirmed: bool = True
     edits: dict[str, Any] = Field(default_factory=dict)
+    reviewer: str | None = None
+    note: str | None = None
 
 
 class RectificationConfirmIn(BaseModel):
     resolved: bool = True
     note: str | None = None
+
+
+class RectificationTransitionIn(BaseModel):
+    to_status: str
+    note: str | None = None
+    by: str | None = None
 
 
 class FollowupIn(BaseModel):
@@ -71,6 +84,7 @@ class HealthOut(BaseModel):
     status: str
     provider: str
     rag_loaded: bool
+    reranker_enabled: bool = True
     version: str
 
 

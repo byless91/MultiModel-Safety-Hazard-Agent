@@ -8,6 +8,7 @@ class RiskAssessment(BaseModel):
     risk_level: str
     operational_level: int = Field(ge=1, le=3)
     factor_scores: dict[str, int] = Field(default_factory=dict)
+    rule_weights: dict[str, float] = Field(default_factory=dict)
     severity_hint: int | None = Field(default=None, ge=1, le=3)
     rule_version: str
     evidence_used: list[str] = Field(default_factory=list)

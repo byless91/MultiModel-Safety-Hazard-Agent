@@ -170,7 +170,8 @@ cd backend
 ## 已知缺口（P1/P2 或安全残余风险）
 
 - Prompt Injection 无法声称“彻底解决”，当前依靠数据标签 + 注入检测 + 强制人工复核兜底
-- Reranker、消融实验、Unsafe Auto-Pass Rate、真实评测集放大未做
-- 前端暂无独立 Model Comparison / AI Trace 视图
-- 整改闭环只有 `under_review / resolved`，未展开完整状态机
+- Reranker 已实现（词面/元数据规则重排，`RERANKER_ENABLED` 可选；30 条评测中命中率无可测量提升，故保留开关不强制）
+- 评测管线已支持场景细分、高风险复核率、Unsafe Auto-Pass Rate、`--limit` 与 `report.md` 人工可读报告；消融评测已支持 A-F 六变体（模型组合/风险引擎/RAG 可开关）并输出 `ablation_report.md`；真实评测集放大仍待做
+- 前端已有证据链面板（视觉事实→模型交叉→风险→法规→判定）、模型 A/B 对比（含失败/降级/单模型标记）、分歧可视化（一致性仪表、逐类对比、冲突标记）、风险引擎解释面板（因子权重、触发规则、证据使用）、法规证据面板（来源/条款/版本/采用状态）与可选 bbox 隐患定位（仅绘制可靠坐标，缺失时明确不绘制）；AI Trace 视图仍未做
+- 整改闭环已实现六态状态机、前后照片成对对比与独立 AI 完成度规则评估（`rectification-assessment-v1`）；未经历人工确认（`verified`）不能关闭，研判确认接口记录复核人/意见/时间
 - Docker、正式 trace 接口、README 与真实评测结果同步未完成

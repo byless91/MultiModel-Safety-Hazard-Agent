@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -19,10 +19,20 @@ from app.schemas.assessment import (
     HealthOut,
     ProviderInfo,
     RectificationConfirmIn,
+    RectificationTransitionIn,
 )
 from app.services.providers import ImageInput, get_provider, get_providers
 from app.services.rag import get_rag
 from app.services.knowledge import rebuild_knowledge
+from app.services.rectification import (
+    RectificationTransitionError,
+    next_rectification_states,
+    normalize_rectification_status,
+    rectification_state_label,
+    submit_rectification_photos,
+    transition_rectification,
+)
+from app.services.rectification_assessment import assess_rectification_completion
 from app.services.workflow import run_workflow
 from app.services.guardrail import (
     detect_image_type,
@@ -61,6 +71,7 @@ def to_out(item: Assessment) -> AssessmentOut:
     risk = parse_json(item.risk_result_json) or {}
     evidence_judge = parse_json(item.evidence_judge_json)
     ensemble_judge = parse_json(item.ensemble_judge_json) or {}
+    rect_status = normalize_rectification_status(item.rectification_status)
     return AssessmentOut(
         id=item.id,
         description=item.description,
@@ -72,15 +83,19 @@ def to_out(item: Assessment) -> AssessmentOut:
         conclusion=item.conclusion,
         evidence=parse_json(item.evidence_json) or [],
         evidence_judge=evidence_judge,
+        multi_model=parse_json(item.multi_model_json),
+        disagreement=parse_json(item.disagreement_json),
         findings=ensemble_judge.get("final_findings") or [],
         report=parse_json(item.report_json),
         followup_questions=parse_json(item.followup_questions_json) or [],
         followup_used=item.followup_used,
         confirmed=item.confirmed,
-        rectification_status=item.rectification_status,
+        rectification_status=rect_status,
         rectification_note=item.rectification_note,
         rectification_score=item.rectification_score,
         rectification_analysis=parse_json(item.rectification_analysis_json),
+        rectification_meta=parse_json(item.rectification_meta_json),
+        rectification_next_states=next_rectification_states(rect_status),
         rectified_at=item.rectified_at,
         review_reasons=parse_json(item.review_reasons_json) or [],
         awaiting_human_review=item.status == "awaiting_human_review",
@@ -103,9 +118,16 @@ def to_out(item: Assessment) -> AssessmentOut:
                 "mime_type": image.mime_type,
                 "size_bytes": image.size_bytes,
                 "image_kind": image.image_kind or "original",
+                "created_at": image.created_at,
                 "url": image_url(image),
             }
-            for image in item.images
+            for image in sorted(
+                item.images,
+                key=lambda img: (
+                    img.created_at.isoformat() if img.created_at else "",
+                    img.id,
+                ),
+            )
         ],
     )
 
@@ -118,6 +140,7 @@ def images_from_db(
     query = select(AssessmentImage).where(AssessmentImage.assessment_id == assessment_id)
     if kind:
         query = query.where(AssessmentImage.image_kind == kind)
+    query = query.order_by(AssessmentImage.created_at, AssessmentImage.id)
     rows = db.scalars(query).all()
     images = []
     for row in rows:
@@ -160,6 +183,16 @@ def _apply_state(assessment: Assessment, state: dict, db: Session) -> None:
     assessment.ensemble_judge_json = (
         json.dumps(state.get("ensemble_judge"), ensure_ascii=False)
         if state.get("ensemble_judge")
+        else None
+    )
+    assessment.multi_model_json = (
+        json.dumps(state.get("multi_model"), ensure_ascii=False)
+        if state.get("multi_model")
+        else None
+    )
+    assessment.disagreement_json = (
+        json.dumps(state.get("disagreement"), ensure_ascii=False)
+        if state.get("disagreement")
         else None
     )
     assessment.followup_questions_json = json.dumps(
@@ -205,10 +238,92 @@ def _reject_text(text: str) -> None:
         raise HTTPException(status_code=400, detail=detail)
 
 
+def _image_row_url(row: AssessmentImage) -> str | None:
+    try:
+        relative = Path(row.stored_path).relative_to(settings.upload_dir)
+        return f"/uploads/{relative.as_posix()}"
+    except ValueError:
+        return None
+
+
+def _rectification_image_rows(
+    db: Session,
+    assessment_id: str,
+    kind: str,
+) -> list[AssessmentImage]:
+    query = (
+        select(AssessmentImage)
+        .where(
+            AssessmentImage.assessment_id == assessment_id,
+            AssessmentImage.image_kind == kind,
+        )
+        .order_by(AssessmentImage.created_at, AssessmentImage.id)
+    )
+    return list(db.scalars(query).all())
+
+
+def _comparison_meta(
+    original_rows: list[AssessmentImage],
+    rectification_rows: list[AssessmentImage],
+) -> dict[str, Any]:
+    pair_count = min(len(original_rows), len(rectification_rows))
+    return {
+        "original_count": len(original_rows),
+        "rectification_count": len(rectification_rows),
+        "pair_count": pair_count,
+        "unmatched_original_count": len(original_rows) - pair_count,
+        "unmatched_rectification_count": len(rectification_rows) - pair_count,
+        "paired": [
+            {
+                "index": index,
+                "original_id": original_rows[index].id,
+                "rectification_id": rectification_rows[index].id,
+                "original_url": _image_row_url(original_rows[index]),
+                "rectification_url": _image_row_url(rectification_rows[index]),
+            }
+            for index in range(pair_count)
+        ],
+    }
+
+
 def _run_rectification_compare(item: Assessment, db: Session) -> None:
     provider = get_provider()
-    originals = images_from_db(db, item.id, kind="original")
-    rectifications = images_from_db(db, item.id, kind="rectification")
+    original_rows = _rectification_image_rows(db, item.id, "original")
+    rectification_rows = _rectification_image_rows(db, item.id, "rectification")
+    originals = [
+        ImageInput(
+            filename=row.filename,
+            path=Path(row.stored_path),
+            mime_type=row.mime_type,
+        )
+        for row in original_rows
+        if Path(row.stored_path).exists()
+    ]
+    rectifications = [
+        ImageInput(
+            filename=row.filename,
+            path=Path(row.stored_path),
+            mime_type=row.mime_type,
+        )
+        for row in rectification_rows
+        if Path(row.stored_path).exists()
+    ]
+    comparison = _comparison_meta(original_rows, rectification_rows)
+    if not rectifications:
+        item.rectification_score = None
+        assessment = assess_rectification_completion(
+            comparison=comparison
+        )
+        item.rectification_analysis_json = json.dumps(
+            {
+                "summary": "暂无整改后照片，无法进行前后对比。",
+                "issues": ["需要至少上传一张整改后照片"],
+                "comparison": comparison,
+                "assessment": assessment.model_dump(),
+            },
+            ensure_ascii=False,
+        )
+        return
     try:
         result = provider.compare(
             originals,
@@ -222,13 +337,20 @@ def _run_rectification_compare(item: Assessment, db: Session) -> None:
     except Exception as exc:
         result = {
             "summary": f"AI 比对暂不可用：{str(exc)[:120]}",
-            "issues": [],
+            "issues": ["AI 前后对比服务暂不可用"],
         }
         score = None
+    if not originals:
+        result.setdefault("issues", []).append("缺少整改前照片，AI 前后对比置信度受限")
+    result["comparison"] = comparison
+    assessment = assess_rectification_completion(
+        provider_result=result if score is not None else None,
+        comparison=comparison,
+        provider_failed=score is None,
+    )
+    result["assessment"] = assessment.model_dump()
     item.rectification_score = score
     item.rectification_analysis_json = json.dumps(result, ensure_ascii=False)
-    if score is not None:
-        item.rectification_status = "resolved" if score >= 0.8 else "under_review"
 
 
 @router.get("/health", response_model=HealthOut)
@@ -238,6 +360,7 @@ def health() -> HealthOut:
         status="ok",
         provider=get_provider().name,
         rag_loaded=len(rag.texts) > 0,
+        reranker_enabled=rag.reranker_enabled,
         version="0.1.0",
     )
 
@@ -388,6 +511,15 @@ def confirm_assessment(
     if edits.get("conclusion"):
         item.conclusion = str(edits["conclusion"])
     item.status = "confirmed" if payload.confirmed else "needs_review"
+    human_review = parse_json(item.human_review_json) or {}
+    human_review["resolution"] = {
+        "confirmed": payload.confirmed,
+        "reviewer": payload.reviewer or "",
+        "note": payload.note or "",
+        "edits": payload.edits or {},
+        "resolved_at": utcnow().isoformat(),
+    }
+    item.human_review_json = json.dumps(human_review, ensure_ascii=False)
     db.commit()
     db.refresh(item)
     return to_out(item)
@@ -403,12 +535,20 @@ async def submit_rectification(
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
+    current_status = normalize_rectification_status(item.rectification_status)
+    if current_status not in ("open", "assigned", "rectifying"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"当前整改状态为“{rectification_state_label(current_status)}”，不允许提交整改照片",
+        )
     staged: list[tuple[UploadFile, bytes]] = []
     for upload in files or []:
         data = await upload.read()
         if len(data) > MAX_FILE_BYTES:
             raise HTTPException(status_code=400, detail="单张图片不能超过 10MB")
         staged.append((upload, data))
+    if not staged:
+        raise HTTPException(status_code=400, detail="至少需要上传一张整改后照片")
     _reject_uploaded_input("", [data for _, data in staged])
 
     upload_root = settings.upload_dir / assessment_id
@@ -428,7 +568,12 @@ async def submit_rectification(
                 image_kind="rectification",
             )
         )
-    item.rectification_status = "under_review"
+    db.flush()
+    submit_rectification_photos(
+        item,
+        note=note or "提交整改照片并进入人工验证",
+        by="user",
+    )
     if note:
         item.rectification_note = note
     item.rectified_at = utcnow()
@@ -467,9 +612,42 @@ def confirm_rectification(
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
-    item.rectification_status = "resolved" if payload.resolved else "under_review"
+    target = "verified" if payload.resolved else "rectifying"
+    note = payload.note or (
+        "人工确认整改完成" if payload.resolved else "人工退回整改"
+    )
+    try:
+        transition_rectification(item, target, note=note, by="user")
+    except RectificationTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if payload.note:
         item.rectification_note = payload.note
+    db.commit()
+    db.refresh(item)
+    return to_out(item)
+
+
+@router.post(
+    "/assessments/{assessment_id}/rectification/transition",
+    response_model=AssessmentOut,
+)
+def transition_rectification_status(
+    assessment_id: str,
+    payload: RectificationTransitionIn,
+    db: Session = Depends(get_db),
+) -> AssessmentOut:
+    item = db.get(Assessment, assessment_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="研判记录不存在")
+    try:
+        transition_rectification(
+            item,
+            payload.to_status,
+            note=payload.note,
+            by=payload.by or "user",
+        )
+    except RectificationTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     db.commit()
     db.refresh(item)
     return to_out(item)

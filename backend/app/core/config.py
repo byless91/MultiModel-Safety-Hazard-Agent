@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     model_retry_backoff: float = 0.5
     risk_rule_version: str = "risk-engine-v1"
     refine_with_evidence: bool = True
+    reranker_enabled: bool = True
+    reranker_top_k: int = 5
+    enable_risk_engine: bool = True
+    enable_evidence_rag: bool = True
 
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     api_bearer_token: str = ""

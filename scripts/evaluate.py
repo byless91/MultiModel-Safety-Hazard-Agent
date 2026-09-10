@@ -61,6 +61,12 @@ def run_case(case: dict) -> dict:
         "grounded": grounded,
         "category_match": state.get("hazard_category") == case["expected_category"],
         "level_match": state.get("risk_level") == case["expected_level"],
+        "is_high_risk": case.get("expected_level") == 1,
+        "review_required": state.get("status")
+        in ("awaiting_human_review", "needs_review"),
+        "auto_passed": state.get("status") == "completed",
+        "unsafe_auto_pass": case.get("expected_level") == 1
+        and state.get("status") == "completed",
         "evidence_count": len(evidence_texts),
         "latency_s": round(elapsed, 2),
     }
@@ -76,6 +82,39 @@ def summarize(results: list[dict]) -> dict:
         if r["predicted_level"] is not None
         and abs(r["predicted_level"] - r["expected_level"]) <= 1
     )
+    high_risk_cases = [item for item in results if item["is_high_risk"]]
+    scenario_map: dict[str, dict[str, int]] = {}
+    for item in results:
+        scenario = item.get("scenario") or "未知"
+        entry = scenario_map.setdefault(
+            scenario,
+            {
+                "total": 0,
+                "category_match": 0,
+                "level_match": 0,
+                "clause_hit": 0,
+                "review_required": 0,
+            },
+        )
+        entry["total"] += 1
+        entry["category_match"] += int(item["category_match"])
+        entry["level_match"] += int(item["level_match"])
+        entry["clause_hit"] += int(item["clause_hit"])
+        entry["review_required"] += int(item["review_required"])
+    scenario_breakdown = {
+        key: {
+            "total": value["total"],
+            "category_accuracy": round(
+                value["category_match"] / value["total"], 4
+            ),
+            "level_accuracy": round(value["level_match"] / value["total"], 4),
+            "clause_hit_rate": round(value["clause_hit"] / value["total"], 4),
+            "review_rate": round(
+                value["review_required"] / value["total"], 4
+            ),
+        }
+        for key, value in scenario_map.items()
+    }
     return {
         "total": total,
         "category_accuracy": round(sum(r["category_match"] for r in results) / total, 4),
@@ -96,7 +135,78 @@ def summarize(results: list[dict]) -> dict:
             if r["status"] in ("needs_review", "awaiting_human_review")
         ),
         "completed_count": sum(1 for r in results if r["status"] == "completed"),
+        "high_risk_review_rate": round(
+            sum(r["review_required"] for r in high_risk_cases)
+            / max(1, len(high_risk_cases)),
+            4,
+        ),
+        "high_risk_case_count": len(high_risk_cases),
+        "unsafe_auto_pass_count": sum(
+            1 for r in results if r["unsafe_auto_pass"]
+        ),
+        "unsafe_auto_pass_rate": round(
+            sum(1 for r in high_risk_cases if r["unsafe_auto_pass"])
+            / max(1, len(high_risk_cases)),
+            4,
+        ),
+        "scenario_breakdown": scenario_breakdown,
     }
+
+
+def build_markdown(results: list[dict], summary: dict) -> str:
+    metric_labels = [
+        ("total", "案例数"),
+        ("provider", "模型模式"),
+        ("category_accuracy", "类别准确率"),
+        ("level_accuracy", "等级准确率"),
+        ("level_accuracy_tolerance1", "等级容差准确率（±1）"),
+        ("clause_hit_rate", "条款命中率"),
+        ("grounded_rate", "可追溯率"),
+        ("hallucination_rate", "幻觉率（无依据输出代理）"),
+        ("high_risk_review_rate", "高风险复核率"),
+        ("unsafe_auto_pass_rate", "不安全自动通过率（Unsafe Auto-Pass Rate）"),
+        ("unsafe_auto_pass_count", "不安全自动通过案例数"),
+        ("needs_review_count", "需人工复核数"),
+        ("completed_count", "自动完成数"),
+        ("avg_confidence", "平均置信度"),
+        ("avg_latency_s", "平均耗时（秒）"),
+    ]
+    lines = [
+        "# 离线评测报告",
+        "",
+        "## 总体指标",
+        "",
+        "| 指标 | 数值 |",
+        "| --- | --- |",
+    ]
+    for key, label in metric_labels:
+        if key in summary:
+            lines.append(f"| {label} | {summary[key]} |")
+    lines.extend(["", "## 场景细分", "", "| 场景 | 案例数 | 类别准确率 | 等级准确率 | 条款命中率 | 复核率 |", "| --- | --- | --- | --- | --- | --- |"])
+    for scenario, value in summary.get("scenario_breakdown", {}).items():
+        lines.append(
+            f"| {scenario} | {value['total']} | {value['category_accuracy']} "
+            f"| {value['level_accuracy']} | {value['clause_hit_rate']} "
+            f"| {value['review_rate']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 逐条结果",
+            "",
+            "| 案例 | 场景 | 期望类别 | 预测类别 | 期望等级 | 预测等级 | 条款命中 | 需复核 |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for item in results:
+        lines.append(
+            f"| {item['id']} | {item.get('scenario', '')} "
+            f"| {item['expected_category']} | {item['predicted_category']} "
+            f"| {item['expected_level']} | {item['predicted_level']} "
+            f"| {'是' if item['clause_hit'] else '否'} "
+            f"| {'是' if item['review_required'] else '否'} |"
+        )
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -104,10 +214,13 @@ def main() -> None:
     parser.add_argument("--provider", default="mock", choices=["mock", "auto"])
     parser.add_argument("--cases", type=Path, default=EVAL_CASES)
     parser.add_argument("--output", type=Path, default=EVAL_DIR)
+    parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
 
     os.environ["PROVIDER_MODE"] = args.provider
     cases = load_cases(args.cases)
+    if args.limit is not None:
+        cases = cases[: args.limit]
     results = [run_case(case) for case in cases]
     summary = summarize(results)
 
@@ -117,6 +230,9 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "report.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    (args.output / "report.md").write_text(
+        build_markdown(results, summary), encoding="utf-8"
     )
     with (args.output / "results.jsonl").open("w", encoding="utf-8") as handle:
         for result in results:

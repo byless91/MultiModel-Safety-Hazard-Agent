@@ -20,6 +20,8 @@ def test_fire_exit_blocked_scores_high():
     assert risk.operational_level == 1
     assert risk.rule_version == RULE_VERSION
     assert risk.factor_scores
+    assert risk.rule_weights
+    assert round(sum(risk.rule_weights.values()), 2) == 1.0
     assert risk.evidence_used
     assert "category_base:占用疏散通道" in risk.triggered_rules
     assert any(rule.startswith("exposure_keyword:") for rule in risk.triggered_rules)

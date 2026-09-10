@@ -11,6 +11,7 @@ from app.services.risk_engine.rules import (
     HIGH_BAND,
     IMMEDIATE_DANGER_KEYWORDS,
     LOW_BAND,
+    RULE_WEIGHTS,
     RULE_VERSION,
 )
 from app.services.risk_engine.schemas import RiskAssessment
@@ -116,6 +117,7 @@ def score_findings(
             risk_level="low",
             operational_level=3,
             factor_scores=dict(DEFAULT_BASE_SCORES),
+            rule_weights=dict(RULE_WEIGHTS),
             severity_hint=severity_hint,
             rule_version=RULE_VERSION,
             evidence_used=[],
@@ -158,6 +160,7 @@ def score_findings(
         risk_level=risk_level,
         operational_level=_operational_level(worst_score),
         factor_scores=worst_factors,
+        rule_weights=dict(RULE_WEIGHTS),
         severity_hint=severity_hint,
         rule_version=RULE_VERSION,
         evidence_used=list(dict.fromkeys(evidence_used))[:5],

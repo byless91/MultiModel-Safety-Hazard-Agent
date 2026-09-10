@@ -1,4 +1,5 @@
 import json
+import re
 
 import numpy as np
 
@@ -7,6 +8,57 @@ from app.services.providers import get_provider, hash_embed
 
 DEMO_SOURCE_MARKERS = ("演示",)
 DEMO_VERSION_MARKERS = ("demo",)
+
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+_WORD_RE = re.compile(r"[a-zA-Z0-9_]{2,}")
+
+
+def _tokens(text: str) -> set[str]:
+    chars = [ch for ch in text if _CJK_RE.match(ch)]
+    tokens = {
+        "".join(chars[index : index + 2])
+        for index in range(len(chars) - 1)
+        if chars[index + 1]
+    }
+    tokens.update(_WORD_RE.findall(text.lower()))
+    return tokens
+
+
+def _lexical_overlap(query: str, text: str) -> float:
+    query_tokens = _tokens(query)
+    if not query_tokens:
+        return 0.0
+    text_tokens = _tokens(text)
+    return len(query_tokens & text_tokens) / len(query_tokens)
+
+
+def _metadata_boost(item: dict, query: str) -> float:
+    boost = 0.0
+    if item.get("article"):
+        boost += 1.0
+    for tag in item.get("tags") or []:
+        if str(tag) and str(tag) in query:
+            boost += 1.0
+            break
+    return boost
+
+
+def rerank_results(query: str, results: list[dict], top_n: int) -> list[dict]:
+    """Deterministic lexical+metadata rerank over the vector candidates."""
+    scored: list[dict] = []
+    for item in results:
+        vector = float(item.get("score") or 0.0)
+        lexical = _lexical_overlap(query, str(item.get("text") or ""))
+        metadata = _metadata_boost(item, query)
+        clone = dict(item)
+        clone["vector_score"] = round(vector, 4)
+        clone["rerank_score"] = round(
+            0.4 * vector + 0.4 * lexical + 0.2 * min(1.0, metadata),
+            4,
+        )
+        scored.append(clone)
+    scored.sort(key=lambda item: item["rerank_score"], reverse=True)
+    return scored[:top_n]
 
 
 try:
@@ -48,6 +100,7 @@ class RAGService:
         self.vectors = np.zeros((0, 0), dtype=np.float32)
         self._index = None
         self.embedding_fallback = False
+        self.reranker_enabled = settings.reranker_enabled
         self.load()
 
     def load(self) -> None:
@@ -112,9 +165,16 @@ class RAGService:
         tags: list[str] | None = None,
         *,
         include_demo: bool = False,
+        reranker_enabled: bool | None = None,
     ) -> list[dict]:
         if not self.texts:
             return []
+        use_reranker = (
+            self.settings.reranker_enabled
+            if reranker_enabled is None
+            else reranker_enabled
+        )
+        candidate_limit = top_k * 2 if use_reranker else top_k
         try:
             if self.embedding_fallback:
                 raise RuntimeError("fallback embedding mode")
@@ -153,8 +213,10 @@ class RAGService:
                     "score": round(float(score), 4),
                 }
             )
-            if len(results) >= top_k:
+            if len(results) >= candidate_limit:
                 break
+        if use_reranker and results:
+            results = rerank_results(query, results, top_k)
         return results
 
 

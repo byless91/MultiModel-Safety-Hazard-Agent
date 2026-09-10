@@ -7,7 +7,7 @@
 - 后端：Python 3.11+、FastAPI、SQLAlchemy、SQLite
 - 智能体：LangGraph StateGraph 条件路由工作流（分析、追问、检索、二次研判、融合研判、证据判定、生成/人工复核），模型失败自动回退 Mock
 - 模型：Qwen2.5-VL / GLM-4V-Flash（OpenAI 兼容 API），Mock 模式无需 Key
-- 检索：FAISS 或 NumPy 兜底向量检索（知识库数据来自 `backend/data/knowledge`）
+- 检索：FAISS 或 NumPy 兜底向量检索，可选规则重排 Reranker（`RERANKER_ENABLED`，执行 Vector Top-K → 重排 → Top-N）
 - 前端：Vue 3、TypeScript、Vite、Element Plus、Pinia
 
 ## 目录结构
@@ -80,6 +80,7 @@ EMBEDDING_MODEL=text-embedding-v3
 - 整改照片回传：上传整改后照片、前后对比展示、AI 完成度评分、确认整改完成
 - 历史记录与详情页
 - 管理员上传知识文档接口（文本格式）
+- 可选 Reranker：词面重叠 + 条款元数据加权重排，可用 `RERANKER_ENABLED=false` 关闭
 
 ## 测试
 
@@ -129,9 +130,34 @@ cd backend
 .\.venv\Scripts\python.exe scripts\evaluate.py --provider auto
 ```
 
+单独对比 Reranker 开关（只跑知识库检索，不调用模型）：
+
+```powershell
+.\backend\.venv\Scripts\python.exe scripts\evaluate_reranker.py
+```
+
+输出 `backend/data/eval/reranker_report.json`。当前 30 条评测中 Reranker 未带来条款命中率的可测量提升，因此保留为可选配置，不默认强制。
+
+## 消融评测
+
+运行 A（Qwen only）→ B（GLM only）→ C（Qwen+GLM）→ D（+Risk Engine）→ E（+Evidence RAG）→ F（完整系统）六组对比：
+
+```powershell
+.\backend\.venv\Scripts\python.exe scripts\ablation.py --provider mock
+```
+
+真实模型版本（会额外调用模型接口，按量计费）：
+
+```powershell
+.\backend\.venv\Scripts\python.exe scripts\ablation.py --provider auto
+```
+
+输出：`backend/data/eval/ablation_report.json`、`ablation_report.md`、`ablation_results.jsonl`。Mock 模式下 A/B/C 共用同一个确定性 Mock，模型间差异需 `--provider auto` 验证。
+
 输出文件：
 
 - `backend/data/eval/report.json`：整体指标
+- `backend/data/eval/report.md`：可直接查看的人工可读报告（总体指标、场景细分、逐条结果）
 - `backend/data/eval/results.jsonl`：逐条命中详情
 
 指标定义：
@@ -141,11 +167,39 @@ cd backend
 - 等级容差准确率：预测等级与标注相差不超过 1 级的比例
 - 条款命中率：预期条款关键词出现在检索证据中的比例
 - 幻觉率：检索证据未覆盖预期条款关键词的比例，作为无依据输出的代理指标
+- 高风险复核率：地面真值高风险案例中进入人工复核的比例
+- 不安全自动通过率（Unsafe Auto-Pass Rate）：地面真值高风险却被系统自动通过的比例，越低越好
 
-当前 Mock 模式下 31 条评测结果：类别准确率 100%，等级容差准确率 100%，条款命中率约 63%（条款命中率会随真实知识库扩充而提升）。
+当前 Mock 模式下 30 条评测结果：类别准确率 100%，等级容差准确率 100%，高风险复核率 100%，条款命中率 40%（条款命中率会随真实知识库扩充而提升）。
+
+### 真实模型评测（2026-09-10 实跑）
+
+单轮 30 条、Qwen-VL + GLM-V 双模型并行（`scripts/evaluate.py --provider auto`）：
+
+| 指标 | 值 |
+| --- | --- |
+| 类别准确率 | 0.5333 |
+| 等级准确率 | 0.6667 |
+| 等级容差（±1） | 1.0 |
+| 条款命中率 | 0.6667 |
+| 高风险复核率 | 1.0 |
+| 不安全自动通过率 | 0.0 |
+| 平均耗时（秒/案例） | 18.2 |
+
+结果落在 `backend/data/eval/report.json` / `report.md`，作为真实模型基线；会随模型版本、知识库更新变化。
 
 ## 下一步
 
 - 扩充法规条款覆盖灭火器、井盖、电气等场景，提升条款命中率
 - 增加知识库审核发布流程、法规版本自动监测
 - 开展试点试用并持续维护评测集
+
+## 浏览器 E2E
+
+以 Mock 模式启动后端（8001）与前端（5173）后运行：
+
+```powershell
+node scripts\verify_e2e.mjs
+```
+
+脚本使用 Playwright + Edge 无头浏览器创建一条研判，并断言 P1 的 8 个前端面板（模型 A/B 对比、分歧可视化、风险引擎解释、法规证据、证据链、隐患定位、人工复核、整改回传）均已渲染。

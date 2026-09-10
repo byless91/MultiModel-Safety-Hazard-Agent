@@ -128,6 +128,25 @@ export const useAssessmentStore = defineStore('assessment', {
         this.loading = false
       }
     },
+    async transitionRectification(
+      id: string,
+      toStatus: string,
+      note?: string,
+    ): Promise<Assessment> {
+      this.loading = true
+      try {
+        const { data } = await api.post<Assessment>(
+          `/assessments/${id}/rectification/transition`,
+          { to_status: toStatus, note },
+        )
+        return data
+      } catch (err) {
+        this.error = extractError(err)
+        throw err
+      } finally {
+        this.loading = false
+      }
+    },
     async compareRectification(id: string): Promise<Assessment> {
       this.loading = true
       try {

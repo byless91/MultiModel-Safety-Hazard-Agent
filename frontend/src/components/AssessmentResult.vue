@@ -59,31 +59,24 @@
       />
 
       <el-card
-        v-if="assessment.risk_score !== undefined && assessment.risk_score !== null"
+        v-if="
+          (assessment.risk_score !== undefined && assessment.risk_score !== null) ||
+          assessment.risk_result
+        "
         class="risk-card"
       >
-        <template #header>
-          <div class="risk-head">
-            <span>风险引擎判定</span>
-            <el-tag :type="riskTag" effect="dark" class="risk-tag">{{ riskLabel }}</el-tag>
-          </div>
-        </template>
-        <div class="risk-main">
-          <span class="risk-score">风险分 {{ assessment.risk_score }} / 100</span>
-          <span v-if="assessment.risk_review_suggestion" class="risk-review-tip">建议人工复核</span>
-        </div>
-        <div v-if="assessment.risk_factors && Object.keys(assessment.risk_factors).length" class="factor-grid">
-          <div v-for="(value, key) in assessment.risk_factors" :key="key" class="factor-item">
-            <span class="factor-label">{{ key }}</span>
-            <span class="factor-value">{{ value }}</span>
-          </div>
-        </div>
-        <ul v-if="assessment.risk_triggered_rules && assessment.risk_triggered_rules.length" class="rule-list">
-          <li v-for="rule in assessment.risk_triggered_rules" :key="rule">{{ rule }}</li>
-        </ul>
-        <p v-if="assessment.risk_rule_version" class="risk-version">
-          规则版本：{{ assessment.risk_rule_version }}
-        </p>
+        <template #header>风险引擎判定与解释</template>
+        <RiskExplanation :assessment="assessment" />
+      </el-card>
+
+      <el-card class="model-comparison-card">
+        <template #header>模型 A/B 对比</template>
+        <ModelComparison :assessment="assessment" />
+      </el-card>
+
+      <el-card v-if="assessment.disagreement" class="disagreement-viz-card">
+        <template #header>分歧可视化</template>
+        <DisagreementViz :assessment="assessment" />
       </el-card>
 
       <div class="result-grid">
@@ -115,24 +108,9 @@
 
       <el-card class="evidence-card">
         <template #header>
-          <span>参考依据（{{ report.evidence_count }}）</span>
+          <span>法规证据（{{ assessment.evidence.length }}）</span>
         </template>
-        <el-empty v-if="!report.legal_basis.length" description="暂无检索到知识库依据" />
-        <div
-          v-for="item in report.legal_basis"
-          :key="item.source + (item.snippet || item.text || '')"
-          class="evidence-item"
-        >
-          <div class="evidence-head">
-            <span class="evidence-source">{{ item.source }}</span>
-            <span class="evidence-article">{{ item.article }}</span>
-            <span class="evidence-score">相关度 {{ Math.round(item.score * 100) }}%</span>
-          </div>
-          <p class="evidence-text">{{ item.snippet || item.text }}</p>
-          <div class="tag-row">
-            <el-tag v-for="tag in item.tags" :key="tag" size="small" type="info">{{ tag }}</el-tag>
-          </div>
-        </div>
+        <LegalEvidence :assessment="assessment" />
       </el-card>
 
       <el-card
@@ -185,6 +163,16 @@
         </p>
       </el-card>
 
+      <el-card class="hazard-overlay-card">
+        <template #header>隐患定位（可选 Bounding Box）</template>
+        <HazardOverlay :assessment="assessment" />
+      </el-card>
+
+      <el-card class="evidence-chain-card">
+        <template #header>证据链</template>
+        <EvidenceChain :assessment="assessment" />
+      </el-card>
+
       <el-card class="rect-card">
         <template #header>
           <div class="rect-head">
@@ -194,35 +182,74 @@
             </el-tag>
           </div>
         </template>
-        <div v-if="originals.length || rectImages.length" class="compare-grid">
-          <div>
-            <div class="compare-label">整改前</div>
-            <div class="thumb-row">
-              <template v-for="img in originals" :key="img.id">
+        <el-steps
+          v-if="assessment.rectification_status"
+          :active="rectActiveIndex"
+          finish-status="success"
+          class="rect-steps"
+          simple
+        >
+          <el-step
+            v-for="step in rectSteps"
+            :key="step.value"
+            :title="step.label"
+          />
+        </el-steps>
+        <div v-if="comparePairs.length" class="compare-grid">
+          <div
+            v-for="(pair, index) in comparePairs"
+            :key="`${pair.original.id}-${pair.rectification.id}`"
+            class="compare-pair"
+          >
+            <div class="compare-pair-head">
+              <span>第 {{ index + 1 }} 组对比</span>
+              <span v-if="comparisonMeta" class="compare-pair-status">
+                AI 比对覆盖 {{ comparisonMeta.pair_count }} 组
+              </span>
+            </div>
+            <div class="compare-columns">
+              <div class="compare-column">
+                <div class="compare-label">整改前</div>
                 <el-image
-                  v-if="img.url"
-                  :src="img.url"
-                  :preview-src-list="[img.url]"
+                  v-if="pair.original.url"
+                  :src="pair.original.url"
+                  :preview-src-list="[pair.original.url]"
                   fit="cover"
                   class="thumb"
                 />
-              </template>
-            </div>
-          </div>
-          <div>
-            <div class="compare-label">整改后</div>
-            <div class="thumb-row">
-              <template v-for="img in rectImages" :key="img.id">
+                <span v-else class="compare-missing">暂无证据</span>
+              </div>
+              <div class="compare-column">
+                <div class="compare-label">整改后</div>
                 <el-image
-                  v-if="img.url"
-                  :src="img.url"
-                  :preview-src-list="[img.url]"
+                  v-if="pair.rectification.url"
+                  :src="pair.rectification.url"
+                  :preview-src-list="[pair.rectification.url]"
                   fit="cover"
                   class="thumb"
                 />
-              </template>
+                <span v-else class="compare-missing">暂无证据</span>
+              </div>
             </div>
           </div>
+        </div>
+        <div v-if="!rectImages.length && originals.length" class="original-only">
+          <div class="compare-label">整改前（暂无整改后照片）</div>
+          <div class="thumb-row">
+            <template v-for="img in originals" :key="img.id">
+              <el-image
+                v-if="img.url"
+                :src="img.url"
+                :preview-src-list="[img.url]"
+                fit="cover"
+                class="thumb"
+              />
+            </template>
+          </div>
+        </div>
+        <p v-if="unmatchedNote" class="compare-unmatched">{{ unmatchedNote }}</p>
+        <div v-if="!rectImages.length" class="compare-empty">
+          <el-alert type="warning" :closable="false" title="暂无整改后照片，无法进行前后对比" />
         </div>
         <p v-if="assessment.rectification_note" class="rect-note">
           {{ assessment.rectification_note }}
@@ -259,8 +286,36 @@
               {{ issue }}
             </li>
           </ul>
+          <div v-if="completionAssessment" class="completion-box">
+            <div class="completion-head">
+              <el-tag :type="verdictTag" effect="light">{{ verdictLabel }}</el-tag>
+              <span v-if="completionAssessment.completion_confidence" class="completion-conf">
+                置信度 {{ Math.round(completionAssessment.completion_confidence * 100) }}%
+              </span>
+            </div>
+            <ul v-if="completionAssessment.reasons.length" class="completion-reasons">
+              <li v-for="reason in completionAssessment.reasons" :key="reason">
+                {{ reason }}
+              </li>
+            </ul>
+            <p v-if="completionAssessment.rule_version" class="completion-version">
+              规则版本：{{ completionAssessment.rule_version }}
+            </p>
+          </div>
         </div>
-        <div class="rect-form">
+        <div v-if="rectHistory.length" class="rect-history">
+          <h4>整改流程记录</h4>
+          <ul>
+            <li v-for="(entry, index) in rectHistory" :key="`${entry.created_at}-${index}`">
+              {{ entry.action }}（{{ statusLabel(entry.from_status) }} → {{ statusLabel(entry.to_status) }}）
+              <span class="rect-history-meta">
+                {{ formatTime(entry.created_at) }}<template v-if="entry.by"> · {{ entry.by }}</template>
+              </span>
+              <span v-if="entry.note" class="rect-history-note">{{ entry.note }}</span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="canSubmitPhotos" class="rect-form">
           <el-upload
             v-model:file-list="rectFiles"
             :auto-upload="false"
@@ -272,8 +327,19 @@
             <el-icon><Plus /></el-icon>
           </el-upload>
           <el-input v-model="rectNote" type="textarea" :rows="2" placeholder="整改说明（可选）" />
-          <div class="rect-actions">
-            <el-button type="primary" :loading="store.loading" @click="onSubmitRectification">
+        </div>
+        <div class="rect-actions">
+            <el-button v-if="canStart" type="primary" :loading="store.loading" @click="onStartRectification">
+              <el-icon><EditPen /></el-icon>
+              开始整改
+            </el-button>
+            <el-button
+              v-if="canSubmitPhotos"
+              type="primary"
+              :loading="store.loading"
+              :disabled="rectFiles.length === 0"
+              @click="onSubmitRectification"
+            >
               提交整改照片
             </el-button>
             <el-button v-if="rectImages.length" @click="onRecompare">
@@ -281,24 +347,76 @@
               重新 AI 比对
             </el-button>
             <el-button
-              v-if="assessment.rectification_status === 'under_review'"
+              v-if="canVerify"
               type="success"
-              @click="onConfirmRectification"
+              @click="onRectificationTransition('verified', '已确认整改完成')"
             >
               确认整改完成
             </el-button>
-          </div>
+            <el-button
+              v-if="canVerify || canClose"
+              type="warning"
+              @click="onRectificationTransition('rectifying', '已退回整改')"
+            >
+              退回整改
+            </el-button>
+            <el-button
+              v-if="canClose"
+              type="primary"
+              @click="onRectificationTransition('closed', '工单已关闭')"
+            >
+              关闭工单
+            </el-button>
+            <el-button
+              v-if="canReopen"
+              type="primary"
+              @click="onRectificationTransition('open', '工单已重新打开')"
+            >
+              重新打开
+            </el-button>
         </div>
+      </el-card>
+
+      <el-card v-if="humanReviewVisible" class="human-review-card">
+        <template #header>
+          <div class="human-review-head">
+            <span>人工复核</span>
+            <el-tag
+              :type="assessment.confirmed ? 'success' : assessment.status === 'needs_review' ? 'warning' : 'primary'"
+              effect="light"
+            >
+              {{ humanReviewTagLabel }}
+            </el-tag>
+          </div>
+        </template>
+        <ul v-if="assessment.review_reasons?.length" class="human-review-reasons">
+          <li v-for="reason in assessment.review_reasons" :key="reason">
+            {{ reason }}
+          </li>
+        </ul>
+        <div v-if="humanResolution" class="human-resolution">
+          <p>复核结论：{{ humanResolution.confirmed ? '确认通过' : '需重新研判' }}</p>
+          <p v-if="humanResolution.reviewer">复核人：{{ humanResolution.reviewer }}</p>
+          <p v-if="humanResolution.note">复核意见：{{ humanResolution.note }}</p>
+          <p v-if="humanResolution.resolved_at">
+            复核时间：{{ formatTime(humanResolution.resolved_at) }}
+          </p>
+        </div>
+        <el-button
+          v-if="!assessment.confirmed"
+          type="primary"
+          :loading="store.loading"
+          @click="emit('confirm')"
+        >
+          <el-icon><CircleCheck /></el-icon>
+          确认结果并定稿
+        </el-button>
       </el-card>
 
       <div class="footer-actions">
         <el-button @click="onDownload">
           <el-icon><Download /></el-icon>
           下载报告
-        </el-button>
-        <el-button type="primary" :disabled="assessment.confirmed" @click="emit('confirm')">
-          <el-icon><CircleCheck /></el-icon>
-          {{ assessment.confirmed ? '已人工确认' : '确认结果并定稿' }}
         </el-button>
         <span class="disclaimer">{{ report.disclaimer }}</span>
       </div>
@@ -311,7 +429,13 @@ import { ElMessage, type UploadFile } from 'element-plus'
 import { computed, ref } from 'vue'
 
 import { useAssessmentStore } from '../stores/assessment'
-import type { Assessment, FindingLocation } from '../types'
+import type { Assessment, AssessmentImage, FindingLocation } from '../types'
+import EvidenceChain from './EvidenceChain.vue'
+import DisagreementViz from './DisagreementViz.vue'
+import HazardOverlay from './HazardOverlay.vue'
+import LegalEvidence from './LegalEvidence.vue'
+import ModelComparison from './ModelComparison.vue'
+import RiskExplanation from './RiskExplanation.vue'
 
 const props = defineProps<{
   assessment: Assessment
@@ -330,12 +454,67 @@ const rectNote = ref('')
 const report = computed(() => props.assessment.report)
 const store = useAssessmentStore()
 
+function byImageTime(a: AssessmentImage, b: AssessmentImage) {
+  const timeA = a.created_at || ''
+  const timeB = b.created_at || ''
+  const time = timeA.localeCompare(timeB)
+  return time !== 0 ? time : a.id.localeCompare(b.id)
+}
+
 const originals = computed(() =>
-  props.assessment.images.filter((image) => image.image_kind === 'original'),
+  props.assessment.images
+    .filter((image) => image.image_kind === 'original')
+    .sort(byImageTime),
 )
 const rectImages = computed(() =>
-  props.assessment.images.filter((image) => image.image_kind === 'rectification'),
+  props.assessment.images
+    .filter((image) => image.image_kind === 'rectification')
+    .sort(byImageTime),
 )
+
+const comparisonMeta = computed(
+  () => props.assessment.rectification_analysis?.comparison ?? null,
+)
+
+const completionAssessment = computed(
+  () => props.assessment.rectification_analysis?.assessment ?? null,
+)
+
+const verdictLabels: Record<string, string> = {
+  resolved_recommended: 'AI 建议判定已完成',
+  not_resolved: 'AI 判定未完成',
+  insufficient_evidence: '证据不足，无法评估',
+  needs_review: '结论冲突，需人工复核',
+}
+
+const verdictLabel = computed(() => {
+  const verdict = completionAssessment.value?.verdict || ''
+  return verdictLabels[verdict] || '待人工复核'
+})
+
+const verdictTag = computed<'success' | 'warning' | 'danger' | 'info'>(() => {
+  const verdict = completionAssessment.value?.verdict
+  if (verdict === 'resolved_recommended') return 'success'
+  if (verdict === 'not_resolved') return 'danger'
+  if (verdict === 'needs_review') return 'warning'
+  return 'info'
+})
+
+const comparePairs = computed(() => {
+  const count = Math.min(originals.value.length, rectImages.value.length)
+  return Array.from({ length: count }, (_, index) => ({
+    original: originals.value[index],
+    rectification: rectImages.value[index],
+  }))
+})
+
+const unmatchedNote = computed(() => {
+  const meta = comparisonMeta.value
+  const before = meta?.original_count ?? originals.value.length
+  const after = meta?.rectification_count ?? rectImages.value.length
+  if (before === after) return ''
+  return `整改前 ${before} 张 / 整改后 ${after} 张，数量不一致，剩余图片无法一一对应，需人工复核。`
+})
 
 const evidenceFindings = computed(() => {
   const judgeFindings = props.assessment.evidence_judge?.findings ?? []
@@ -352,29 +531,82 @@ function findingLocations(finding: { locations?: FindingLocation[] }) {
   return finding.locations ?? []
 }
 
-const rectTag = computed<'success' | 'warning' | 'info'>(() => {
+const rectSteps = [
+  { value: 'open', label: '待分派' },
+  { value: 'assigned', label: '已分派' },
+  { value: 'rectifying', label: '整改中' },
+  { value: 'pending_verification', label: '待验证' },
+  { value: 'verified', label: '已验证' },
+  { value: 'closed', label: '已关闭' },
+]
+
+const rectLabels: Record<string, string> = {
+  open: '待分派',
+  assigned: '已分派',
+  rectifying: '整改中',
+  pending_verification: '待验证',
+  verified: '已验证',
+  closed: '已关闭',
+}
+
+const rectTag = computed<'success' | 'warning' | 'info' | 'primary'>(() => {
   const status = props.assessment.rectification_status
-  return status === 'resolved' ? 'success' : status === 'under_review' ? 'warning' : 'info'
+  if (status === 'verified') return 'success'
+  if (status === 'pending_verification') return 'warning'
+  if (status === 'rectifying' || status === 'assigned') return 'primary'
+  return 'info'
 })
 
 const rectLabel = computed(() => {
-  const status = props.assessment.rectification_status
-  return status === 'resolved' ? '已整改完成' : status === 'under_review' ? '整改待复核' : '未提交'
+  const status = props.assessment.rectification_status || ''
+  return rectLabels[status] || '未开始整改'
 })
+
+const rectActiveIndex = computed(() => {
+  const status = props.assessment.rectification_status
+  const index = rectSteps.findIndex((item) => item.value === status)
+  return index === -1 ? 0 : index
+})
+
+const rectHistory = computed(
+  () => props.assessment.rectification_meta?.history ?? [],
+)
+
+function statusLabel(status: string) {
+  return rectLabels[status] || status
+}
+
+function formatTime(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
+}
+
+const canStart = computed(() => {
+  const status = props.assessment.rectification_status
+  return status === 'open' || status === 'assigned'
+})
+
+const canSubmitPhotos = computed(() => {
+  const status = props.assessment.rectification_status
+  return status === 'open' || status === 'assigned' || status === 'rectifying'
+})
+
+const canVerify = computed(
+  () => props.assessment.rectification_status === 'pending_verification',
+)
+
+const canClose = computed(
+  () => props.assessment.rectification_status === 'verified',
+)
+
+const canReopen = computed(
+  () => props.assessment.rectification_status === 'closed',
+)
 
 const rectColor = computed(() => {
   const score = props.assessment.rectification_score ?? 0
   return score >= 0.8 ? '#16a34a' : score >= 0.5 ? '#d97706' : '#94a3b8'
-})
-
-const riskTag = computed<'success' | 'warning' | 'danger'>(() => {
-  const label = props.assessment.risk_label
-  return label === 'high' ? 'danger' : label === 'medium' ? 'warning' : 'success'
-})
-
-const riskLabel = computed(() => {
-  const map: Record<string, string> = { low: '低风险', medium: '中风险', high: '高风险' }
-  return map[props.assessment.risk_label || ''] || '未评分'
 })
 
 const levelTag = computed<'danger' | 'warning' | 'success'>(() => {
@@ -390,6 +622,26 @@ const levelLabel = computed(() => {
 const levelColor = computed(() => {
   const level = props.assessment.risk_level || 3
   return level === 1 ? '#dc2626' : level === 2 ? '#d97706' : '#16a34a'
+})
+
+const humanReviewVisible = computed(
+  () =>
+    Boolean(
+      props.assessment.awaiting_human_review ||
+        props.assessment.status === 'needs_review' ||
+        props.assessment.review_reasons?.length ||
+        props.assessment.human_review?.resolution,
+    ),
+)
+
+const humanResolution = computed(
+  () => props.assessment.human_review?.resolution ?? null,
+)
+
+const humanReviewTagLabel = computed(() => {
+  if (props.assessment.confirmed) return '已人工确认'
+  if (props.assessment.status === 'needs_review') return '需重新研判'
+  return '待人工复核'
 })
 
 async function onDownload() {
@@ -418,10 +670,23 @@ async function onSubmitRectification() {
   ElMessage.success('整改照片已提交')
 }
 
-async function onConfirmRectification() {
-  const updated = await store.confirmRectification(props.assessment.id, true)
+async function onStartRectification() {
+  const updated = await store.transitionRectification(
+    props.assessment.id,
+    'rectifying',
+    '开始整改',
+  )
   emit('updated', updated)
-  ElMessage.success('已确认整改完成')
+  ElMessage.success('已开始整改')
+}
+
+async function onRectificationTransition(toStatus: string, message: string) {
+  const updated = await store.transitionRectification(
+    props.assessment.id,
+    toStatus,
+  )
+  emit('updated', updated)
+  ElMessage.success(message)
 }
 
 async function onRecompare() {
@@ -554,6 +819,14 @@ async function onRecompare() {
   margin: 0;
   color: #94a3b8;
   font-size: 12px;
+}
+
+.model-comparison-card {
+  margin-top: 14px;
+}
+
+.disagreement-viz-card {
+  margin-top: 14px;
 }
 
 .result-card {
@@ -694,8 +967,94 @@ async function onRecompare() {
   margin-top: 18px;
 }
 
+.human-review-card {
+  margin-top: 14px;
+}
+
+.human-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.human-review-reasons {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: #b45309;
+  font-size: 13px;
+}
+
+.human-review-reasons li {
+  margin-bottom: 4px;
+}
+
+.human-resolution {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.human-resolution p {
+  margin: 0 0 4px;
+}
+
+.human-resolution p:last-child {
+  margin-bottom: 0;
+}
+
 .rect-card {
   margin-top: 14px;
+}
+
+.evidence-chain-card {
+  margin-top: 14px;
+}
+
+.hazard-overlay-card {
+  margin-top: 14px;
+}
+
+.rect-steps {
+  margin-bottom: 12px;
+}
+
+.rect-history {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.rect-history h4 {
+  margin: 0 0 8px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.rect-history ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.rect-history li {
+  margin-bottom: 4px;
+}
+
+.rect-history-meta {
+  margin-left: 6px;
+  color: #94a3b8;
+}
+
+.rect-history-note {
+  display: block;
+  color: #64748b;
 }
 
 .rect-head {
@@ -705,9 +1064,71 @@ async function onRecompare() {
 }
 
 .compare-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  margin-bottom: 12px;
+}
+
+.compare-pair {
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.compare-pair-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.compare-pair-status {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.compare-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compare-column {
+  min-width: 0;
+}
+
+.compare-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 78px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.compare-unmatched {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  color: #b45309;
+  font-size: 12px;
+}
+
+.compare-empty {
+  margin-bottom: 12px;
+}
+
+.original-only {
   margin-bottom: 12px;
 }
 
@@ -740,6 +1161,43 @@ async function onRecompare() {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
+}
+
+.completion-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.completion-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.completion-conf {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.completion-reasons {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.completion-reasons li {
+  margin-bottom: 4px;
+}
+
+.completion-version {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .compare-result-head {

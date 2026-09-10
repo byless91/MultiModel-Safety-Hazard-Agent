@@ -4,12 +4,14 @@ export interface AssessmentImage {
   mime_type?: string
   size_bytes: number
   image_kind: string
+  created_at?: string
   url?: string
 }
 
 export interface EvidenceItem {
   id?: string
   source: string
+  document?: string
   article?: string
   effective_date?: string
   text?: string
@@ -17,6 +19,9 @@ export interface EvidenceItem {
   version: string
   tags: string[]
   score: number
+  risk_type?: string
+  scene?: string
+  is_demo?: boolean
 }
 
 export interface FindingEvidenceStatus {
@@ -48,6 +53,66 @@ export interface FindingLocation {
   location_text?: string
 }
 
+export interface ModelHazardOutput {
+  hazard_type: string
+  description?: string
+  severity?: number
+  confidence?: number
+  observed_facts?: string[]
+  uncertainties?: string[]
+  location?: FindingLocation | null
+}
+
+export interface ModelAnalysisData {
+  scene_summary?: string
+  observations?: string[]
+  hazard_hints?: string[]
+  keywords?: string[]
+  vision_confidence?: number
+  hazards?: ModelHazardOutput[]
+}
+
+export interface ModelRunResult {
+  provider: string
+  family: string
+  model: string
+  model_version: string
+  status: string
+  error_type: string
+  error_message: string
+  latency_ms: number
+  retry_count: number
+  analysis: ModelAnalysisData | null
+}
+
+export interface DisagreementData {
+  mode: string
+  agreement_available: boolean
+  agreement_score: number
+  category_agreement: boolean
+  severity_difference: number | null
+  critical_conflict: boolean
+  need_human_review: boolean
+  reasons: string[]
+  pairs: DisagreementPair[]
+  model_count: number
+  compared_models: string[]
+}
+
+export interface DisagreementPair {
+  category: string
+  family_a: string
+  family_b: string
+  severity_a: number | null
+  severity_b: number | null
+  confidence_a: number
+  confidence_b: number
+  severity_difference: number | null
+  category_score: number
+  severity_score: number
+  factual_conflict: boolean
+}
+
 export interface Finding {
   finding_id: string
   category: string
@@ -63,6 +128,8 @@ export interface Finding {
   evidence_ids: string[]
   support_score?: number
   unsupported_claims?: string[]
+  risk_score?: number | null
+  risk_level?: string | null
 }
 
 export interface WorkOrder {
@@ -74,6 +141,48 @@ export interface WorkOrder {
   items: string[]
   acceptance: string
   source_note: string
+}
+
+export interface RectificationComparisonPair {
+  index: number
+  original_id: string
+  rectification_id: string
+  original_url?: string | null
+  rectification_url?: string | null
+}
+
+export interface RectificationComparison {
+  original_count: number
+  rectification_count: number
+  pair_count: number
+  unmatched_original_count: number
+  unmatched_rectification_count: number
+  paired: RectificationComparisonPair[]
+}
+
+export type RectificationVerdict =
+  | 'resolved_recommended'
+  | 'not_resolved'
+  | 'insufficient_evidence'
+  | 'needs_review'
+
+export interface RectificationAssessment {
+  completion_score: number | null
+  completion_confidence: number
+  verdict: RectificationVerdict
+  review_required: boolean
+  triggered_rules: string[]
+  reasons: string[]
+  provider_ok: boolean
+  rule_version: string
+}
+
+export interface HumanReviewResolution {
+  confirmed: boolean
+  reviewer?: string
+  note?: string
+  edits?: Record<string, unknown>
+  resolved_at?: string
 }
 
 export interface AssessmentReport {
@@ -99,6 +208,23 @@ export type AssessmentStatus =
   | 'awaiting_human_review'
   | 'confirmed'
 
+export type RectificationStatus =
+  | 'open'
+  | 'assigned'
+  | 'rectifying'
+  | 'pending_verification'
+  | 'verified'
+  | 'closed'
+
+export interface RectificationHistoryEntry {
+  action: string
+  from_status: string
+  to_status: string
+  note: string
+  by: string
+  created_at: string
+}
+
 export interface Assessment {
   id: string
   description: string
@@ -110,6 +236,15 @@ export interface Assessment {
   conclusion?: string
   evidence: EvidenceItem[]
   evidence_judge?: EvidenceJudgeData | null
+  multi_model?: {
+    ensemble_mode: string
+    succeeded: number
+    failed: number
+    total_latency_ms: number
+    primary: ModelRunResult
+    results: ModelRunResult[]
+  } | null
+  disagreement?: DisagreementData | null
   findings?: Finding[]
   report?: AssessmentReport
   followup_questions: string[]
@@ -121,12 +256,14 @@ export interface Assessment {
     need_human_review: boolean
     review_reasons: string[]
     triggers: Record<string, boolean>
+    resolution?: HumanReviewResolution | null
   } | null
   risk_result?: {
     risk_score: number
     risk_level: string
     operational_level: number
     factor_scores: Record<string, number>
+    rule_weights: Record<string, number>
     severity_hint?: number | null
     rule_version: string
     evidence_used: string[]
@@ -141,7 +278,7 @@ export interface Assessment {
   risk_evidence_used?: string[]
   risk_triggered_rules?: string[]
   risk_review_suggestion?: boolean
-  rectification_status?: 'pending' | 'under_review' | 'resolved'
+  rectification_status?: RectificationStatus | null
   rectification_note?: string
   rectification_score?: number
   rectification_analysis?: {
@@ -150,7 +287,14 @@ export interface Assessment {
     summary?: string
     issues?: string[]
     reasons?: string[]
+    comparison?: RectificationComparison | null
+    assessment?: RectificationAssessment | null
   }
+  rectification_meta?: {
+    current_status?: string
+    history: RectificationHistoryEntry[]
+  } | null
+  rectification_next_states?: RectificationStatus[]
   rectified_at?: string
   created_at: string
   updated_at: string

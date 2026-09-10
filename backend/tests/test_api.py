@@ -60,10 +60,20 @@ def test_followup_and_confirm_flow():
 
         confirmed = client.post(
             f"/api/v1/assessments/{first['id']}/confirm",
-            json={"confirmed": True, "edits": {"conclusion": "人工确认：楼道堆物需立即清理"}},
+            json={
+                "confirmed": True,
+                "reviewer": "张网格员",
+                "note": "现场已核实，处置建议合理",
+                "edits": {"conclusion": "人工确认：楼道堆物需立即清理"},
+            },
         )
         assert confirmed.status_code == 200
         assert confirmed.json()["status"] == "confirmed"
+        human_review = confirmed.json()["human_review"]
+        assert human_review["resolution"]["confirmed"] is True
+        assert human_review["resolution"]["reviewer"] == "张网格员"
+        assert human_review["resolution"]["note"] == "现场已核实，处置建议合理"
+        assert human_review["resolution"]["resolved_at"]
 
 
 def test_list_assessments():
@@ -88,7 +98,7 @@ def test_rectification_flow():
         )
         assert submitted.status_code == 200
         body = submitted.json()
-        assert body["rectification_status"] == "under_review"
+        assert body["rectification_status"] == "pending_verification"
         assert body["images"][-1]["image_kind"] == "rectification"
         assert body["rectification_score"] is not None
         assert body["rectification_analysis"] is not None
@@ -98,7 +108,7 @@ def test_rectification_flow():
             json={"resolved": True},
         )
         assert confirmed.status_code == 200
-        assert confirmed.json()["rectification_status"] == "resolved"
+        assert confirmed.json()["rectification_status"] == "verified"
 
 
 def test_rectification_compare_endpoint():
@@ -120,6 +130,26 @@ def test_rectification_compare_endpoint():
     body = response.json()
     assert body["rectification_score"] is not None
     assert body["rectification_analysis"]["summary"]
+    assert body["rectification_analysis"]["comparison"]["rectification_count"] == 1
+    assert body["rectification_analysis"]["comparison"]["unmatched_rectification_count"] == 1
+
+
+def test_api_persists_multi_model_and_disagreement():
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/v1/assessments",
+            data={"description": "小区楼道堆放纸箱杂物，堵塞疏散通道"},
+        )
+        assert created.status_code == 201
+        body = created.json()
+        assert body["multi_model"]["ensemble_mode"] == "mock"
+        assert body["multi_model"]["results"][0]["provider"] == "mock"
+        assert body["multi_model"]["results"][0]["status"] == "success"
+        assert body["disagreement"]["mode"] == "single"
+        assert body["disagreement"]["model_count"] == 1
+        fetched = client.get(f"/api/v1/assessments/{body['id']}")
+        assert fetched.status_code == 200
+        assert fetched.json()["disagreement"]["mode"] == "single"
 
 
 def test_upload_knowledge_document_triggers_rebuild(monkeypatch):
