@@ -98,7 +98,7 @@ python -m pytest
 新增或修改语料后，在项目根目录执行：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\ingest_knowledge.py
+.\backend\.venv\Scripts\python.exe scripts\ingest_knowledge.py
 ```
 
 脚本会完成清洗、切片、向量化和检索验证：
@@ -111,10 +111,36 @@ python -m pytest
 
 ```powershell
 cd backend
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8001
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8001
 ```
 
 注意：当前切入的法规节选仅用于开发验证，正式使用前请逐条对照官方原文核对版本。
+
+### 向量缓存与索引持久化
+
+切片向量按「文本内容哈希 + embedding 模型」缓存在 `backend/data/faiss/`：
+
+```
+backend/data/faiss/
+  embeddings_<provider>_<model>.npz   # 内容哈希 → 向量
+  vector_index.faiss                  # FAISS 索引
+  vector_index.json                   # 语料签名、维度、切片数
+```
+
+行为：
+
+- 语料未变化时，重启直接加载已持久化的索引，**不调用 embedding 接口**。
+- 新增文档时，只对新增切片调用 embedding，已有切片走缓存。
+- 语料或 embedding 模型变化时，签名不匹配，自动重建。
+- 切换 provider / 模型会使用不同的缓存文件，不会串用不同维度的向量。
+
+清除缓存可强制全量重建：
+
+```powershell
+Remove-Item -Recurse -Force backend\data\faiss
+```
+
+安装 `faiss-cpu` 才会启用索引持久化；未安装时回退到 NumPy 检索，embedding 缓存仍然生效。
 
 ## 离线评测
 
@@ -123,13 +149,13 @@ cd backend
 运行 Mock 模式评测：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\evaluate.py --provider mock
+.\backend\.venv\Scripts\python.exe scripts\evaluate.py --provider mock
 ```
 
 运行真实模型评测（会调用 30 次模型接口，按量计费）：
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\evaluate.py --provider auto
+.\backend\.venv\Scripts\python.exe scripts\evaluate.py --provider auto
 ```
 
 单独对比 Reranker 开关（只跑知识库检索，不调用模型）：

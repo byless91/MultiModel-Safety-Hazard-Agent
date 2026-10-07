@@ -8,12 +8,38 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import get_settings
+from app.services.ensemble.categories import CATEGORY_RAG_TAGS
 from app.services.guardrail.input_guard import inspect_text
 from app.services.rag import get_rag
 
 SENTENCE_END = re.compile(r"(?<=[。！？；])")
 ARTICLE_RE = re.compile(r"第\s*[一二三四五六七八九十百千零〇0-9]+\s*条")
 SKIP_SOURCE_FILENAMES = {"sources.md"}
+
+_KNOWN_TAGS = sorted({tag for tags in CATEGORY_RAG_TAGS.values() for tag in tags})
+
+
+def derive_tags(text: str, limit: int = 8) -> list[str]:
+    """Infer retrieval tags from document text.
+
+    Uploaded regulations carry no tag metadata, and tag-filtered retrieval
+    otherwise excludes them permanently, so fall back to matching the known
+    tag vocabulary against the document body.
+    """
+    return [tag for tag in _KNOWN_TAGS if tag in text][:limit]
+
+
+def _knowledge_content_rejected(text: str) -> bool:
+    """Injection checks only.
+
+    Documents are bounded by the upload size limit, not by the 2000-character
+    cap that applies to a user's short field description. Applying that cap here
+    silently dropped every long regulation from the index.
+    """
+    return any(
+        item.severity == "error"
+        for item in inspect_text(text, source="knowledge_content", max_length=None)
+    )
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -81,13 +107,15 @@ def collect_directory_records(
         meta, body = parse_frontmatter(path.read_text(encoding="utf-8", errors="ignore"))
         if path.name in SKIP_SOURCE_FILENAMES or meta.get("index") == "false":
             continue
-        if any(item.severity == "error" for item in inspect_text(body, source="knowledge_content")):
+        if _knowledge_content_rejected(body):
             continue
         if not body.strip():
             continue
         item_id = meta.get("id") or path.stem
         title = meta.get("title") or path.stem
         tags = meta.get("tags") or []
+        if not tags:
+            tags = derive_tags(body)
         article = meta.get("article") or extract_article(body)
         document = meta.get("document") or title
         risk_type = meta.get("risk_type") or (tags[0] if tags else "")
@@ -143,7 +171,7 @@ def document_to_records(
     body = str(doc.get("content_text") or "").strip()
     if not body:
         return []
-    if any(item.severity == "error" for item in inspect_text(body, source="knowledge_content")):
+    if _knowledge_content_rejected(body):
         return []
     title = str(doc.get("title") or "未命名文档")
     article = str(doc.get("article") or extract_article(body))
@@ -151,6 +179,8 @@ def document_to_records(
         str(item)
         for item in list(dict.fromkeys((doc.get("tags") or []) + (doc.get("meta_tags") or [])))
     ]
+    if not tags:
+        tags = derive_tags(body)
     records: list[dict] = []
     for index, chunk in enumerate(chunk_text(body, chunk_size, overlap)):
         records.append(

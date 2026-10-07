@@ -1,9 +1,22 @@
 import json
 import re
+from pathlib import Path
 
 import numpy as np
 
 from app.core.config import get_settings
+from app.services.embedding_cache import (
+    CACHE_VERSION,
+    corpus_signature,
+    embedding_cache_file,
+    index_file,
+    index_meta_file,
+    load_embedding_cache,
+    load_index_meta,
+    save_embedding_cache,
+    save_index_meta,
+    text_hash,
+)
 from app.services.providers import get_provider, hash_embed
 
 DEMO_SOURCE_MARKERS = ("演示",)
@@ -97,11 +110,23 @@ class RAGService:
         self.provider = provider
         self.texts: list[str] = []
         self.metas: list[dict] = []
+        self.hashes: list[str] = []
         self.vectors = np.zeros((0, 0), dtype=np.float32)
         self._index = None
+        self.embedding_dim = 0
         self.embedding_fallback = False
         self.reranker_enabled = settings.reranker_enabled
+        self.model_key = self._model_key()
         self.load()
+
+    @property
+    def cache_dir(self) -> Path:
+        return Path(self.settings.faiss_index_dir)
+
+    def _model_key(self) -> str:
+        provider = getattr(self.provider, "name", "") or "unknown"
+        model = getattr(self.provider, "embedding_model", "") or "default"
+        return f"{provider}:{model}"
 
     def load(self) -> None:
         chunks = []
@@ -135,28 +160,109 @@ class RAGService:
             }
             for item in chunks
         ]
-        self.rebuild()
+        self.hashes = [text_hash(text) for text in self.texts]
+        self.model_key = self._model_key()
+        self.load_or_build_index()
 
-    def rebuild(self) -> None:
+    def load_or_build_index(self) -> None:
+        """Reuse the persisted FAISS index when the corpus is unchanged.
+
+        This is the fast path: no embedding API calls and no vector assembly.
+        """
         if not self.texts:
             self.vectors = np.zeros((0, 0), dtype=np.float32)
             self._index = None
+            self.embedding_dim = 0
             return
-        if self.embedding_fallback:
-            vectors = hash_embed(self.texts)
-        else:
-            try:
-                vectors = self.provider.embed(self.texts)
-                self.embedding_fallback = False
-            except Exception:
-                self.embedding_fallback = True
-                vectors = hash_embed(self.texts)
+        signature = corpus_signature(self.hashes, self.model_key)
+        if self._restore_persisted_index(signature):
+            return
+        self.rebuild()
+        self._persist_index(signature)
+
+    def _restore_persisted_index(self, signature: str) -> bool:
+        if not HAS_FAISS:
+            return False
+        meta = load_index_meta(index_meta_file(self.cache_dir))
+        if not meta or meta.get("signature") != signature:
+            return False
+        path = index_file(self.cache_dir)
+        if not path.exists():
+            return False
+        try:
+            self._index = faiss.read_index(str(path))
+        except Exception:
+            self._index = None
+            return False
+        self.embedding_dim = int(meta.get("dim") or 0) or int(self._index.d)
+        self.embedding_fallback = bool(meta.get("embedding_fallback", False))
+        self.vectors = np.zeros((0, 0), dtype=np.float32)
+        return True
+
+    def _persist_index(self, signature: str) -> None:
+        if not HAS_FAISS or self._index is None:
+            return
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            faiss.write_index(self._index, str(index_file(self.cache_dir)))
+            save_index_meta(
+                index_meta_file(self.cache_dir),
+                {
+                    "version": CACHE_VERSION,
+                    "signature": signature,
+                    "model_key": self.model_key,
+                    "count": len(self.texts),
+                    "dim": int(self.embedding_dim),
+                    "embedding_fallback": bool(self.embedding_fallback),
+                },
+            )
+        except OSError:
+            pass
+
+    def rebuild(self) -> None:
+        if len(self.hashes) != len(self.texts):
+            self.hashes = [text_hash(text) for text in self.texts]
+        if not self.texts:
+            self.vectors = np.zeros((0, 0), dtype=np.float32)
+            self._index = None
+            self.embedding_dim = 0
+            return
+        vectors = self._embed_texts()
         self.vectors = np.asarray(vectors, dtype=np.float32)
+        self.embedding_dim = (
+            int(self.vectors.shape[1]) if self.vectors.ndim == 2 else 0
+        )
         self._index = None
         if HAS_FAISS and self.vectors.shape[0] > 0:
             index = faiss.IndexFlatIP(self.vectors.shape[1])
             index.add(self.vectors)
             self._index = index
+
+    def _embed_texts(self) -> list:
+        if self.embedding_fallback:
+            return hash_embed(self.texts)
+        try:
+            return self._embed_with_cache()
+        except Exception:
+            self.embedding_fallback = True
+            return hash_embed(self.texts)
+
+    def _embed_with_cache(self) -> list:
+        """Embed only chunks whose text hash is absent from the cache."""
+        cache_path = embedding_cache_file(self.cache_dir, self.model_key)
+        cache = load_embedding_cache(cache_path, self.model_key)
+        missing = [
+            (index, text)
+            for index, (item_hash, text) in enumerate(zip(self.hashes, self.texts))
+            if item_hash not in cache
+        ]
+        if missing:
+            fresh = self.provider.embed([text for _, text in missing])
+            for (index, _), vector in zip(missing, fresh):
+                cache[self.hashes[index]] = np.asarray(vector, dtype=np.float32)
+            save_embedding_cache(cache_path, self.model_key, cache)
+        self.embedding_fallback = False
+        return [cache[item_hash] for item_hash in self.hashes]
 
     def search(
         self,
@@ -175,23 +281,29 @@ class RAGService:
             else reranker_enabled
         )
         candidate_limit = top_k * 2 if use_reranker else top_k
+        # Tag filtering happens after retrieval, so a tag must not be crowded
+        # out of the candidate window by untagged chunks.
+        candidate_window = min(
+            max(top_k * 4, 200 if tags else 0),
+            len(self.texts),
+        )
         try:
             if self.embedding_fallback:
                 raise RuntimeError("fallback embedding mode")
             query_vector = np.asarray(self.provider.embed([query]), dtype=np.float32)
         except Exception:
-            if self.vectors.shape[1] != 256:
+            if self.embedding_dim != 256:
                 self.embedding_fallback = True
                 self.rebuild()
             query_vector = np.asarray(hash_embed([query]), dtype=np.float32)
 
         if self._index is not None:
-            scores, indexes = self._index.search(query_vector, min(top_k * 4, len(self.texts)))
+            scores, indexes = self._index.search(query_vector, candidate_window)
             pairs = [(int(i), float(s)) for i, s in zip(indexes[0], scores[0]) if i >= 0]
         else:
             dots = self.vectors @ query_vector[0]
             order = np.argsort(dots)[::-1]
-            pairs = [(int(i), float(dots[i])) for i in order[: top_k * 4]]
+            pairs = [(int(i), float(dots[i])) for i in order[:candidate_window]]
 
         results: list[dict] = []
         seen: set[str] = set()

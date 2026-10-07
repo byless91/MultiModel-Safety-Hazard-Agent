@@ -1,5 +1,8 @@
-import os
 import io
+import atexit
+import os
+import shutil
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -7,10 +10,19 @@ import pytest
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
+# Knowledge rebuilds write chunks into KNOWLEDGE_DIR/chunks. Tests must never
+# touch the real index, so work on a throwaway copy of the corpus instead.
+_REAL_KNOWLEDGE_DIR = BACKEND_DIR / "data" / "knowledge"
+_TEST_KNOWLEDGE_DIR = Path(tempfile.mkdtemp(prefix="safety-hazard-knowledge-"))
+if _REAL_KNOWLEDGE_DIR.exists():
+    shutil.copytree(_REAL_KNOWLEDGE_DIR, _TEST_KNOWLEDGE_DIR, dirs_exist_ok=True)
+atexit.register(shutil.rmtree, _TEST_KNOWLEDGE_DIR, ignore_errors=True)
+
 os.environ["PROVIDER_MODE"] = "mock"
 os.environ["DATABASE_URL"] = f"sqlite:///{(BACKEND_DIR / 'data' / 'test.db').as_posix()}"
 os.environ["UPLOAD_DIR"] = str(BACKEND_DIR / "data" / "uploads" / "test")
-os.environ["KNOWLEDGE_DIR"] = str(BACKEND_DIR / "data" / "knowledge")
+os.environ["KNOWLEDGE_DIR"] = str(_TEST_KNOWLEDGE_DIR)
+os.environ["FAISS_INDEX_DIR"] = str(BACKEND_DIR / "data" / "faiss" / "test")
 os.environ["MAX_FOLLOWUPS"] = "2"
 
 

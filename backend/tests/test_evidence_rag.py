@@ -2,7 +2,7 @@ import json
 
 from app.core.config import Settings
 from app.services.ensemble.categories import rag_tags_for_category
-from app.services.knowledge import document_to_records, ingest_directory
+from app.services.knowledge import derive_tags, document_to_records, ingest_directory
 from app.services.providers import MockProvider
 from app.services.rag import RAGService, build_evidence_context, retrieval_as_evidence
 
@@ -97,6 +97,48 @@ def test_category_rag_tags_mapping():
     assert rag_tags_for_category("未知类别") == []
 
 
+def test_tag_filter_survives_large_untagged_corpus(tmp_path):
+    """Tag filtering runs after retrieval, so the window must not crowd out tags.
+
+    Untagged chunks that dominate lexical similarity used to fill the fixed
+    top_k*4 window, hiding every tagged chunk from tag-filtered search.
+    """
+    chunks = [
+        {
+            "id": f"noise-{index}",
+            "document": "噪声文档",
+            "tags": [],
+            "text": "占用疏散通道 占用疏散通道 占用疏散通道",
+        }
+        for index in range(120)
+    ]
+    chunks.extend(
+        {
+            "id": f"tagged-{index}",
+            "document": "中华人民共和国消防法",
+            "article": "第二十八条",
+            "source": "国家法律法规数据库",
+            "tags": ["消防", "疏散通道"],
+            "text": "本条为消防安全管理的一般性规定。",
+        }
+        for index in range(3)
+    )
+    (tmp_path / "chunks.jsonl").write_text(
+        "\n".join(json.dumps(item, ensure_ascii=False) for item in chunks),
+        encoding="utf-8",
+    )
+    settings = Settings(
+        provider_mode="mock",
+        knowledge_dir=str(tmp_path),
+        _env_file=None,
+    )
+    rag = RAGService(settings, MockProvider())
+    results = rag.search("占用疏散通道", top_k=5, tags=["消防", "疏散通道"])
+    assert results, "tagged chunks must not be crowded out of the candidate window"
+    assert all("消防" in item["tags"] for item in results)
+    assert len(results) >= 3
+
+
 def test_build_evidence_context_includes_trace():
     context = build_evidence_context(
         [
@@ -182,6 +224,55 @@ def test_ingest_skips_injected_source_documents(tmp_path):
     records = ingest_directory(source, tmp_path / "out")
     assert records
     assert not any("忽略" in record["text"] for record in records)
+
+
+def test_long_source_document_is_not_dropped_by_description_length_cap(tmp_path):
+    """The 2000-char user-description cap must not apply to regulations."""
+    source = tmp_path / "source"
+    source.mkdir()
+    body = "第二十八条 任何单位、个人不得占用、堵塞、封闭疏散通道、安全出口。" * 200
+    assert len(body) > 2000
+    (source / "long_law.txt").write_text(body, encoding="utf-8")
+    records = ingest_directory(source, tmp_path / "out")
+    assert records
+    assert sum(len(record["text"]) for record in records) > 2000
+
+
+def test_long_uploaded_document_becomes_chunks():
+    body = "第二十八条 任何单位、个人不得占用、堵塞、封闭疏散通道、安全出口。" * 200
+    assert len(body) > 2000
+    records = document_to_records(
+        {
+            "id": "long-doc",
+            "title": "消防法全文",
+            "source": "国家法律法规数据库",
+            "content_text": body,
+        }
+    )
+    assert records
+    assert len(records) > 1
+
+
+def test_derive_tags_from_regulation_text():
+    tags = derive_tags("不得占用、堵塞疏散通道和安全出口，不得埋压、圈占消火栓。")
+    assert "疏散通道" in tags
+    assert "安全出口" in tags
+    assert "消火栓" in tags
+    assert derive_tags("与安全无关的普通说明文字。") == []
+
+
+def test_uploaded_document_without_metadata_still_gets_tags():
+    """Untagged uploads would be invisible to tag-filtered retrieval."""
+    records = document_to_records(
+        {
+            "id": "no-tags-doc",
+            "title": "消防法节选",
+            "content_text": "第二十八条 不得占用、堵塞、封闭疏散通道、安全出口。",
+        }
+    )
+    assert records
+    assert records[0]["tags"]
+    assert "疏散通道" in records[0]["tags"]
 
 
 def test_rag_search_excludes_demo_rows_by_default(tmp_path):
