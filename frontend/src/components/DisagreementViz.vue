@@ -4,13 +4,9 @@
       <div class="viz-overview">
         <div class="viz-score">
           <div class="viz-score-label">模型一致性</div>
-          <el-progress
-            type="dashboard"
-            :percentage="agreementPercent"
-            :width="120"
-            :stroke-width="10"
-            :color="agreementColor"
-          />
+          <div class="viz-score-value" :style="{ color: agreementColor }">
+            {{ disagreement.agreement_available ? `${agreementPercent}%` : '—' }}
+          </div>
           <p v-if="!disagreement.agreement_available" class="viz-score-hint">
             未进行交叉验证
           </p>
@@ -174,6 +170,13 @@ function confidenceText(value: number) {
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+.viz-score-value {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .viz-score-label,

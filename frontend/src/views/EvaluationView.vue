@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">评测总览</h1>
-        <p class="page-subtitle">指标、A-F 对比与错误分析均来自正式评测产物，不展示推算数据</p>
+        <p class="page-subtitle">数据来自正式评测产物，不展示推算结果。</p>
       </div>
       <el-button :loading="loading" @click="load">
         <el-icon><Refresh /></el-icon>
@@ -24,168 +24,222 @@
       <div class="meta-strip">
         <el-tag :type="modeTag.type">{{ modeTag.label }}</el-tag>
         <el-tag v-if="report.dataset_version" type="info">数据集 {{ report.dataset_version }}</el-tag>
-        <el-tag v-if="report.provider" type="info">Provider {{ report.provider }}</el-tag>
         <el-tag v-if="report.dataset_overview" type="info">
-          {{ report.dataset_overview.case_count }} 案例
+          {{ report.dataset_overview.case_count }} 个案例
         </el-tag>
       </div>
 
-      <div class="metric-grid">
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.category_accuracy) }}</div>
-          <div class="metric-label">类别准确率</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.level_accuracy) }}</div>
-          <div class="metric-label">等级准确率</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.severity_mae) }}</div>
-          <div class="metric-label">Severity MAE</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.level_accuracy_tolerance1) }}</div>
-          <div class="metric-label">±1 容差</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.evidence_support_rate) }}</div>
-          <div class="metric-label">证据支持率</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.unsupported_claim_rate) }}</div>
-          <div class="metric-label">无依据结论率</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.model_conflict_rate) }}</div>
-          <div class="metric-label">模型分歧率</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-value">{{ fmt(m.human_review_rate) }}</div>
-          <div class="metric-label">人工复核率</div>
-        </div>
-        <div class="metric-cell danger">
-          <div class="metric-value">{{ fmt(m.unsafe_auto_pass_rate) }}</div>
-          <div class="metric-label">Unsafe Auto-Pass</div>
-        </div>
-      </div>
-
-      <el-card class="block-card">
-        <template #header>Dataset Overview</template>
-        <div v-if="report.dataset_overview" class="overview-list">
-          <p>来源分布：{{ pretty(report.dataset_overview.source_type_counts) }}</p>
-          <p>类别分布：{{ pretty(report.dataset_overview.category_counts) }}</p>
-          <p>等级分布：{{ pretty(report.dataset_overview.severity_counts) }}</p>
-          <p>有隐患样本 {{ report.dataset_overview.hazard_case_count }}，
-            无隐患负样本 {{ report.dataset_overview.safe_negative_case_count }}，
-            含图片 {{ report.dataset_overview.image_case_count }}</p>
-          <ul v-if="report.dataset_overview.limitation_notes?.length" class="limitation-list">
-            <li v-for="note in report.dataset_overview.limitation_notes" :key="note">{{ note }}</li>
-          </ul>
-        </div>
-      </el-card>
-
-      <el-card class="block-card">
-        <template #header>模块表现</template>
-        <el-table v-if="report.model_family_performance?.length" :data="report.model_family_performance" size="small">
-          <el-table-column prop="family" label="模型家族" />
-          <el-table-column prop="attempts" label="有效样本" width="100" />
-          <el-table-column label="类别准确率" width="120">
-            <template #default="{ row }">{{ fmt(row.category_accuracy) }}</template>
-          </el-table-column>
-          <el-table-column label="等级准确率" width="120">
-            <template #default="{ row }">{{ fmt(row.level_accuracy) }}</template>
-          </el-table-column>
-        </el-table>
-        <p v-if="report.evidence_stats_summary" class="module-line">
-          Evidence：支持 {{ report.evidence_stats_summary.supported_count }} 条，
-          不足 {{ report.evidence_stats_summary.insufficient_count }} 条
-        </p>
-        <p v-if="report.review_and_risk_stats" class="module-line">
-          Risk Engine：高风险 {{ report.review_and_risk_stats.high_risk_case_count }} 条，
-          建议复核 {{ report.review_and_risk_stats.risk_review_suggestion_count }} 条，
-          平均风险分 {{ report.review_and_risk_stats.average_risk_score }}
-        </p>
-      </el-card>
-
-      <el-card v-if="ablationVariants.length" class="block-card">
-        <template #header>消融对比（A-F）</template>
-        <p v-if="ablation" class="module-line">
-          数据集 {{ ablation.dataset_version }} /
-          {{ ablation.case_count }} 案例 /
-          {{ ablation.provider_mode }} 模式 / 来源 {{ pretty(ablation.partitions || ablation.source_type_counts) }}
-        </p>
-        <el-table :data="ablationVariants" size="small">
-          <el-table-column prop="label" label="变体" min-width="170" />
-          <el-table-column label="模式" width="90">
-            <template #default="{ row }">{{ row.mode || ablation?.evaluation_mode || '-' }}</template>
-          </el-table-column>
-          <el-table-column label="类别" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.category_accuracy) }}</template>
-          </el-table-column>
-          <el-table-column label="等级" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.level_accuracy) }}</template>
-          </el-table-column>
-          <el-table-column label="MAE" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.severity_mae) }}</template>
-          </el-table-column>
-          <el-table-column label="条款" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.clause_hit_rate) }}</template>
-          </el-table-column>
-          <el-table-column label="证据支持" width="100">
-            <template #default="{ row }">{{ fmt(row.metrics.evidence_support_rate) }}</template>
-          </el-table-column>
-          <el-table-column label="复核率" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.human_review_rate) }}</template>
-          </el-table-column>
-          <el-table-column label="分歧率" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.model_conflict_rate) }}</template>
-          </el-table-column>
-          <el-table-column label="Unsafe" width="90">
-            <template #default="{ row }">{{ fmt(row.metrics.unsafe_auto_pass_rate) }}</template>
-          </el-table-column>
-        </el-table>
-      </el-card>
-
-      <el-card class="block-card">
-        <template #header>错误分析</template>
-        <el-row v-if="report.error_summary?.counts" :gutter="12" class="error-chips">
-          <el-col :span="8" :xs="12" v-for="(count, key) in report.error_summary.counts" :key="key">
-            <div class="error-chip">
-              <span class="error-chip-name">{{ errorLabel(key) }}</span>
-              <span class="error-chip-count">{{ count }}</span>
+      <el-tabs v-model="activeTab" class="eval-tabs">
+        <el-tab-pane label="总览" name="overview">
+          <div class="metric-grid">
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.category_accuracy) }}</span>
+              <span class="metric-label">类别准确率</span>
             </div>
-          </el-col>
-        </el-row>
-      </el-card>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.level_accuracy) }}</span>
+              <span class="metric-label">等级准确率</span>
+            </div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmt(m.severity_mae) }}</span>
+              <span class="metric-label">Severity MAE</span>
+            </div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.level_accuracy_tolerance1) }}</span>
+              <span class="metric-label">±1 容差</span>
+            </div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.evidence_support_rate) }}</span>
+              <span class="metric-label">证据支持率</span>
+            </div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.unsupported_claim_rate) }}</span>
+              <span class="metric-label">无依据结论率</span>
+            </div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.model_conflict_rate) }}</span>
+              <span class="metric-label">模型分歧率</span>
+            </div>
+            <div class="metric-cell">
+              <span class="metric-value">{{ fmtRate(m.human_review_rate) }}</span>
+              <span class="metric-label">人工复核率</span>
+            </div>
+            <div class="metric-cell metric-cell--danger">
+              <span class="metric-value">{{ fmtRate(m.unsafe_auto_pass_rate) }}</span>
+              <span class="metric-label">Unsafe Auto-Pass</span>
+            </div>
+          </div>
 
-      <el-card class="block-card">
-        <template #header>失败案例清单</template>
-        <el-table
-          v-if="report.error_analysis?.length"
-          :data="report.error_analysis"
-          size="small"
-          empty-text="暂无失败案例"
-        >
-          <el-table-column prop="case_id" label="案例" min-width="150" />
-          <el-table-column prop="expected" label="期望" min-width="160" />
-          <el-table-column prop="predicted" label="预测" min-width="160" />
-          <el-table-column label="错误类型" min-width="170">
-            <template #default="{ row }">
-              <span v-for="flag in row.flags" :key="flag" class="flag-tag">{{ flag }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="原因" min-width="280">
-            <template #default="{ row }">
-              <span class="reason-text">{{ joinReasons(row) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
+          <section v-if="report.dataset_overview" class="block">
+            <h4 class="block-title">Dataset Overview</h4>
+            <dl class="overview-grid">
+              <div>
+                <dt>来源分布</dt>
+                <dd>
+                  <span
+                    v-for="(count, key) in report.dataset_overview.source_type_counts"
+                    :key="key"
+                    class="dist-chip"
+                  >
+                    {{ key }} {{ count }}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>类别分布</dt>
+                <dd>
+                  <span
+                    v-for="(count, key) in report.dataset_overview.category_counts"
+                    :key="key"
+                    class="dist-chip"
+                  >
+                    {{ key }} {{ count }}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>等级分布</dt>
+                <dd>
+                  <span
+                    v-for="(count, key) in report.dataset_overview.severity_counts"
+                    :key="key"
+                    class="dist-chip"
+                  >
+                    {{ key }} 级 {{ count }}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>样本构成</dt>
+                <dd>
+                  有隐患 {{ report.dataset_overview.hazard_case_count }}，
+                  无隐患 {{ report.dataset_overview.safe_negative_case_count }}，
+                  含图片 {{ report.dataset_overview.image_case_count }}
+                </dd>
+              </div>
+            </dl>
+            <ul v-if="report.dataset_overview.limitation_notes?.length" class="limitation-list">
+              <li v-for="note in report.dataset_overview.limitation_notes" :key="note">{{ note }}</li>
+            </ul>
+          </section>
+
+          <section class="block">
+            <h4 class="block-title">模块表现</h4>
+            <el-table
+              v-if="report.model_family_performance?.length"
+              :data="report.model_family_performance"
+              size="small"
+            >
+              <el-table-column prop="family" label="模型家族" />
+              <el-table-column prop="attempts" label="有效样本" width="100" />
+              <el-table-column label="类别准确率" width="120">
+                <template #default="{ row }">{{ fmt(row.category_accuracy) }}</template>
+              </el-table-column>
+              <el-table-column label="等级准确率" width="120">
+                <template #default="{ row }">{{ fmt(row.level_accuracy) }}</template>
+              </el-table-column>
+            </el-table>
+            <p v-if="report.evidence_stats_summary" class="module-line">
+              Evidence：支持 {{ report.evidence_stats_summary.supported_count }} 条，
+              不足 {{ report.evidence_stats_summary.insufficient_count }} 条
+            </p>
+            <p v-if="report.review_and_risk_stats" class="module-line">
+              Risk Engine：高风险 {{ report.review_and_risk_stats.high_risk_case_count }} 条，
+              建议复核 {{ report.review_and_risk_stats.risk_review_suggestion_count }} 条，
+              平均风险分 {{ report.review_and_risk_stats.average_risk_score }}
+            </p>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="消融对比" name="ablation">
+          <section class="block">
+            <h4 class="block-title">消融对比（A-F）</h4>
+            <p v-if="ablation" class="module-line">
+              数据集 {{ ablation.dataset_version }} /
+              {{ ablation.case_count }} 个案例 /
+              {{ ablation.provider_mode }} 模式 /
+              来源 {{ pretty(ablation.partitions || ablation.source_type_counts) }}
+            </p>
+            <el-table v-if="ablationVariants.length" :data="ablationVariants" size="small">
+              <el-table-column prop="label" label="变体" min-width="170" />
+              <el-table-column label="模式" width="90">
+                <template #default="{ row }">
+                  {{ row.mode || ablation?.evaluation_mode || '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column label="类别" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.category_accuracy) }}</template>
+              </el-table-column>
+              <el-table-column label="等级" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.level_accuracy) }}</template>
+              </el-table-column>
+              <el-table-column label="MAE" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.severity_mae) }}</template>
+              </el-table-column>
+              <el-table-column label="条款" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.clause_hit_rate) }}</template>
+              </el-table-column>
+              <el-table-column label="证据支持" width="100">
+                <template #default="{ row }">{{ fmt(row.metrics.evidence_support_rate) }}</template>
+              </el-table-column>
+              <el-table-column label="复核率" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.human_review_rate) }}</template>
+              </el-table-column>
+              <el-table-column label="分歧率" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.model_conflict_rate) }}</template>
+              </el-table-column>
+              <el-table-column label="Unsafe" width="90">
+                <template #default="{ row }">{{ fmt(row.metrics.unsafe_auto_pass_rate) }}</template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="还没有消融评测结果" />
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="错误分析" name="errors">
+          <section class="block">
+            <h4 class="block-title">错误分析</h4>
+            <div v-if="report.error_summary?.counts" class="error-grid">
+              <div v-for="(count, key) in report.error_summary.counts" :key="key" class="error-cell">
+                <span class="error-count">{{ count }}</span>
+                <span class="error-name">{{ errorLabel(key) }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="block">
+            <h4 class="block-title">失败案例清单</h4>
+            <el-table
+              v-if="report.error_analysis?.length"
+              :data="report.error_analysis"
+              size="small"
+            >
+              <el-table-column prop="case_id" label="案例" min-width="150" />
+              <el-table-column prop="expected" label="期望" min-width="150" />
+              <el-table-column prop="predicted" label="预测" min-width="150" />
+              <el-table-column label="错误类型" min-width="160">
+                <template #default="{ row }">
+                  <span v-for="flag in row.flags" :key="flag" class="flag-tag">
+                    {{ errorLabel(flag) }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column label="原因" min-width="260">
+                <template #default="{ row }">
+                  <span class="reason-text">{{ joinReasons(row) }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="没有需要分析的失败案例" />
+          </section>
+        </el-tab-pane>
+      </el-tabs>
     </template>
 
-    <el-card v-else-if="!errorMessage" class="block-card">
-      <el-empty description="尚未生成评测报告，请先运行 scripts/evaluate.py 与 scripts/ablation.py" />
-    </el-card>
+    <el-empty
+      v-else-if="!errorMessage"
+      description="还没有评测报告，先运行 scripts/evaluate.py 和 scripts/ablation.py"
+    />
   </section>
 </template>
 
@@ -203,24 +257,26 @@ import type {
 const loading = ref(false)
 const errorMessage = ref('')
 const payload = ref<EvaluationReportsPayload | null>(null)
+const activeTab = ref('overview')
 
 const report = computed<EvaluationReport | null>(() => payload.value?.evaluation_report ?? null)
 const ablation = computed<AblationReport | null>(() => payload.value?.ablation_report ?? null)
+const ablationVariants = computed(() =>
+  Object.entries(ablation.value?.variants || {}).map(([key, item]) => ({ key, ...item })),
+)
+
 const m = computed<EvaluationMetrics>(() => {
   const current = report.value
   if (!current) return { total: 0 }
   if (current.metrics && Object.keys(current.metrics).length > 0) {
     return current.metrics
   }
-  // 兼容旧的 report.json：指标位于顶层。
   return current as unknown as EvaluationMetrics
 })
-const ablationVariants = computed(() =>
-  Object.entries(ablation.value?.variants || {}).map(([key, item]) => ({ key, ...item })),
-)
 
 const modeTag = computed(() => {
-  const mode = report.value?.evaluation_mode || payload.value?.ablation_report?.evaluation_mode || 'mock'
+  const mode =
+    report.value?.evaluation_mode || payload.value?.ablation_report?.evaluation_mode || 'mock'
   const isMock = mode === 'mock' || mode === 'fallback'
   return { type: isMock ? 'info' : 'success', label: isMock ? 'Mock 模式' : '真实模型模式' }
 })
@@ -247,6 +303,11 @@ function fmt(value: number | null | undefined) {
     return Number.isInteger(value) ? String(value) : value.toFixed(4)
   }
   return String(value)
+}
+
+function fmtRate(value: number | null | undefined) {
+  if (value === null || value === undefined) return '-'
+  return `${(value * 100).toFixed(1)}%`
 }
 
 function pretty(value: Record<string, number> | undefined) {
@@ -283,111 +344,148 @@ function extractDetail(err: unknown): string {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--s-3);
   flex-wrap: wrap;
 }
 
 .error-alert {
-  margin: 14px 0;
+  margin: var(--s-4) 0;
 }
 
 .meta-strip {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
   flex-wrap: wrap;
-  margin: 14px 0;
+  margin: var(--s-4) 0 var(--s-2);
 }
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--s-1) 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .metric-cell {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 10px 12px;
-  min-height: 64px;
-}
-
-.metric-cell.danger {
-  background: #fff7ed;
-  border-color: #fdba74;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-3) var(--s-3) 0;
 }
 
 .metric-value {
-  font-size: 20px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
-  color: #0f172a;
+  line-height: 1.1;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
 }
 
 .metric-label {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #64748b;
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
-.block-card {
-  margin-bottom: 14px;
+.metric-cell--danger .metric-value {
+  color: var(--warning);
 }
 
-.overview-list p {
-  margin: 4px 0;
-  color: #334155;
+.block {
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.block:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.block-title {
+  margin: 0 0 var(--s-3);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-3) var(--s-5);
+  margin: 0;
+}
+
+.overview-grid dt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.overview-grid dd {
+  margin: var(--s-1) 0 0;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.dist-chip {
+  display: inline-block;
+  margin: 0 var(--s-1) var(--s-1) 0;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: var(--fs-xs);
 }
 
 .limitation-list {
-  margin: 8px 0 0;
+  margin: var(--s-4) 0 0;
   padding-left: 18px;
-  color: #92400e;
-  font-size: 13px;
+  color: var(--warning);
+  font-size: var(--fs-sm);
 }
 
 .module-line {
-  color: #334155;
-  margin: 6px 0;
+  margin: var(--s-2) 0 0;
+  color: var(--text);
+  font-size: var(--fs-sm);
 }
 
-.error-chips {
-  row-gap: 10px;
+.error-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-1) 0;
 }
 
-.error-chip {
+.error-cell {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 8px 10px;
-  background: #f1f5f9;
-  height: 36px;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding-right: var(--s-3);
 }
 
-.error-chip-name {
-  color: #475569;
-  font-size: 13px;
-}
-
-.error-chip-count {
+.error-count {
+  font-size: var(--fs-xl);
   font-weight: 700;
-  color: #be123c;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.error-name {
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
 .flag-tag {
   display: inline-block;
-  margin-right: 6px;
-  padding: 2px 6px;
-  border-radius: 4px;
+  margin: 0 var(--s-1) var(--s-1) 0;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
   background: #fee2e2;
-  color: #b91c1c;
-  font-size: 12px;
+  color: var(--danger);
+  font-size: var(--fs-xs);
 }
 
 .reason-text {
-  color: #475569;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 </style>

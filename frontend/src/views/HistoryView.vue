@@ -18,7 +18,14 @@
         </el-button>
       </div>
 
-      <el-table :data="items" v-loading="store.loading" empty-text="暂无研判记录">
+      <el-table :data="items" v-loading="store.loading">
+        <template #empty>
+          <div class="empty-state">
+            <p class="empty-title">还没有研判记录</p>
+            <p class="empty-hint">到「现场研判」上传现场照片和情况描述，记录会自动出现在这里。</p>
+            <el-button type="primary" plain @click="router.push('/')">去现场研判</el-button>
+          </div>
+        </template>
         <el-table-column label="时间" width="170">
           <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
         </el-table-column>
@@ -118,7 +125,23 @@ function statusLabel(status: string) {
 <style scoped>
 .toolbar {
   display: flex;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.empty-state {
+  padding: var(--s-5) var(--s-4);
+}
+
+.empty-title {
+  margin: 0 0 var(--s-1);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.empty-hint {
+  margin: 0 0 var(--s-4);
+  color: var(--muted);
+  font-size: var(--fs-sm);
 }
 </style>

@@ -3,13 +3,8 @@
     <div class="explain-overview">
       <div class="explain-score">
         <div class="explain-score-label">风险分</div>
-        <el-progress
-          type="dashboard"
-          :percentage="score"
-          :width="120"
-          :stroke-width="10"
-          :color="scoreColor"
-        />
+        <div class="explain-score-value" :style="{ color: scoreColor }">{{ score }}</div>
+        <div class="explain-score-scale">满分 100</div>
         <span class="explain-level">{{ levelText }}</span>
       </div>
       <div class="explain-summary">
@@ -216,6 +211,18 @@ const triggeredRules = computed(() =>
   flex-direction: column;
   align-items: center;
   gap: 6px;
+}
+
+.explain-score-value {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.explain-score-scale {
+  font-size: 12px;
+  color: var(--muted, #6b7280);
 }
 
 .explain-score-label,

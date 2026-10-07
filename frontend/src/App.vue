@@ -12,8 +12,14 @@
           <router-link to="/knowledge" class="nav-link">知识库</router-link>
           <router-link to="/evaluation" class="nav-link">评测总览</router-link>
         </nav>
-        <el-tag v-if="provider" size="small" :type="provider === 'mock' ? 'info' : 'success'">
-          {{ provider === 'mock' ? 'Mock 演示模式' : '真实模型模式' }}
+        <el-tag
+          v-if="provider"
+          class="mode-tag"
+          size="small"
+          effect="dark"
+          :type="provider === 'mock' ? 'info' : 'success'"
+        >
+          {{ provider === 'mock' ? '演示模式' : '真实模型' }}
         </el-tag>
       </div>
     </header>
@@ -46,23 +52,24 @@ onMounted(async () => {
 }
 
 .topbar {
-  background: #164e63;
+  background: var(--brand-dark);
 }
 
 .topbar-inner {
   display: flex;
   align-items: center;
-  gap: 24px;
-  max-width: 1200px;
+  gap: var(--s-5);
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 12px 20px;
+  padding: var(--s-3) var(--s-5);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   color: #ffffff;
+  font-size: var(--fs-lg);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -73,25 +80,44 @@ onMounted(async () => {
 
 .nav {
   display: flex;
-  gap: 18px;
+  gap: var(--s-1);
   flex: 1;
 }
 
 .nav-link {
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-control);
   color: #cbd5e1;
   text-decoration: none;
-  padding: 4px 2px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 .nav-link.router-link-active {
+  background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
   font-weight: 600;
 }
 
-@media (max-width: 640px) {
+.mode-tag {
+  flex: none;
+}
+
+@media (max-width: 720px) {
   .topbar-inner {
     flex-wrap: wrap;
-    gap: 10px;
+    gap: var(--s-2);
+    padding: var(--s-3) var(--s-3);
+  }
+
+  .nav {
+    order: 3;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
   }
 }
 </style>

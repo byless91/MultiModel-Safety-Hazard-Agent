@@ -5,9 +5,19 @@
       返回
     </el-button>
     <h1 class="page-title">研判详情</h1>
-    <p class="page-subtitle">{{ assessment?.description || '加载中' }}</p>
+    <p class="page-subtitle">{{ assessment?.description || '正在加载研判记录' }}</p>
 
-    <el-card v-if="assessment" v-loading="store.loading">
+    <el-skeleton v-if="!assessment && store.loading" :rows="6" animated />
+
+    <el-alert
+      v-else-if="!assessment && loadError"
+      title="没有找到这条研判记录，可能已被删除"
+      type="warning"
+      :closable="false"
+      show-icon
+    />
+
+    <section v-else-if="assessment" class="detail-panel">
       <AssessmentResult
         :assessment="assessment"
         :loading="store.loading"
@@ -15,7 +25,7 @@
         @confirm="onConfirm"
         @updated="onUpdated"
       />
-    </el-card>
+    </section>
   </section>
 </template>
 
@@ -31,12 +41,18 @@ import type { Assessment } from '../types'
 const route = useRoute()
 const store = useAssessmentStore()
 const assessment = ref<Assessment | null>(null)
+const loadError = ref(false)
 
 onMounted(load)
 
 async function load() {
-  const id = String(route.params.id)
-  assessment.value = await store.get(id)
+  loadError.value = false
+  try {
+    const id = String(route.params.id)
+    assessment.value = await store.get(id)
+  } catch {
+    loadError.value = true
+  }
 }
 
 async function onFollowup(answer: string) {
@@ -57,6 +73,13 @@ function onUpdated(updated: Assessment) {
 
 <style scoped>
 .back-button {
-  margin: 0 0 8px -12px;
+  margin: 0 0 var(--s-2) -12px;
+}
+
+.detail-panel {
+  padding: var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
 }
 </style>

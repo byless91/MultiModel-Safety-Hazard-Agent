@@ -1,41 +1,58 @@
 <template>
   <section class="page">
     <h1 class="page-title">现场隐患智能研判</h1>
-    <p class="page-subtitle">上传现场照片并填写描述，系统自动完成识别、检索、分级与成文</p>
+    <p class="page-subtitle">
+      上传现场照片并描述情况，系统给出隐患类型、风险等级和处置建议。
+    </p>
 
-    <el-card v-loading="store.loading">
-      <form class="input-form" @submit.prevent="submit">
-        <div class="form-row">
-          <label class="form-label">现场照片（最多 3 张）</label>
-          <el-upload
-            v-model:file-list="fileList"
-            list-type="picture-card"
-            accept="image/*"
-            multiple
-            :auto-upload="false"
-            :limit="3"
-            :on-exceed="onExceed"
+    <el-card v-loading="store.loading" class="intake-card">
+      <form class="intake" @submit.prevent="submit">
+        <div class="intake-row">
+          <div class="field">
+            <label class="field-label">
+              现场照片
+              <span class="field-hint">最多 3 张，也可以先只用文字描述</span>
+            </label>
+            <el-upload
+              v-model:file-list="fileList"
+              list-type="picture-card"
+              accept="image/*"
+              multiple
+              :auto-upload="false"
+              :limit="3"
+              :on-exceed="onExceed"
+            >
+              <el-icon><Plus /></el-icon>
+            </el-upload>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="hazard-description">
+              情况描述
+              <span class="field-hint">写清位置、看到的物品和危险情况</span>
+            </label>
+            <el-input
+              id="hazard-description"
+              v-model="description"
+              type="textarea"
+              :rows="4"
+              placeholder="例如：3 栋 2 单元楼道堆满纸箱，挡住疏散通道"
+            />
+          </div>
+        </div>
+
+        <div class="intake-actions">
+          <el-button
+            type="primary"
+            native-type="submit"
+            :loading="store.loading"
+            :disabled="!description.trim()"
           >
-            <el-icon><Plus /></el-icon>
-          </el-upload>
-        </div>
-
-        <div class="form-row">
-          <label class="form-label">隐患描述</label>
-          <el-input
-            v-model="description"
-            type="textarea"
-            :rows="5"
-            placeholder="例如：××小区 3 栋 2 单元楼道堆放纸箱杂物，通行明显受阻"
-          />
-        </div>
-
-        <div class="form-actions">
-          <el-button type="primary" native-type="submit" :loading="store.loading" :disabled="!description.trim()">
             <el-icon><UploadFilled /></el-icon>
             开始研判
           </el-button>
           <el-button :disabled="store.loading" @click="resetForm">重置</el-button>
+          <span v-if="!description.trim()" class="action-hint">填写情况描述后才能开始</span>
         </div>
       </form>
     </el-card>
@@ -49,13 +66,11 @@
       show-icon
     />
 
-    <el-card v-if="assessment" class="result-panel">
-      <template #header>
-        <div class="result-panel-head">
-          <span>研判结果</span>
-          <span class="result-id">{{ assessment.id.slice(0, 8) }}</span>
-        </div>
-      </template>
+    <section v-if="assessment" class="result-panel">
+      <div class="result-panel-head">
+        <span class="result-panel-title">研判结果</span>
+        <span class="result-id">记录号 {{ assessment.id.slice(0, 8) }}</span>
+      </div>
       <AssessmentResult
         :assessment="assessment"
         :loading="store.loading"
@@ -63,7 +78,7 @@
         @confirm="onConfirm"
         @updated="onUpdated"
       />
-    </el-card>
+    </section>
   </section>
 </template>
 
@@ -111,51 +126,95 @@ function resetForm() {
   store.error = ''
 }
 
-function onExceed(files: UploadFiles) {
-  ElMessage.warning(`最多上传 3 张图片`)
+function onExceed(_files: UploadFiles) {
+  ElMessage.warning('最多上传 3 张图片')
 }
 </script>
 
 <style scoped>
-.input-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+.intake-card {
+  background: var(--panel);
 }
 
-.form-row {
+.intake {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+
+.intake-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+
+.field {
   min-width: 0;
 }
 
-.form-label {
-  display: block;
-  margin-bottom: 8px;
+.field-label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
   font-weight: 600;
-  color: #334155;
+  color: var(--text-strong);
 }
 
-.form-actions {
+.field-hint {
+  font-weight: 400;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.intake-actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: var(--s-3);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+
+.action-hint {
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 .error-alert {
-  margin-top: 14px;
+  margin-top: var(--s-4);
 }
 
 .result-panel {
-  margin-top: 18px;
+  margin-top: var(--s-5);
+  padding: var(--s-4);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
 }
 
 .result-panel-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  gap: var(--s-3);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.result-panel-title {
+  font-weight: 700;
+  color: var(--text-strong);
 }
 
 .result-id {
-  color: #94a3b8;
-  font-size: 12px;
-  word-break: break-all;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+@media (max-width: 860px) {
+  .intake-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

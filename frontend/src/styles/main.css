@@ -1,10 +1,50 @@
+/* Design tokens: one radius scale, one spacing scale, one type scale. */
 :root {
+  /* Brand */
   --brand: #155e75;
   --brand-dark: #164e63;
+  --brand-soft: #ecfeff;
+
+  /* Surfaces. Cards use a hairline border, never border + shadow. */
+  --bg: #f4f6f8;
   --panel: #ffffff;
-  --border: #e2e8f0;
-  --text: #1e293b;
-  --muted: #64748b;
+  --panel-2: #f8fafc;
+  --border: #e3e8ef;
+  --border-strong: #cbd5e1;
+
+  /* Text */
+  --text: #1f2937;
+  --text-strong: #0f172a;
+  --muted: #6b7280;
+
+  /* Semantic states */
+  --danger: #b91c1c;
+  --warning: #b45309;
+  --success: #15803d;
+  --info: var(--brand);
+
+  /* Radius: cards 12px, controls 8px, small tags pill. */
+  --r-card: 12px;
+  --r-control: 8px;
+  --r-pill: 999px;
+
+  /* Spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  /* Type scale, fixed px for a consistent-DPI product UI */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+
+  --shadow-pop: 0 8px 24px rgba(15, 23, 42, 0.1);
 }
 
 * {
@@ -20,37 +60,114 @@ body,
 
 body {
   color: var(--text);
-  background: #f1f5f9;
+  background: var(--bg);
   font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: var(--fs-md);
+  line-height: 1.6;
+}
+
+/* Browser surfaces carry the design too. */
+::selection {
+  background: #bae6fd;
+  color: #0c4a6e;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: var(--r-pill);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .page {
-  max-width: 1200px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 20px 20px 48px;
+  padding: var(--s-5) var(--s-5) 64px;
 }
 
 .page-title {
-  margin: 0 0 4px;
-  font-size: 20px;
+  margin: 0 0 var(--s-1);
+  font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: 0;
+  color: var(--text-strong);
 }
 
 .page-subtitle {
-  margin: 0 0 18px;
+  margin: 0 0 var(--s-5);
   color: var(--muted);
+  font-size: var(--fs-md);
 }
 
+/* Element Plus alignment with the token set. */
 .el-card {
-  border-radius: 8px;
+  border-radius: var(--r-card);
   border-color: var(--border);
+  box-shadow: none;
 }
 
 .el-card__header {
+  padding: var(--s-3) var(--s-4);
   font-weight: 600;
+  color: var(--text-strong);
+}
+
+.el-card__body {
+  padding: var(--s-4);
+}
+
+.el-button {
+  border-radius: var(--r-control);
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  border-radius: var(--r-control);
+}
+
+.el-table {
+  --el-table-border-color: var(--border);
+  --el-table-header-text-color: var(--muted);
+}
+
+.el-table th.el-table__cell {
+  background: var(--panel-2);
+  font-weight: 600;
+}
+
+/* Keep transient messages clear of the fixed-height top bar. */
+.el-message {
+  top: 68px !important;
 }
 
 .status-dot {
@@ -65,3 +182,8 @@ body {
   word-break: break-all;
 }
 
+@media (max-width: 640px) {
+  .page {
+    padding: var(--s-4) var(--s-3) 48px;
+  }
+}

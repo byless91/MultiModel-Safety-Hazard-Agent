@@ -2,7 +2,7 @@
   <div v-loading="loading" class="result-wrap">
     <el-alert
       v-if="assessment.status === 'needs_more_info'"
-      title="需要补充现场信息"
+      title="还需要补充现场情况"
       type="warning"
       :closable="false"
       show-icon
@@ -30,428 +30,426 @@
     </el-alert>
 
     <template v-else-if="report">
-      <div class="result-header">
-        <div>
-          <h3 class="result-title">
+      <header class="conclusion">
+        <div class="conclusion-main">
+          <h3 class="conclusion-title">
             {{ assessment.hazard_category || '隐患类型待确认' }}
-            <el-tag :type="levelTag" effect="dark">{{ levelLabel }}</el-tag>
+            <el-tag :type="levelTag" effect="dark" size="small">{{ levelLabel }}</el-tag>
           </h3>
-          <p class="result-summary">{{ report.summary }}</p>
+          <p class="conclusion-text">{{ report.summary }}</p>
         </div>
-        <div class="confidence-wrap">
-          <span class="confidence-label">综合置信度</span>
-          <el-progress
-            type="circle"
-            :percentage="Math.round((assessment.confidence || 0) * 100)"
-            :width="72"
-            :stroke-width="8"
-            :color="levelColor"
-          />
+        <div class="conclusion-metric">
+          <span class="conclusion-metric-value">{{ confidencePercent }}%</span>
+          <span class="conclusion-metric-label">AI 把握</span>
         </div>
-      </div>
+      </header>
 
-      <div class="plain-summary" :class="`plain-${assessment.status}`">
-        <div class="plain-summary-title">
-          <el-icon><InfoFilled /></el-icon>
-          结果怎么理解
+      <dl class="plain-summary">
+        <div class="plain-item">
+          <dt>风险等级</dt>
+          <dd>{{ riskDesc }}</dd>
         </div>
-        <div class="plain-summary-grid">
-          <div class="plain-item">
-            <span class="plain-label">风险等级</span>
-            <span class="plain-value">{{ riskDesc }}</span>
-          </div>
-          <div class="plain-item">
-            <span class="plain-label">AI 把握程度</span>
-            <span class="plain-value">{{ confidenceText }}</span>
-          </div>
-          <div class="plain-item">
-            <span class="plain-label">法规依据</span>
-            <span class="plain-value">{{ evidenceText }}</span>
-          </div>
-          <div class="plain-item">
-            <span class="plain-label">下一步</span>
-            <span class="plain-value next-step">{{ nextStepText }}</span>
-          </div>
+        <div class="plain-item">
+          <dt>法规依据</dt>
+          <dd>{{ evidenceText }}</dd>
         </div>
-      </div>
+        <div class="plain-item plain-item--wide">
+          <dt>下一步</dt>
+          <dd class="next-step">{{ nextStepText }}</dd>
+        </div>
+      </dl>
 
       <el-alert
         v-if="assessment.status === 'needs_review'"
-        title="该结果需要人工复核"
+        class="review-alert"
+        title="该结果需要人工复核后才能使用"
         type="warning"
         :closable="false"
         show-icon
       />
 
-      <el-card
-        v-if="
-          (assessment.risk_score !== undefined && assessment.risk_score !== null) ||
-          assessment.risk_result
-        "
-        class="risk-card"
-      >
-        <template #header>风险引擎判定与解释</template>
-        <RiskExplanation :assessment="assessment" />
-      </el-card>
-
-      <el-card class="model-comparison-card">
-        <template #header>模型 A/B 对比</template>
-        <ModelComparison :assessment="assessment" />
-      </el-card>
-
-      <el-card v-if="assessment.disagreement" class="disagreement-viz-card">
-        <template #header>分歧可视化</template>
-        <DisagreementViz :assessment="assessment" />
-      </el-card>
-
-      <div class="result-grid">
-        <el-card class="result-card">
-          <template #header>处置建议</template>
-          <h4>现场处置</h4>
-          <ul class="action-list">
-            <li v-for="action in report.immediate_actions" :key="action">{{ action }}</li>
-          </ul>
-          <h4>长效机制</h4>
-          <ul class="action-list">
-            <li v-for="action in report.long_term_actions" :key="action">{{ action }}</li>
-          </ul>
-        </el-card>
-
-        <el-card class="result-card">
-          <template #header>整改工单</template>
-          <el-descriptions :column="1" size="small" border>
-            <el-descriptions-item label="类别">{{ report.work_order.category }}</el-descriptions-item>
-            <el-descriptions-item label="等级">{{ report.work_order.level }}</el-descriptions-item>
-            <el-descriptions-item label="时限">{{ report.work_order.deadline }}</el-descriptions-item>
-            <el-descriptions-item label="位置">{{ report.work_order.location }}</el-descriptions-item>
-            <el-descriptions-item label="验收">
-              {{ report.work_order.acceptance }}
-            </el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </div>
-
-      <el-card class="evidence-card">
-        <template #header>
-          <span>法规证据（{{ assessment.evidence.length }}）</span>
-        </template>
-        <LegalEvidence :assessment="assessment" />
-      </el-card>
-
-      <el-card
-        v-if="assessment.evidence_judge || assessment.findings?.length"
-        class="evidence-judge-card"
-      >
-        <template #header>
-          <div class="evidence-judge-head">
-            <span>证据链判定</span>
-            <el-tag
-              v-if="assessment.evidence_judge"
-              :type="assessment.evidence_judge.supported ? 'success' : 'warning'"
-              effect="light"
-            >
-              {{ assessment.evidence_judge.supported ? '证据支持' : '证据不足' }}
-            </el-tag>
-          </div>
-        </template>
-        <div v-for="finding in evidenceFindings" :key="finding.finding_id" class="judge-finding">
-          <div class="judge-finding-head">
-            <span class="finding-category">{{ finding.category }}</span>
-            <el-tag :type="finding.supported ? 'success' : 'warning'" size="small">
-              {{ finding.supported ? '支持' : '不足' }}
-            </el-tag>
-            <span v-if="finding.support_score !== undefined" class="support-score">
-              支持度 {{ Math.round((finding.support_score || 0) * 100) }}%
-            </span>
-          </div>
-          <div v-if="finding.evidence_ids?.length" class="evidence-ids">
-            依据：{{ finding.evidence_ids.join('、') }}
-          </div>
-          <ul v-if="finding.unsupported_claims?.length" class="unsupported-list">
-            <li v-for="claim in finding.unsupported_claims" :key="claim">{{ claim }}</li>
-          </ul>
-          <div v-if="findingLocations(finding).length" class="location-row">
-            <span
-              v-for="(loc, index) in findingLocations(finding)"
-              :key="loc.image_id || loc.location_text || `loc-${index}`"
-              class="location-chip"
-            >
-              <template v-if="loc.image_id">图片 {{ loc.image_id }}</template>
-              <template v-if="loc.location_text">：{{ loc.location_text }}</template>
-              <span v-if="loc.bbox"> bbox [{{ loc.bbox.join(', ') }}]</span>
-            </span>
-          </div>
-        </div>
-        <p v-if="assessment.evidence_judge" class="judge-counts">
-          视觉证据 {{ assessment.evidence_judge.visual_evidence_count }} 条，
-          法规证据 {{ assessment.evidence_judge.retrieval_evidence_count }} 条
-        </p>
-      </el-card>
-
-      <el-card class="hazard-overlay-card">
-        <template #header>隐患定位（可选 Bounding Box）</template>
-        <HazardOverlay :assessment="assessment" />
-      </el-card>
-
-      <el-card class="evidence-chain-card">
-        <template #header>证据链</template>
-        <EvidenceChain :assessment="assessment" />
-      </el-card>
-
-      <el-card class="rect-card">
-        <template #header>
-          <div class="rect-head">
-            <span>整改回传</span>
-            <el-tag v-if="assessment.rectification_status" :type="rectTag" effect="light">
-              {{ rectLabel }}
-            </el-tag>
-          </div>
-        </template>
-        <el-steps
-          v-if="assessment.rectification_status"
-          :active="rectActiveIndex"
-          finish-status="success"
-          class="rect-steps"
-          simple
-        >
-          <el-step
-            v-for="step in rectSteps"
-            :key="step.value"
-            :title="step.label"
-          />
-        </el-steps>
-        <div v-if="comparePairs.length" class="compare-grid">
-          <div
-            v-for="(pair, index) in comparePairs"
-            :key="`${pair.original.id}-${pair.rectification.id}`"
-            class="compare-pair"
-          >
-            <div class="compare-pair-head">
-              <span>第 {{ index + 1 }} 组对比</span>
-              <span v-if="comparisonMeta" class="compare-pair-status">
-                AI 比对覆盖 {{ comparisonMeta.pair_count }} 组
-              </span>
-            </div>
-            <div class="compare-columns">
-              <div class="compare-column">
-                <div class="compare-label">整改前</div>
-                <el-image
-                  v-if="pair.original.url"
-                  :src="pair.original.url"
-                  :preview-src-list="[pair.original.url]"
-                  fit="cover"
-                  class="thumb"
-                />
-                <span v-else class="compare-missing">暂无证据</span>
+      <el-tabs v-model="activeTab" class="result-tabs">
+        <el-tab-pane label="处置意见" name="action">
+          <section class="block">
+            <h4 class="block-title">处置建议</h4>
+            <div class="advice-grid">
+              <div>
+                <h5 class="advice-title">现场处置</h5>
+                <ul class="action-list">
+                  <li v-for="action in report.immediate_actions" :key="action">{{ action }}</li>
+                </ul>
               </div>
-              <div class="compare-column">
-                <div class="compare-label">整改后</div>
-                <el-image
-                  v-if="pair.rectification.url"
-                  :src="pair.rectification.url"
-                  :preview-src-list="[pair.rectification.url]"
-                  fit="cover"
-                  class="thumb"
-                />
-                <span v-else class="compare-missing">暂无证据</span>
+              <div>
+                <h5 class="advice-title">长效机制</h5>
+                <ul class="action-list">
+                  <li v-for="action in report.long_term_actions" :key="action">{{ action }}</li>
+                </ul>
               </div>
             </div>
-          </div>
-        </div>
-        <div v-if="!rectImages.length && originals.length" class="original-only">
-          <div class="compare-label">整改前（暂无整改后照片）</div>
-          <div class="thumb-row">
-            <template v-for="img in originals" :key="img.id">
-              <el-image
-                v-if="img.url"
-                :src="img.url"
-                :preview-src-list="[img.url]"
-                fit="cover"
-                class="thumb"
-              />
-            </template>
-          </div>
-        </div>
-        <p v-if="unmatchedNote" class="compare-unmatched">{{ unmatchedNote }}</p>
-        <div v-if="!rectImages.length" class="compare-empty">
-          <el-alert type="warning" :closable="false" title="暂无整改后照片，无法进行前后对比" />
-        </div>
-        <p v-if="assessment.rectification_note" class="rect-note">
-          {{ assessment.rectification_note }}
-        </p>
-        <div
-          v-if="
-            assessment.rectification_score !== undefined &&
-            assessment.rectification_score !== null
-          "
-          class="compare-result"
-        >
-          <div class="compare-result-head">
-            <span>整改完成度</span>
-            <span class="compare-score">
-              {{ Math.round(assessment.rectification_score * 100) }}%
-            </span>
-          </div>
-          <el-progress
-            :percentage="Math.round(assessment.rectification_score * 100)"
-            :stroke-width="10"
-            :color="rectColor"
-          />
-          <p v-if="assessment.rectification_analysis?.summary" class="compare-summary">
-            {{ assessment.rectification_analysis.summary }}
-          </p>
-          <ul
-            v-if="assessment.rectification_analysis?.issues?.length"
-            class="issue-list"
-          >
-            <li
-              v-for="issue in assessment.rectification_analysis.issues"
-              :key="issue"
-            >
-              {{ issue }}
-            </li>
-          </ul>
-          <div v-if="completionAssessment" class="completion-box">
-            <div class="completion-head">
-              <el-tag :type="verdictTag" effect="light">{{ verdictLabel }}</el-tag>
-              <span v-if="completionAssessment.completion_confidence" class="completion-conf">
-                置信度 {{ Math.round(completionAssessment.completion_confidence * 100) }}%
-              </span>
-            </div>
-            <ul v-if="completionAssessment.reasons.length" class="completion-reasons">
-              <li v-for="reason in completionAssessment.reasons" :key="reason">
-                {{ reason }}
-              </li>
+          </section>
+
+          <section class="block">
+            <h4 class="block-title">整改工单</h4>
+            <el-descriptions :column="workOrderColumns" size="small" border>
+              <el-descriptions-item label="类别">{{ report.work_order.category }}</el-descriptions-item>
+              <el-descriptions-item label="等级">{{ report.work_order.level }}</el-descriptions-item>
+              <el-descriptions-item label="时限">{{ report.work_order.deadline }}</el-descriptions-item>
+              <el-descriptions-item label="位置">{{ report.work_order.location }}</el-descriptions-item>
+              <el-descriptions-item label="验收" :span="workOrderColumns">
+                {{ report.work_order.acceptance }}
+              </el-descriptions-item>
+            </el-descriptions>
+          </section>
+
+          <section v-if="humanReviewVisible" class="block">
+            <h4 class="block-title">
+              人工复核
+              <el-tag
+                :type="assessment.confirmed ? 'success' : assessment.status === 'needs_review' ? 'warning' : 'primary'"
+                effect="light"
+                size="small"
+              >
+                {{ humanReviewTagLabel }}
+              </el-tag>
+            </h4>
+            <ul v-if="assessment.review_reasons?.length" class="review-reasons">
+              <li v-for="reason in assessment.review_reasons" :key="reason">{{ reason }}</li>
             </ul>
-            <p v-if="completionAssessment.rule_version" class="completion-version">
-              规则版本：{{ completionAssessment.rule_version }}
-            </p>
-          </div>
-        </div>
-        <div v-if="rectHistory.length" class="rect-history">
-          <h4>整改流程记录</h4>
-          <ul>
-            <li v-for="(entry, index) in rectHistory" :key="`${entry.created_at}-${index}`">
-              {{ entry.action }}（{{ statusLabel(entry.from_status) }} → {{ statusLabel(entry.to_status) }}）
-              <span class="rect-history-meta">
-                {{ formatTime(entry.created_at) }}<template v-if="entry.by"> · {{ entry.by }}</template>
-              </span>
-              <span v-if="entry.note" class="rect-history-note">{{ entry.note }}</span>
-            </li>
-          </ul>
-        </div>
-        <div v-if="canSubmitPhotos" class="rect-form">
-          <el-upload
-            v-model:file-list="rectFiles"
-            :auto-upload="false"
-            :limit="3"
-            accept="image/*"
-            multiple
-            list-type="picture-card"
-          >
-            <el-icon><Plus /></el-icon>
-          </el-upload>
-          <el-input v-model="rectNote" type="textarea" :rows="2" placeholder="整改说明（可选）" />
-        </div>
-        <div class="rect-actions">
-            <el-button v-if="canStart" type="primary" :loading="store.loading" @click="onStartRectification">
-              <el-icon><EditPen /></el-icon>
-              开始整改
-            </el-button>
+            <div v-if="humanResolution" class="resolution">
+              <p>复核结论：{{ humanResolution.confirmed ? '确认通过' : '需重新研判' }}</p>
+              <p v-if="humanResolution.reviewer">复核人：{{ humanResolution.reviewer }}</p>
+              <p v-if="humanResolution.note">复核意见：{{ humanResolution.note }}</p>
+              <p v-if="humanResolution.resolved_at">
+                复核时间：{{ formatTime(humanResolution.resolved_at) }}
+              </p>
+            </div>
             <el-button
-              v-if="canSubmitPhotos"
+              v-if="!assessment.confirmed"
               type="primary"
               :loading="store.loading"
-              :disabled="rectFiles.length === 0"
-              @click="onSubmitRectification"
+              @click="emit('confirm')"
             >
-              提交整改照片
+              <el-icon><CircleCheck /></el-icon>
+              确认结果并定稿
             </el-button>
-            <el-button v-if="rectImages.length" @click="onRecompare">
-              <el-icon><RefreshRight /></el-icon>
-              重新 AI 比对
-            </el-button>
-            <el-button
-              v-if="canVerify"
-              type="success"
-              @click="onRectificationTransition('verified', '已确认整改完成')"
+          </section>
+        </el-tab-pane>
+        <el-tab-pane name="evidence">
+          <template #label>
+            证据依据
+            <span
+              v-if="assessment.evidence.length"
+              class="tab-badge"
+              :class="{ 'tab-badge--warn': evidenceNeedsAttention }"
             >
-              确认整改完成
-            </el-button>
-            <el-button
-              v-if="canVerify || canClose"
-              type="warning"
-              @click="onRectificationTransition('rectifying', '已退回整改')"
-            >
-              退回整改
-            </el-button>
-            <el-button
-              v-if="canClose"
-              type="primary"
-              @click="onRectificationTransition('closed', '工单已关闭')"
-            >
-              关闭工单
-            </el-button>
-            <el-button
-              v-if="canReopen"
-              type="primary"
-              @click="onRectificationTransition('open', '工单已重新打开')"
-            >
-              重新打开
-            </el-button>
-        </div>
-      </el-card>
+              {{ assessment.evidence.length }}
+            </span>
+          </template>
 
-      <el-card v-if="humanReviewVisible" class="human-review-card">
-        <template #header>
-          <div class="human-review-head">
-            <span>人工复核</span>
-            <el-tag
-              :type="assessment.confirmed ? 'success' : assessment.status === 'needs_review' ? 'warning' : 'primary'"
-              effect="light"
-            >
-              {{ humanReviewTagLabel }}
-            </el-tag>
-          </div>
-        </template>
-        <ul v-if="assessment.review_reasons?.length" class="human-review-reasons">
-          <li v-for="reason in assessment.review_reasons" :key="reason">
-            {{ reason }}
-          </li>
-        </ul>
-        <div v-if="humanResolution" class="human-resolution">
-          <p>复核结论：{{ humanResolution.confirmed ? '确认通过' : '需重新研判' }}</p>
-          <p v-if="humanResolution.reviewer">复核人：{{ humanResolution.reviewer }}</p>
-          <p v-if="humanResolution.note">复核意见：{{ humanResolution.note }}</p>
-          <p v-if="humanResolution.resolved_at">
-            复核时间：{{ formatTime(humanResolution.resolved_at) }}
-          </p>
-        </div>
-        <el-button
-          v-if="!assessment.confirmed"
-          type="primary"
-          :loading="store.loading"
-          @click="emit('confirm')"
-        >
-          <el-icon><CircleCheck /></el-icon>
-          确认结果并定稿
-        </el-button>
-      </el-card>
+          <section class="block">
+            <h4 class="block-title">法规证据</h4>
+            <LegalEvidence :assessment="assessment" />
+          </section>
 
-      <div class="footer-actions">
+          <section
+            v-if="assessment.evidence_judge || assessment.findings?.length"
+            class="block"
+          >
+            <h4 class="block-title">
+              证据链判定
+              <el-tag
+                v-if="assessment.evidence_judge"
+                :type="assessment.evidence_judge.supported ? 'success' : 'warning'"
+                effect="light"
+                size="small"
+              >
+                {{ assessment.evidence_judge.supported ? '证据支持' : '证据不足' }}
+              </el-tag>
+            </h4>
+            <div v-for="finding in evidenceFindings" :key="finding.finding_id" class="judge-finding">
+              <div class="judge-finding-head">
+                <span class="finding-category">{{ finding.category }}</span>
+                <el-tag :type="finding.supported ? 'success' : 'warning'" size="small">
+                  {{ finding.supported ? '支持' : '不足' }}
+                </el-tag>
+                <span v-if="finding.support_score !== undefined" class="support-score">
+                  支持度 {{ Math.round((finding.support_score || 0) * 100) }}%
+                </span>
+              </div>
+              <div v-if="finding.evidence_ids?.length" class="evidence-ids">
+                依据：{{ finding.evidence_ids.join('、') }}
+              </div>
+              <ul v-if="finding.unsupported_claims?.length" class="unsupported-list">
+                <li v-for="claim in finding.unsupported_claims" :key="claim">{{ claim }}</li>
+              </ul>
+              <div v-if="findingLocations(finding).length" class="location-row">
+                <span
+                  v-for="(loc, index) in findingLocations(finding)"
+                  :key="loc.image_id || loc.location_text || `loc-${index}`"
+                  class="location-chip"
+                >
+                  <template v-if="loc.image_id">图片 {{ loc.image_id }}</template>
+                  <template v-if="loc.location_text">：{{ loc.location_text }}</template>
+                  <span v-if="loc.bbox"> bbox [{{ loc.bbox.join(', ') }}]</span>
+                </span>
+              </div>
+            </div>
+            <p v-if="assessment.evidence_judge" class="judge-counts">
+              视觉证据 {{ assessment.evidence_judge.visual_evidence_count }} 条，
+              法规证据 {{ assessment.evidence_judge.retrieval_evidence_count }} 条
+            </p>
+          </section>
+
+          <section class="block">
+            <h4 class="block-title">证据链</h4>
+            <EvidenceChain :assessment="assessment" />
+          </section>
+
+          <section class="block">
+            <h4 class="block-title">隐患定位（可选 Bounding Box）</h4>
+            <HazardOverlay :assessment="assessment" />
+          </section>
+        </el-tab-pane>
+        <el-tab-pane label="模型分析" name="model">
+          <section
+            v-if="
+              (assessment.risk_score !== undefined && assessment.risk_score !== null) ||
+              assessment.risk_result
+            "
+            class="block"
+          >
+            <h4 class="block-title">风险引擎判定与解释</h4>
+            <RiskExplanation :assessment="assessment" />
+          </section>
+
+          <section class="block">
+            <h4 class="block-title">模型 A/B 对比</h4>
+            <ModelComparison :assessment="assessment" />
+          </section>
+
+          <section v-if="assessment.disagreement" class="block">
+            <h4 class="block-title">分歧可视化</h4>
+            <DisagreementViz :assessment="assessment" />
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane name="rectification">
+          <template #label>
+            整改闭环
+            <span v-if="assessment.rectification_status" class="tab-badge">
+              {{ rectLabel }}
+            </span>
+          </template>
+
+          <section class="block">
+            <h4 class="block-title">整改回传</h4>
+            <el-steps
+              v-if="assessment.rectification_status"
+              :active="rectActiveIndex"
+              finish-status="success"
+              class="rect-steps"
+              simple
+            >
+              <el-step v-for="step in rectSteps" :key="step.value" :title="step.label" />
+            </el-steps>
+
+            <div v-if="comparePairs.length" class="compare-grid">
+              <div
+                v-for="(pair, index) in comparePairs"
+                :key="`${pair.original.id}-${pair.rectification.id}`"
+                class="compare-pair"
+              >
+                <div class="compare-pair-head">
+                  <span>第 {{ index + 1 }} 组对比</span>
+                  <span v-if="comparisonMeta" class="compare-pair-status">
+                    AI 比对覆盖 {{ comparisonMeta.pair_count }} 组
+                  </span>
+                </div>
+                <div class="compare-columns">
+                  <div>
+                    <div class="compare-label">整改前</div>
+                    <el-image
+                      v-if="pair.original.url"
+                      :src="pair.original.url"
+                      :preview-src-list="[pair.original.url]"
+                      fit="cover"
+                      class="thumb"
+                    />
+                    <span v-else class="compare-missing">暂无证据</span>
+                  </div>
+                  <div>
+                    <div class="compare-label">整改后</div>
+                    <el-image
+                      v-if="pair.rectification.url"
+                      :src="pair.rectification.url"
+                      :preview-src-list="[pair.rectification.url]"
+                      fit="cover"
+                      class="thumb"
+                    />
+                    <span v-else class="compare-missing">暂无证据</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!rectImages.length && originals.length" class="original-only">
+              <div class="compare-label">整改前（暂无整改后照片）</div>
+              <div class="thumb-row">
+                <template v-for="img in originals" :key="img.id">
+                  <el-image
+                    v-if="img.url"
+                    :src="img.url"
+                    :preview-src-list="[img.url]"
+                    fit="cover"
+                    class="thumb"
+                  />
+                </template>
+              </div>
+            </div>
+
+            <p v-if="unmatchedNote" class="compare-unmatched">{{ unmatchedNote }}</p>
+            <div v-if="!rectImages.length" class="compare-empty">
+              <el-alert type="warning" :closable="false" title="暂无整改后照片，无法进行前后对比" />
+            </div>
+            <p v-if="assessment.rectification_note" class="rect-note">
+              {{ assessment.rectification_note }}
+            </p>
+            <div
+              v-if="
+                assessment.rectification_score !== undefined &&
+                assessment.rectification_score !== null
+              "
+              class="compare-result"
+            >
+              <div class="compare-result-head">
+                <span>整改完成度</span>
+                <span class="compare-score">
+                  {{ Math.round(assessment.rectification_score * 100) }}%
+                </span>
+              </div>
+              <el-progress
+                :percentage="Math.round(assessment.rectification_score * 100)"
+                :stroke-width="8"
+                :color="rectColor"
+              />
+              <p v-if="assessment.rectification_analysis?.summary" class="compare-summary">
+                {{ assessment.rectification_analysis.summary }}
+              </p>
+              <ul v-if="assessment.rectification_analysis?.issues?.length" class="issue-list">
+                <li v-for="issue in assessment.rectification_analysis.issues" :key="issue">
+                  {{ issue }}
+                </li>
+              </ul>
+              <div v-if="completionAssessment" class="completion-box">
+                <div class="completion-head">
+                  <el-tag :type="verdictTag" effect="light">{{ verdictLabel }}</el-tag>
+                  <span v-if="completionAssessment.completion_confidence" class="completion-conf">
+                    置信度 {{ Math.round(completionAssessment.completion_confidence * 100) }}%
+                  </span>
+                </div>
+                <ul v-if="completionAssessment.reasons.length" class="completion-reasons">
+                  <li v-for="reason in completionAssessment.reasons" :key="reason">
+                    {{ reason }}
+                  </li>
+                </ul>
+                <p v-if="completionAssessment.rule_version" class="completion-version">
+                  规则版本：{{ completionAssessment.rule_version }}
+                </p>
+              </div>
+            </div>
+
+            <div v-if="rectHistory.length" class="rect-history">
+              <h5 class="advice-title">整改流程记录</h5>
+              <ul>
+                <li v-for="(entry, index) in rectHistory" :key="`${entry.created_at}-${index}`">
+                  {{ entry.action }}（{{ statusLabel(entry.from_status) }} → {{ statusLabel(entry.to_status) }}）
+                  <span class="rect-history-meta">
+                    {{ formatTime(entry.created_at) }}<template v-if="entry.by"> · {{ entry.by }}</template>
+                  </span>
+                  <span v-if="entry.note" class="rect-history-note">{{ entry.note }}</span>
+                </li>
+              </ul>
+            </div>
+
+            <div v-if="canSubmitPhotos" class="rect-form">
+              <el-upload
+                v-model:file-list="rectFiles"
+                :auto-upload="false"
+                :limit="3"
+                accept="image/*"
+                multiple
+                list-type="picture-card"
+              >
+                <el-icon><Plus /></el-icon>
+              </el-upload>
+              <el-input v-model="rectNote" type="textarea" :rows="2" placeholder="整改说明（可选）" />
+            </div>
+
+            <div class="rect-actions">
+              <el-button v-if="canStart" type="primary" :loading="store.loading" @click="onStartRectification">
+                <el-icon><EditPen /></el-icon>
+                开始整改
+              </el-button>
+              <el-button
+                v-if="canSubmitPhotos"
+                type="primary"
+                :loading="store.loading"
+                :disabled="rectFiles.length === 0"
+                @click="onSubmitRectification"
+              >
+                提交整改照片
+              </el-button>
+              <el-button v-if="rectImages.length" @click="onRecompare">
+                <el-icon><RefreshRight /></el-icon>
+                重新 AI 比对
+              </el-button>
+              <el-button
+                v-if="canVerify"
+                type="success"
+                @click="onRectificationTransition('verified', '已确认整改完成')"
+              >
+                确认整改完成
+              </el-button>
+              <el-button
+                v-if="canVerify || canClose"
+                type="warning"
+                @click="onRectificationTransition('rectifying', '已退回整改')"
+              >
+                退回整改
+              </el-button>
+              <el-button
+                v-if="canClose"
+                type="primary"
+                @click="onRectificationTransition('closed', '工单已关闭')"
+              >
+                关闭工单
+              </el-button>
+              <el-button
+                v-if="canReopen"
+                type="primary"
+                @click="onRectificationTransition('open', '工单已重新打开')"
+              >
+                重新打开
+              </el-button>
+            </div>
+          </section>
+        </el-tab-pane>
+      </el-tabs>
+
+      <footer class="result-footer">
         <el-button @click="onDownload">
           <el-icon><Download /></el-icon>
           下载报告
         </el-button>
         <span class="disclaimer">{{ report.disclaimer }}</span>
-      </div>
+      </footer>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, type UploadFile } from 'element-plus'
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { useAssessmentStore } from '../stores/assessment'
 import type { Assessment, AssessmentImage, FindingLocation } from '../types'
@@ -476,6 +474,25 @@ const emit = defineEmits<{
 const answer = ref('')
 const rectFiles = ref<UploadFile[]>([])
 const rectNote = ref('')
+const activeTab = ref('action')
+const narrow = ref(false)
+let mediaQuery: MediaQueryList | null = null
+
+function syncNarrow(event?: MediaQueryListEvent) {
+  narrow.value = event ? event.matches : Boolean(mediaQuery?.matches)
+}
+
+onMounted(() => {
+  mediaQuery = window.matchMedia('(max-width: 720px)')
+  syncNarrow()
+  mediaQuery.addEventListener('change', syncNarrow)
+})
+
+onUnmounted(() => {
+  mediaQuery?.removeEventListener('change', syncNarrow)
+})
+
+const workOrderColumns = computed(() => (narrow.value ? 1 : 2))
 const report = computed(() => props.assessment.report)
 const store = useAssessmentStore()
 
@@ -631,7 +648,7 @@ const canReopen = computed(
 
 const rectColor = computed(() => {
   const score = props.assessment.rectification_score ?? 0
-  return score >= 0.8 ? '#16a34a' : score >= 0.5 ? '#d97706' : '#94a3b8'
+  return score >= 0.8 ? '#15803d' : score >= 0.5 ? '#b45309' : '#94a3b8'
 })
 
 const levelTag = computed<'danger' | 'warning' | 'success'>(() => {
@@ -644,25 +661,15 @@ const levelLabel = computed(() => {
   return level === 1 ? '一级 · 立即处置' : level === 2 ? '二级 · 限期整改' : '三级 · 建议改进'
 })
 
-const levelColor = computed(() => {
-  const level = props.assessment.risk_level || 3
-  return level === 1 ? '#dc2626' : level === 2 ? '#d97706' : '#16a34a'
-})
+const confidencePercent = computed(() =>
+  Math.round((props.assessment.confidence || 0) * 100),
+)
 
 const riskDesc = computed(() => {
   const level = props.assessment.risk_level || 3
   if (level === 1) return '高风险 · 应立即处置'
   if (level === 2) return '中风险 · 尽快整改'
   return '较低风险 · 建议改进'
-})
-
-const confidenceText = computed(() => {
-  const value = props.assessment.confidence
-  if (value === undefined || value === null) return '暂时无法判断'
-  const percent = Math.round(value * 100)
-  if (value >= 0.8) return `AI 把握较高（${percent}%）`
-  if (value >= 0.6) return `AI 把握一般（${percent}%）`
-  return `AI 把握较低（${percent}%），请以现场为准`
 })
 
 const evidenceText = computed(() => {
@@ -672,6 +679,10 @@ const evidenceText = computed(() => {
   if (props.assessment.evidence.length) return '已列出参考资料，请结合现场判断'
   return '暂无参考资料，需现场核实'
 })
+
+const evidenceNeedsAttention = computed(
+  () => Boolean(props.assessment.evidence_judge && !props.assessment.evidence_judge.supported),
+)
 
 const nextStepText = computed(() => {
   const status = props.assessment.status
@@ -760,456 +771,288 @@ async function onRecompare() {
   min-height: 120px;
 }
 
-.followup-box {
-  margin-top: 8px;
-}
-
-.question-list {
-  margin: 0 0 12px;
-  padding-left: 18px;
-}
-
-.followup-button {
-  margin-top: 12px;
-}
-
-.result-header {
+/* Conclusion: one screen answers what it is, how sure, what next. */
+.conclusion {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
   align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.plain-summary {
-  margin-bottom: 14px;
-  padding: 12px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.plain-summary-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  color: #334155;
-  font-weight: 600;
-}
-
-.plain-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px 16px;
-}
-
-.plain-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.plain-label {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.plain-value {
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.plain-value.next-step {
-  color: #155e75;
-  font-weight: 600;
-}
-
-@media (max-width: 640px) {
-  .plain-summary-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.result-title {
-  margin: 0 0 8px;
-  font-size: 18px;
-  letter-spacing: 0;
-}
-
-.result-title .el-tag {
-  margin-left: 8px;
-}
-
-.result-summary {
-  margin: 0;
-  color: #475569;
-}
-
-.confidence-wrap {
-  text-align: center;
-  flex: 0 0 92px;
-}
-
-.confidence-label {
-  display: block;
-  margin-bottom: 4px;
-  color: #64748b;
-  font-size: 12px;
-}
-
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 14px;
-  margin: 14px 0;
-}
-
-.risk-card {
-  margin-top: 14px;
-}
-
-.risk-head {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
+  gap: var(--s-5);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--border);
 }
 
-.risk-main {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.risk-score {
-  font-weight: 600;
-  color: #155e75;
-}
-
-.risk-review-tip {
-  color: #b45309;
-  font-size: 12px;
-}
-
-.factor-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.factor-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 8px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 12px;
-}
-
-.factor-label {
-  color: #64748b;
-}
-
-.factor-value {
-  font-weight: 600;
-}
-
-.rule-list {
-  margin: 0 0 6px;
-  padding-left: 18px;
-  color: #475569;
-  font-size: 12px;
-}
-
-.risk-version {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.model-comparison-card {
-  margin-top: 14px;
-}
-
-.disagreement-viz-card {
-  margin-top: 14px;
-}
-
-.result-card {
+.conclusion-main {
   min-width: 0;
 }
 
-.result-card h4 {
-  margin: 10px 0 6px;
-  color: #334155;
+.conclusion-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.conclusion-text {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--text);
+}
+
+.conclusion-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+}
+
+.conclusion-metric-value {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.conclusion-metric-label {
+  margin-top: var(--s-1);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.plain-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3) var(--s-5);
+  margin: var(--s-4) 0;
+  padding: 0;
+}
+
+.plain-summary .plain-item {
+  min-width: 0;
+}
+
+.plain-item--wide {
+  grid-column: 1 / -1;
+}
+
+.plain-summary dt {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.plain-summary dd {
+  margin: var(--s-1) 0 0;
+  color: var(--text);
+}
+
+.plain-summary dd.next-step {
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+
+.review-alert {
+  margin-bottom: var(--s-4);
+}
+
+.result-tabs {
+  margin-top: var(--s-2);
+}
+
+.tab-badge {
+  display: inline-block;
+  margin-left: var(--s-1);
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 18px;
+}
+
+.tab-badge--warn {
+  background: #fef3c7;
+  color: var(--warning);
+}
+
+/* Flat sections: no nested cards, separation comes from space and a rule. */
+.block {
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.block:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.block-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-3);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.advice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-5);
+}
+
+.advice-title {
+  margin: 0 0 var(--s-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .action-list {
   margin: 0;
   padding-left: 18px;
-  color: #475569;
+  color: var(--text);
 }
 
 .action-list li {
-  margin-bottom: 6px;
+  margin-bottom: var(--s-1);
 }
 
-.evidence-card {
-  margin-top: 14px;
+.review-reasons {
+  margin: 0 0 var(--s-3);
+  padding-left: 18px;
+  color: var(--warning);
+  font-size: var(--fs-sm);
 }
 
-.evidence-item {
-  padding: 12px 0;
-  border-bottom: 1px solid #eef2f7;
+.review-reasons li {
+  margin-bottom: var(--s-1);
 }
 
-.evidence-item:last-child {
-  border-bottom: 0;
+.resolution {
+  margin-bottom: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-control);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: var(--fs-sm);
 }
 
-.evidence-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.resolution p {
+  margin: 0 0 var(--s-1);
 }
 
-.evidence-source {
-  font-weight: 600;
-  color: #155e75;
-}
-
-.evidence-score {
-  color: #64748b;
-  white-space: nowrap;
-}
-
-.evidence-text {
-  margin: 6px 0;
-  color: #475569;
-}
-
-.tag-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.evidence-judge-card {
-  margin-top: 14px;
-}
-
-.evidence-judge-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.resolution p:last-child {
+  margin-bottom: 0;
 }
 
 .judge-finding {
-  padding: 10px 0;
-  border-bottom: 1px solid #eef2f7;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.judge-finding:last-child {
+.judge-finding:last-of-type {
   border-bottom: 0;
 }
 
 .judge-finding-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   flex-wrap: wrap;
 }
 
 .finding-category {
   font-weight: 600;
-  color: #334155;
+  color: var(--text-strong);
 }
 
 .support-score {
-  color: #64748b;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 .evidence-ids {
-  margin-top: 6px;
-  color: #475569;
-  font-size: 13px;
+  margin-top: var(--s-1);
+  color: var(--muted);
+  font-size: var(--fs-sm);
   word-break: break-all;
 }
 
 .unsupported-list {
-  margin: 6px 0 0;
+  margin: var(--s-1) 0 0;
   padding-left: 18px;
-  color: #b45309;
-  font-size: 13px;
+  color: var(--warning);
+  font-size: var(--fs-sm);
 }
 
 .location-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 6px;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
 }
 
 .location-chip {
-  padding: 3px 8px;
-  border: 1px solid #dbeafe;
-  border-radius: 4px;
-  background: #eff6ff;
-  color: #1e40af;
-  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: var(--fs-xs);
 }
 
 .judge-counts {
-  margin: 10px 0 0;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.footer-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 18px;
-}
-
-.human-review-card {
-  margin-top: 14px;
-}
-
-.human-review-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.human-review-reasons {
-  margin: 0 0 10px;
-  padding-left: 18px;
-  color: #b45309;
-  font-size: 13px;
-}
-
-.human-review-reasons li {
-  margin-bottom: 4px;
-}
-
-.human-resolution {
-  margin-bottom: 10px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  color: #475569;
-  font-size: 13px;
-}
-
-.human-resolution p {
-  margin: 0 0 4px;
-}
-
-.human-resolution p:last-child {
-  margin-bottom: 0;
-}
-
-.rect-card {
-  margin-top: 14px;
-}
-
-.evidence-chain-card {
-  margin-top: 14px;
-}
-
-.hazard-overlay-card {
-  margin-top: 14px;
+  margin: var(--s-3) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
 }
 
 .rect-steps {
-  margin-bottom: 12px;
-}
-
-.rect-history {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-}
-
-.rect-history h4 {
-  margin: 0 0 8px;
-  color: #334155;
-  font-size: 13px;
-}
-
-.rect-history ul {
-  margin: 0;
-  padding-left: 16px;
-  color: #475569;
-  font-size: 12px;
-}
-
-.rect-history li {
-  margin-bottom: 4px;
-}
-
-.rect-history-meta {
-  margin-left: 6px;
-  color: #94a3b8;
-}
-
-.rect-history-note {
-  display: block;
-  color: #64748b;
-}
-
-.rect-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  margin-bottom: var(--s-4);
 }
 
 .compare-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: 12px;
+  gap: var(--s-4);
+  margin-bottom: var(--s-3);
 }
 
 .compare-pair {
-  padding: 10px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
 }
 
 .compare-pair-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  color: #334155;
-  font-size: 13px;
+  margin-bottom: var(--s-2);
+  color: var(--text-strong);
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
 .compare-pair-status {
-  color: #64748b;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
   font-weight: 400;
 }
 
 .compare-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--s-3);
 }
 
-.compare-column {
-  min-width: 0;
+.compare-label {
+  margin-bottom: var(--s-1);
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 .compare-missing {
@@ -1217,145 +1060,195 @@ async function onRecompare() {
   align-items: center;
   justify-content: center;
   min-height: 78px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 6px;
-  color: #94a3b8;
-  font-size: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-control);
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
 .compare-unmatched {
-  margin: 0 0 10px;
-  padding: 8px 10px;
+  margin: 0 0 var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-control);
   background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 6px;
-  color: #b45309;
-  font-size: 12px;
+  color: var(--warning);
+  font-size: var(--fs-sm);
 }
 
-.compare-empty {
-  margin-bottom: 12px;
-}
-
+.compare-empty,
 .original-only {
-  margin-bottom: 12px;
-}
-
-.compare-label {
-  margin-bottom: 6px;
-  color: #64748b;
-  font-size: 12px;
+  margin-bottom: var(--s-3);
 }
 
 .thumb-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 .thumb {
   width: 104px;
   height: 78px;
-  border-radius: 6px;
+  border-radius: var(--r-control);
 }
 
 .rect-note {
-  margin: 0 0 10px;
-  color: #475569;
+  margin: 0 0 var(--s-3);
+  color: var(--text);
 }
 
 .compare-result {
-  margin-bottom: 12px;
-  padding: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-}
-
-.completion-box {
-  margin-top: 10px;
-  padding: 10px 12px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-}
-
-.completion-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.completion-conf {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.completion-reasons {
-  margin: 8px 0 0;
-  padding-left: 16px;
-  color: #475569;
-  font-size: 12px;
-}
-
-.completion-reasons li {
-  margin-bottom: 4px;
-}
-
-.completion-version {
-  margin: 8px 0 0;
-  color: #94a3b8;
-  font-size: 12px;
+  margin-bottom: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
 }
 
 .compare-result-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: var(--s-2);
   font-weight: 600;
 }
 
 .compare-score {
-  color: #155e75;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
 }
 
 .compare-summary {
-  margin: 8px 0 0;
-  color: #475569;
+  margin: var(--s-2) 0 0;
+  color: var(--text);
 }
 
 .issue-list {
-  margin: 8px 0 0;
+  margin: var(--s-2) 0 0;
   padding-left: 18px;
-  color: #b45309;
+  color: var(--warning);
+}
+
+.completion-box {
+  margin-top: var(--s-3);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+}
+
+.completion-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.completion-conf {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.completion-reasons {
+  margin: var(--s-2) 0 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.completion-reasons li {
+  margin-bottom: var(--s-1);
+}
+
+.completion-version {
+  margin: var(--s-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.rect-history {
+  margin-bottom: var(--s-3);
+}
+
+.rect-history ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.rect-history li {
+  margin-bottom: var(--s-1);
+}
+
+.rect-history-meta {
+  margin-left: var(--s-1);
+  color: var(--muted);
+}
+
+.rect-history-note {
+  display: block;
+  color: var(--muted);
 }
 
 .rect-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
 }
 
 .rect-actions {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.result-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
 }
 
 .disclaimer {
-  color: #94a3b8;
-  font-size: 12px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 
-@media (max-width: 640px) {
-  .result-header {
+.followup-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.question-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.followup-button {
+  align-self: flex-start;
+}
+
+@media (max-width: 720px) {
+  .conclusion {
     flex-direction: column;
+    gap: var(--s-3);
   }
 
-  .confidence-wrap {
-    align-self: flex-start;
-    text-align: left;
+  .conclusion-metric {
+    align-items: flex-start;
+  }
+
+  .plain-summary,
+  .advice-grid,
+  .compare-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .result-footer {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

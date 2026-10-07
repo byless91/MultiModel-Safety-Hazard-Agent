@@ -19,37 +19,53 @@ const browser = await chromium.launch({
 
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+
+  /** Element Plus tab items are stable across versions via this selector. */
+  async function openTab(label, scope = page) {
+    await scope.locator('.el-tabs__item', { hasText: label }).first().click()
+  }
+
+  async function expectText(text, timeout = 15000) {
+    await page.getByText(text).first().waitFor({ timeout })
+  }
+
   await page.goto(BASE, { waitUntil: 'domcontentloaded' })
-  await page.getByText('现场隐患智能研判').first().waitFor({ timeout: 15000 })
+  await expectText('现场隐患智能研判')
 
   await page.locator('textarea').first().fill('小区楼道堆放纸箱杂物，堵塞疏散通道，通行明显受阻')
   await page.getByRole('button', { name: /开始研判/ }).click()
+  await expectText('占用疏散通道', 30000)
 
-  await page.getByText('占用疏散通道').first().waitFor({ timeout: 30000 })
+  const result = await page.locator('.conclusion-title').innerText()
 
-  const result = await page.locator('.result-title').innerText()
-
-  const sections = [
-    '模型 A/B 对比',
-    '分歧可视化',
-    '风险引擎判定与解释',
-    '法规证据',
-    '证据链',
-    '隐患定位（可选 Bounding Box）',
-    '人工复核',
-    '整改回传',
-  ]
+  // Default tab: the operational answer a field worker needs first.
+  const actionSections = ['处置建议', '整改工单', '人工复核']
   const checked = []
-  for (const section of sections) {
-    await page.getByText(section).first().waitFor({ timeout: 15000 })
+  for (const section of actionSections) {
+    await expectText(section)
     checked.push(section)
   }
 
-  // Phase 12: evaluation overview page smoke assertions (must be lightweight
-  // and data-driven; no invented metric values are asserted).
+  await openTab('证据依据')
+  for (const section of ['法规证据', '证据链判定', '证据链', '隐患定位（可选 Bounding Box）']) {
+    await expectText(section)
+    checked.push(section)
+  }
+
+  await openTab('模型分析')
+  for (const section of ['风险引擎判定与解释', '模型 A/B 对比', '分歧可视化']) {
+    await expectText(section)
+    checked.push(section)
+  }
+
+  await openTab('整改闭环')
+  await expectText('整改回传')
+  checked.push('整改回传')
+
+  // Evaluation overview page.
   await page.getByRole('link', { name: '评测总览' }).click()
   await page.waitForURL(/\/evaluation$/, { timeout: 15000 })
-  await page.getByText('评测总览').first().waitFor({ timeout: 15000 })
+  await expectText('评测总览')
   await page.getByRole('button', { name: /刷新/ }).waitFor({ timeout: 15000 })
 
   const metricLabels = [
@@ -66,23 +82,26 @@ try {
   for (const label of metricLabels) {
     await page.getByText(label, { exact: true }).first().waitFor({ timeout: 15000 })
   }
-
-  for (const column of ['变体', '模式', 'Unsafe']) {
-    await page.getByText(column, { exact: true }).first().waitFor({ timeout: 15000 })
-  }
-  await page.getByText('消融对比（A-F）').first().waitFor({ timeout: 15000 })
-  await page.getByText('失败案例清单').first().waitFor({ timeout: 15000 })
-  await page.getByText('Dataset Overview').first().waitFor({ timeout: 15000 })
+  await expectText('Dataset Overview')
 
   const modeText = await page.locator('.meta-strip').innerText()
   const modeOk = /Mock 模式|真实模型模式/.test(modeText)
+
+  await openTab('消融对比')
+  await expectText('消融对比（A-F）')
+  for (const column of ['变体', '模式', 'Unsafe']) {
+    await page.getByText(column, { exact: true }).first().waitFor({ timeout: 15000 })
+  }
+
+  await openTab('错误分析')
+  await expectText('失败案例清单')
 
   console.log(
     JSON.stringify({
       status: 'pass',
       base: BASE,
       result,
-      checked_p1_sections: checked.length,
+      checked_result_sections: checked.length,
       sections: checked,
       checked_evaluation_page: true,
       evaluation_mode_label_ok: modeOk,
