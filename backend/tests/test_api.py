@@ -211,6 +211,85 @@ def test_upload_long_knowledge_document_accepted():
     assert response.json()["status"] in ("indexed", "index_error")
 
 
+def test_upload_pdf_knowledge_document_extracts_text(make_pdf):
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/knowledge/documents",
+            data={"title": "消防法 PDF"},
+            files=[
+                (
+                    "file",
+                    ("law.pdf", make_pdf("Article 28: keep escape routes clear."), "application/pdf"),
+                )
+            ],
+        )
+        assert response.status_code == 201
+        doc_id = response.json()["id"]
+        detail = client.get(f"/api/v1/knowledge/documents/{doc_id}")
+    assert detail.status_code == 200
+    assert "Article 28" in detail.json()["content"]
+
+
+def test_upload_docx_knowledge_document_extracts_chinese(make_docx):
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/knowledge/documents",
+            data={"title": "消防法 Word"},
+            files=[
+                (
+                    "file",
+                    (
+                        "law.docx",
+                        make_docx("第二十八条 禁止占用、堵塞疏散通道和安全出口。"),
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                )
+            ],
+        )
+        assert response.status_code == 201
+        detail = client.get(f"/api/v1/knowledge/documents/{response.json()['id']}")
+    assert detail.status_code == 200
+    assert "第二十八条" in detail.json()["content"]
+    assert "疏散通道" in detail.json()["content"]
+
+
+def test_upload_legacy_doc_gets_actionable_hint():
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/knowledge/documents",
+            data={"title": "旧版 Word"},
+            files=[("file", ("old.doc", b"\xd0\xcf\x11\xe0legacy", "application/msword"))],
+        )
+    assert response.status_code == 400
+    assert "另存为 .docx" in response.json()["detail"]
+
+
+def test_upload_empty_document_returns_actionable_error(make_docx):
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/knowledge/documents",
+            data={"title": "空白文档"},
+            files=[
+                (
+                    "file",
+                    ("blank.docx", make_docx(""), "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                )
+            ],
+        )
+    assert response.status_code == 422
+    assert "扫描件" in response.json()["detail"]
+
+
+def test_upload_unsupported_suffix_rejected():
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/knowledge/documents",
+            data={"title": "可执行文件"},
+            files=[("file", ("payload.exe", b"MZ\x90\x00", "application/octet-stream"))],
+        )
+    assert response.status_code == 400
+
+
 def test_delete_knowledge_document_triggers_rebuild(monkeypatch):
     from app.api import routes
 

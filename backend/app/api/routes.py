@@ -1,5 +1,6 @@
 import json
 import re
+import tempfile
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
@@ -41,6 +42,13 @@ from app.services.guardrail import (
     inspect_text,
     validate_uploaded_input,
 )
+from app.services.document_converter import (
+    LEGACY_SUFFIX_HINTS,
+    PLAIN_SUFFIXES,
+    SUPPORTED_SUFFIXES,
+    ConversionError,
+    convert_to_markdown,
+)
 
 from app.models.entities import utcnow
 
@@ -48,7 +56,7 @@ settings = get_settings()
 
 MAX_FILE_BYTES = settings.max_file_bytes
 MAX_DOCUMENT_BYTES = settings.max_document_bytes
-ALLOWED_DOCUMENT_SUFFIXES = {".txt", ".md"}
+ALLOWED_DOCUMENT_SUFFIXES = set(SUPPORTED_SUFFIXES)
 ALLOWED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 UNSAFE_FILENAME_RE = re.compile(
     r"(\.\./|\.\.\\|[/\\]{2}|[\x00-\x1f]|^[A-Za-z]:[\\/])"
@@ -231,6 +239,28 @@ def _safe_filename(filename: str, *, allowed_suffixes: set[str], default: str) -
     if not name.replace(suffix, "").strip():
         raise HTTPException(status_code=400, detail="文件名不能只有扩展名")
     return name, suffix
+
+
+async def _extract_document_text(data: bytes, suffix: str) -> str:
+    """Return plain text/Markdown for an uploaded knowledge document.
+
+    Plain text and Markdown are decoded directly; PDF/Word go through the
+    MarkItDown converter, which runs off the event loop with its own timeout.
+    """
+    if suffix in PLAIN_SUFFIXES:
+        return data.decode("utf-8", errors="ignore")
+
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
+            handle.write(data)
+            temp_path = Path(handle.name)
+        return await convert_to_markdown(temp_path)
+    except ConversionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 def _parse_ocr_texts(raw: str) -> list[str]:
@@ -805,12 +835,16 @@ async def upload_knowledge_document(
     data = await file.read()
     if len(data) > MAX_DOCUMENT_BYTES:
         raise HTTPException(status_code=400, detail="文档不能超过 20MB")
+    raw_name = file.filename or "document.txt"
+    legacy_hint = LEGACY_SUFFIX_HINTS.get(Path(raw_name).suffix.lower())
+    if legacy_hint:
+        raise HTTPException(status_code=400, detail=legacy_hint)
     original_name, suffix = _safe_filename(
-        file.filename or "document.txt",
+        raw_name,
         allowed_suffixes=ALLOWED_DOCUMENT_SUFFIXES,
         default="document.txt",
     )
-    text = data.decode("utf-8", errors="ignore")
+    text = await _extract_document_text(data, suffix)
     # 知识库文档只做注入防护，不套用用户描述的 2000 字限制；
     # 文件大小上限由 MAX_DOCUMENT_BYTES 控制。
     _reject_text(text, max_length=None)
@@ -819,7 +853,10 @@ async def upload_knowledge_document(
         source=source,
         status="parsed",
         content_text=text.strip(),
-        meta_json=json.dumps({"filename": original_name}, ensure_ascii=False),
+        meta_json=json.dumps(
+            {"filename": original_name, "source_format": suffix.lstrip(".")},
+            ensure_ascii=False,
+        ),
     )
     db.add(doc)
     db.commit()

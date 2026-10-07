@@ -1,7 +1,9 @@
 <template>
   <section class="page">
     <h1 class="page-title">知识库管理</h1>
-    <p class="page-subtitle">上传法规文档、查看内容、触发切片与向量重建</p>
+    <p class="page-subtitle">
+      上传法规文档、查看内容、触发切片与向量重建。支持 PDF、Word、Markdown 和纯文本。
+    </p>
 
     <el-card v-loading="store.loading">
       <template #header>上传知识文档</template>
@@ -14,11 +16,11 @@
             <el-input v-model="source" placeholder="如：国家法律法规数据库或官网链接" />
           </el-form-item>
         </div>
-        <el-form-item label="文件（.txt 或 .md，支持 YAML 元数据头）">
+        <el-form-item label="文件（PDF / Word / .md / .txt）">
           <el-upload
             :auto-upload="false"
             :limit="1"
-            accept=".txt,.md"
+            accept=".pdf,.docx,.md,.markdown,.txt"
             :on-change="onFileChange"
           >
             <el-button type="primary" plain>
@@ -26,6 +28,9 @@
               选择文件
             </el-button>
           </el-upload>
+          <p class="field-hint">
+            PDF 与 Word 会自动转成文本入库；扫描件（图片版 PDF）提取不到文字，需先用可复制文字的版本。
+          </p>
         </el-form-item>
         <div class="doc-actions">
           <el-button type="primary" :loading="store.loading" :disabled="!selectedFile" @click="upload">
@@ -103,16 +108,20 @@ function onFileChange(file: UploadFile) {
 
 async function upload() {
   if (!selectedFile.value) return
-  await store.uploadDocument(
-    selectedFile.value,
-    title.value || selectedFile.value.name,
-    source.value,
-  )
-  ElMessage.success('文档已上传并已重建知识库')
-  title.value = ''
-  source.value = ''
-  selectedFile.value = null
-  await load()
+  try {
+    await store.uploadDocument(
+      selectedFile.value,
+      title.value || selectedFile.value.name,
+      source.value,
+    )
+    ElMessage.success('文档已上传并已重建知识库')
+    title.value = ''
+    source.value = ''
+    selectedFile.value = null
+    await load()
+  } catch {
+    ElMessage.error(store.error || '文档上传失败')
+  }
 }
 
 async function rebuild() {
@@ -162,6 +171,13 @@ function formatTime(value: string) {
 .rebuild-tip {
   color: #64748b;
   margin: 10px 0 0;
+}
+
+.field-hint {
+  margin: var(--s-2) 0 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
 }
 
 .preview-text {
