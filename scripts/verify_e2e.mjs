@@ -1,19 +1,27 @@
 /**
  * E2E smoke test for the local MVP.
  * Requires backend on :8001 and frontend dev server on :5173.
+ * Uses playwright-core installed in frontend/ (run `pnpm install` there first).
  */
 import { createRequire } from 'module'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 const BASE = process.env.E2E_BASE || 'http://localhost:5173'
-const RUNTIME_MODULES =
-  process.env.CODEX_NODE_MODULES ||
-  'C:/Users/34036/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+const FRONTEND_PACKAGE = path.join(HERE, '..', 'frontend', 'package.json')
 
-const require = createRequire(RUNTIME_MODULES + '/')
-const { chromium } = require('playwright-core')
+let chromium
+try {
+  const require = createRequire(FRONTEND_PACKAGE)
+  ;({ chromium } = require('playwright-core'))
+} catch (err) {
+  console.error('无法加载 playwright-core：请先在 frontend/ 目录执行 pnpm install（' + err.message + '）')
+  process.exit(1)
+}
 
 const browser = await chromium.launch({
-  channel: 'msedge',
+  channel: process.env.E2E_CHANNEL || 'msedge',
   headless: true,
 })
 

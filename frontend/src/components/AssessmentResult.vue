@@ -591,14 +591,6 @@ const rectLabels: Record<string, string> = {
   closed: '已关闭',
 }
 
-const rectTag = computed<'success' | 'warning' | 'info' | 'primary'>(() => {
-  const status = props.assessment.rectification_status
-  if (status === 'verified') return 'success'
-  if (status === 'pending_verification') return 'warning'
-  if (status === 'rectifying' || status === 'assigned') return 'primary'
-  return 'info'
-})
-
 const rectLabel = computed(() => {
   const status = props.assessment.rectification_status || ''
   return rectLabels[status] || '未开始整改'

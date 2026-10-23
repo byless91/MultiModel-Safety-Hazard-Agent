@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, type UploadFile, type UploadFiles } from 'element-plus'
+import { ElMessage, type UploadFile } from 'element-plus'
 import { ref } from 'vue'
 
 import AssessmentResult from '../components/AssessmentResult.vue'
@@ -126,7 +126,7 @@ function resetForm() {
   store.error = ''
 }
 
-function onExceed(_files: UploadFiles) {
+function onExceed() {
   ElMessage.warning('最多上传 3 张图片')
 }
 </script>

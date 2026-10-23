@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "type-check": "vue-tsc --noEmit",
+    "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -20,6 +22,10 @@
   "devDependencies": {
     "@types/node": "^20.16.11",
     "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/eslint-config-typescript": "^14.9.0",
+    "eslint": "^10.13.0",
+    "eslint-plugin-vue": "^10.11.1",
+    "playwright-core": "^1.64.1",
     "typescript": "~5.5.4",
     "vite": "^5.4.9",
     "vue-tsc": "^2.1.6"

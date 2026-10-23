@@ -1,4 +1,4 @@
-allowBuilds:
-  esbuild: set this to true or false
-  vue-demi: set this to true or false
-dangerouslyAllowAllBuilds: true
+# 仅允许以下依赖执行安装期构建脚本，其余一律禁止（供应链防护）
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi
