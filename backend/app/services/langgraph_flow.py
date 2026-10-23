@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, TypedDict
 
 from app.core.config import get_settings
-from app.services.guardrail import EvidenceGuardResult, validate_model_analysis
-from app.services.evidence import judge_evidence
-from app.services.human_review import decide_human_review
 from app.services.ensemble import (
     ModelRunResult,
     MultiModelResult,
@@ -18,11 +16,13 @@ from app.services.ensemble import (
     standardize_model_runs,
 )
 from app.services.ensemble.categories import rag_tags_for_category
+from app.services.evidence import judge_evidence
 from app.services.evidence_refine import refine_with_evidence
+from app.services.guardrail import EvidenceGuardResult, validate_model_analysis
+from app.services.human_review import decide_human_review
 from app.services.providers import (
     MockProvider,
     build_providers,
-    get_provider,
     get_providers,
 )
 from app.services.rag import (
@@ -40,6 +40,8 @@ try:
     HAS_LANGGRAPH = True
 except Exception:  # LangGraph 未安装时由 workflow.py 退回函数式流程
     HAS_LANGGRAPH = False
+
+logger = logging.getLogger("safety_hazard.workflow")
 
 
 class WorkflowState(TypedDict, total=False):
@@ -115,7 +117,16 @@ def node_analyze(state: WorkflowState) -> dict[str, Any]:
             reason = "; ".join(
                 item.error_message for item in multi.results if item.status == "failed"
             )[:200]
-    except Exception as exc:
+    except (KeyError, TypeError, AttributeError, IndexError, NameError):
+        # 编程错误不允许被 Mock 兜底掩盖：显式抛出，让请求失败并留下完整堆栈
+        logger.exception("analyze 节点出现编程错误，拒绝降级为 Mock")
+        raise
+    except Exception as exc:  # 模型/网络类故障：降级 Mock，但必须留下日志与原因
+        logger.warning(
+            "多模型分析失败，已降级 Mock 兜底：%s",
+            str(exc)[:200],
+            exc_info=True,
+        )
         result = MockProvider().analyze(state["images"], state["description"])
         result["vision_confidence"] = min(float(result.get("vision_confidence", 0.5)), 0.5)
         fallback = True
@@ -327,7 +338,6 @@ def node_evidence(state: WorkflowState) -> dict[str, Any]:
 
 def node_generate(state: WorkflowState) -> dict[str, Any]:
     report = build_report(state)
-    confidence = state.get("confidence", 0.0)
     review = decide_human_review(state)
     status = (
         "awaiting_human_review" if review.need_human_review else "completed"

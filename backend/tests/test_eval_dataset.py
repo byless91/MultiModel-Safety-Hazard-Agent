@@ -13,7 +13,6 @@ from app.eval.dataset import (
     validate_case_row,
 )
 
-
 EXISTING_ROWS = [
     {
         "id": "eval-fire-001",

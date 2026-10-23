@@ -21,7 +21,7 @@ from app.services.providers.http import (
     VISION_PROMPT,
     OpenAICompatibleProvider,
 )
-from app.services.providers.mock import MockProvider, RULE_TEMPLATES, hash_embed
+from app.services.providers.mock import RULE_TEMPLATES, MockProvider, hash_embed
 from app.services.providers.qwen import QwenProvider
 from app.services.providers.schemas import (
     HazardFinding,

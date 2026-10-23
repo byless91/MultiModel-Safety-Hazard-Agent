@@ -1,6 +1,11 @@
 import logging
+import secrets
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,8 +20,20 @@ setup_logging()
 logger = logging.getLogger("safety_hazard.api")
 
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    init_db()
+    from app.services.providers import get_provider
+    from app.services.rag import get_rag
+
+    # 预热含同步 IO（建索引/embedding），放线程池避免阻塞事件循环
+    await run_in_threadpool(get_provider)
+    await run_in_threadpool(get_rag)
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins,
@@ -36,8 +53,6 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def log_requests(request, call_next):
-        import time
-
         started = time.perf_counter()
         response = await call_next(request)
         logger.info(
@@ -52,21 +67,16 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def require_api_token(request, call_next):
         token = get_settings().api_bearer_token
-        if token and request.headers.get("Authorization") != f"Bearer {token}":
-            return JSONResponse(status_code=401, content={"detail": "未授权"})
+        if token:
+            header = (request.headers.get("Authorization") or "").encode("utf-8")
+            expected = f"Bearer {token}".encode()
+            # 常量时间比较，防止时序侧信道逐位猜解 token
+            if not secrets.compare_digest(header, expected):
+                return JSONResponse(status_code=401, content={"detail": "未授权"})
         return await call_next(request)
 
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
-
-    @app.on_event("startup")
-    def startup() -> None:
-        init_db()
-        from app.services.providers import get_provider
-        from app.services.rag import get_rag
-
-        get_provider()
-        get_rag()
 
     return app
 

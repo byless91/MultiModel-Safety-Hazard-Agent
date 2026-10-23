@@ -26,3 +26,7 @@ backend/data/logs/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# SQLite WAL sidecar files
+backend/data/*.db-wal
+backend/data/*.db-shm

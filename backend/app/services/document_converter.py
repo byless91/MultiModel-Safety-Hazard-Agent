@@ -61,7 +61,7 @@ async def convert_to_markdown(
             asyncio.to_thread(_convert_sync, path),
             timeout=timeout,
         )
-    except asyncio.TimeoutError as exc:
+    except TimeoutError as exc:
         raise ConversionError(
             f"文件解析超时（超过 {int(timeout)} 秒），请拆分或压缩后再上传"
         ) from exc

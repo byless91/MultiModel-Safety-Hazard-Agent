@@ -5,7 +5,6 @@ from pathlib import Path
 from app.eval.dataset import EvalCase, load_dataset
 from app.eval.evaluation import build_evaluation_report
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 

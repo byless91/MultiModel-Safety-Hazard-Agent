@@ -5,7 +5,6 @@ import pytest
 from app.core.config import Settings
 from app.eval.evaluation import (
     build_error_analysis,
-    build_variant_runtime,
     compute_metrics,
     evaluation_mode,
     pick_variant,

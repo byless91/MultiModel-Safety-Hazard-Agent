@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
 
 from app.services.ensemble.schemas import ModelRunResult, MultiModelResult
 from app.services.providers.base import (

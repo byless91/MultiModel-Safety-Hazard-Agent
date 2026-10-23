@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import tempfile
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.db import get_db
 from app.models import Assessment, AssessmentImage, KnowledgeDocument
+from app.models.entities import utcnow
 from app.schemas.assessment import (
     AssessmentOut,
     ConfirmIn,
@@ -23,9 +26,22 @@ from app.schemas.assessment import (
     RectificationConfirmIn,
     RectificationTransitionIn,
 )
+from app.services.document_converter import (
+    LEGACY_SUFFIX_HINTS,
+    PLAIN_SUFFIXES,
+    SUPPORTED_SUFFIXES,
+    ConversionError,
+    convert_to_markdown,
+)
+from app.services.guardrail import (
+    detect_image_type,
+    inspect_ocr_texts,
+    inspect_text,
+    validate_uploaded_input,
+)
+from app.services.knowledge import rebuild_knowledge
 from app.services.providers import ImageInput, get_provider, get_providers
 from app.services.rag import get_rag
-from app.services.knowledge import rebuild_knowledge
 from app.services.rectification import (
     RectificationTransitionError,
     next_rectification_states,
@@ -36,28 +52,28 @@ from app.services.rectification import (
 )
 from app.services.rectification_assessment import assess_rectification_completion
 from app.services.workflow import run_workflow
-from app.services.guardrail import (
-    detect_image_type,
-    inspect_ocr_texts,
-    inspect_text,
-    validate_uploaded_input,
-)
-from app.services.document_converter import (
-    LEGACY_SUFFIX_HINTS,
-    PLAIN_SUFFIXES,
-    SUPPORTED_SUFFIXES,
-    ConversionError,
-    convert_to_markdown,
-)
-
-from app.models.entities import utcnow
 
 settings = get_settings()
+logger = logging.getLogger("safety_hazard.api")
 
-MAX_FILE_BYTES = settings.max_file_bytes
-MAX_DOCUMENT_BYTES = settings.max_document_bytes
 ALLOWED_DOCUMENT_SUFFIXES = set(SUPPORTED_SUFFIXES)
 ALLOWED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+ALLOWED_ASSESSMENT_STATUSES = {
+    "pending",
+    "needs_more_info",
+    "awaiting_human_review",
+    "completed",
+    "needs_review",
+    "confirmed",
+    "failed",
+}
+UPLOAD_READ_CHUNK = 1024 * 1024
+_IMAGE_MIME_BY_KIND = {
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "gif": "image/gif",
+    "webp": "image/webp",
+}
 UNSAFE_FILENAME_RE = re.compile(
     r"(\.\./|\.\.\\|[/\\]{2}|[\x00-\x1f]|^[A-Za-z]:[\\/])"
 )
@@ -241,6 +257,29 @@ def _safe_filename(filename: str, *, allowed_suffixes: set[str], default: str) -
     return name, suffix
 
 
+async def _read_upload_limited(
+    upload: UploadFile, *, max_bytes: int, detail: str
+) -> bytes:
+    """分块读取上传内容并在超限时立即拒绝，避免大文件整段读入内存后才校验。"""
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await upload.read(UPLOAD_READ_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(status_code=400, detail=detail)
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _sniffed_image_mime(data: bytes) -> str:
+    """以文件内容（magic bytes）推断 MIME，不信任客户端声明的 content_type。"""
+    kind = detect_image_type(data)
+    return _IMAGE_MIME_BY_KIND.get(kind or "", "application/octet-stream")
+
+
 async def _extract_document_text(data: bytes, suffix: str) -> str:
     """Return plain text/Markdown for an uploaded knowledge document.
 
@@ -420,7 +459,7 @@ def health() -> HealthOut:
         provider=get_provider().name,
         rag_loaded=len(rag.texts) > 0,
         reranker_enabled=rag.reranker_enabled,
-        version="0.1.0",
+        version=settings.app_version,
     )
 
 
@@ -522,11 +561,14 @@ async def create_assessment(
     if len(file_list) > settings.max_images:
         raise HTTPException(status_code=400, detail=f"最多上传 {settings.max_images} 张图片")
 
+    image_limit_mb = settings.max_file_bytes // (1024 * 1024)
     staged: list[tuple[UploadFile, bytes]] = []
     for upload in file_list:
-        data = await upload.read()
-        if len(data) > MAX_FILE_BYTES:
-            raise HTTPException(status_code=400, detail="单张图片不能超过 10MB")
+        data = await _read_upload_limited(
+            upload,
+            max_bytes=settings.max_file_bytes,
+            detail=f"单张图片不能超过 {image_limit_mb}MB",
+        )
         staged.append((upload, data))
     ocr_list = _parse_ocr_texts(ocr_texts)
     _reject_ocr_texts(ocr_list)
@@ -548,19 +590,22 @@ async def create_assessment(
         stored_name = f"{uuid4().hex}_{original_name}"
         target = upload_root / stored_name
         target.write_bytes(data)
+        sniffed_mime = _sniffed_image_mime(data)
         image = AssessmentImage(
             assessment_id=assessment.id,
             filename=original_name,
             stored_path=str(target),
-            mime_type=upload.content_type,
+            mime_type=sniffed_mime,
             size_bytes=len(data),
         )
         db.add(image)
-        images.append(ImageInput(filename=original_name, path=target, mime_type=upload.content_type))
+        images.append(ImageInput(filename=original_name, path=target, mime_type=sniffed_mime))
 
     db.commit()
     try:
-        state = run_workflow(
+        # 多模型研判是长耗时同步调用，必须移出事件循环，否则阻塞全站请求
+        state = await run_in_threadpool(
+            run_workflow,
             description=description or "（未填写描述）",
             images=images,
             followup_answer=followup_answer or None,
@@ -584,10 +629,13 @@ def list_assessments(
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> list[AssessmentOut]:
+    if status is not None and status not in ALLOWED_ASSESSMENT_STATUSES:
+        raise HTTPException(status_code=422, detail="无效的 status 筛选值")
+    limit = max(1, min(limit, 200))
     query = select(Assessment).order_by(Assessment.created_at.desc())
     if status:
         query = query.where(Assessment.status == status)
-    query = query.limit(min(limit, 200)).offset(max(0, offset))
+    query = query.limit(limit).offset(max(0, offset))
     return [to_out(item) for item in db.scalars(query).all()]
 
 
@@ -643,7 +691,13 @@ def confirm_assessment(
     if edits.get("hazard_category"):
         item.hazard_category = str(edits["hazard_category"])
     if edits.get("risk_level") is not None:
-        item.risk_level = int(edits["risk_level"])
+        try:
+            level = int(edits["risk_level"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="risk_level 必须为 1-4 的整数") from None
+        if not 1 <= level <= 4:
+            raise HTTPException(status_code=422, detail="risk_level 必须为 1-4 的整数")
+        item.risk_level = level
     if edits.get("conclusion"):
         item.conclusion = str(edits["conclusion"])
     item.status = "confirmed" if payload.confirmed else "needs_review"
@@ -678,10 +732,15 @@ async def submit_rectification(
             detail=f"当前整改状态为“{rectification_state_label(current_status)}”，不允许提交整改照片",
         )
     staged: list[tuple[UploadFile, bytes]] = []
-    for upload in files or []:
-        data = await upload.read()
-        if len(data) > MAX_FILE_BYTES:
-            raise HTTPException(status_code=400, detail="单张图片不能超过 10MB")
+    file_list = files or []
+    if len(file_list) > settings.max_images:
+        raise HTTPException(status_code=400, detail=f"最多上传 {settings.max_images} 张整改照片")
+    for upload in file_list:
+        data = await _read_upload_limited(
+            upload,
+            max_bytes=settings.max_file_bytes,
+            detail=f"单张图片不能超过 {settings.max_file_bytes // (1024 * 1024)}MB",
+        )
         staged.append((upload, data))
     if not staged:
         raise HTTPException(status_code=400, detail="至少需要上传一张整改后照片")
@@ -703,7 +762,7 @@ async def submit_rectification(
                 assessment_id=assessment_id,
                 filename=original_name,
                 stored_path=str(target),
-                mime_type=upload.content_type,
+                mime_type=_sniffed_image_mime(data),
                 size_bytes=len(data),
                 image_kind="rectification",
             )
@@ -717,7 +776,8 @@ async def submit_rectification(
     if note:
         item.rectification_note = note
     item.rectified_at = utcnow()
-    _run_rectification_compare(item, db)
+    # AI 前后比对含模型调用（mock 之外最长 60s），同样移出事件循环
+    await run_in_threadpool(_run_rectification_compare, item, db)
     db.commit()
     db.refresh(item)
     return to_out(item)
@@ -832,9 +892,11 @@ async def upload_knowledge_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> KnowledgeDocument:
-    data = await file.read()
-    if len(data) > MAX_DOCUMENT_BYTES:
-        raise HTTPException(status_code=400, detail="文档不能超过 20MB")
+    data = await _read_upload_limited(
+        file,
+        max_bytes=settings.max_document_bytes,
+        detail=f"文档不能超过 {settings.max_document_bytes // (1024 * 1024)}MB",
+    )
     raw_name = file.filename or "document.txt"
     legacy_hint = LEGACY_SUFFIX_HINTS.get(Path(raw_name).suffix.lower())
     if legacy_hint:
@@ -910,8 +972,8 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
     try:
         rebuild_knowledge(db=db)
     except Exception:
-        # Deletion is committed; keep the API response stable even if reindex fails.
-        pass
+        # 删除已提交，保持 204 响应稳定；但索引与库状态从此不一致，必须留下日志供运维跟进
+        logger.exception("删除知识文档后索引重建失败，知识库与索引可能不一致（document_id=%s）", document_id)
     return Response(status_code=204)
 
 

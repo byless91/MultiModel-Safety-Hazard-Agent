@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import evaluate as evaluate_pipeline
+
 from app.eval.metrics import compute_metrics, metric_definitions
 
 

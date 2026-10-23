@@ -9,14 +9,13 @@ from app.services.ensemble import (
     standardize_model_runs,
 )
 from app.services.ensemble.categories import rag_tags_for_category
-from app.services.evidence_refine import refine_with_evidence
-from app.services.langgraph_flow import HAS_LANGGRAPH, run_langgraph
-from app.services.guardrail import EvidenceGuardResult, validate_model_analysis
 from app.services.evidence import judge_evidence
+from app.services.evidence_refine import refine_with_evidence
+from app.services.guardrail import EvidenceGuardResult, validate_model_analysis
 from app.services.human_review import decide_human_review
+from app.services.langgraph_flow import HAS_LANGGRAPH, run_langgraph
 from app.services.providers import (
     build_providers,
-    get_provider,
     get_providers,
 )
 from app.services.rag import (

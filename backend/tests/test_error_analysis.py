@@ -4,8 +4,8 @@ from app.eval.evaluation import build_evaluation_report
 from app.eval.metrics import (
     error_by_dimension,
     error_summary,
-    failure_cases,
     failure_case_reason,
+    failure_cases,
 )
 
 

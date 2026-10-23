@@ -33,7 +33,7 @@ def corpus_signature(
 ) -> str:
     """Signature covering the exact corpus and embedding model."""
     digest = hashlib.sha256()
-    digest.update(f"v{version}|{model_key}|{len(hashes)}|".encode("utf-8"))
+    digest.update(f"v{version}|{model_key}|{len(hashes)}|".encode())
     for item in hashes:
         digest.update(item.encode("utf-8"))
         digest.update(b"|")

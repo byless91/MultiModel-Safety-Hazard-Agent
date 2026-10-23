@@ -1,6 +1,5 @@
 """Evaluation runner, trace completeness and metric calculations."""
 
-import json
 from pathlib import Path
 
 from app.core.config import get_settings

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "多模态基层安全隐患智能研判与处置辅助系统"
+    app_version: str = "0.1.0"
     debug: bool = True
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'data' / 'app.db').as_posix()}"
     upload_dir: Path = BACKEND_DIR / "data" / "uploads"

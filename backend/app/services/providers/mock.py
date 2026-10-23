@@ -10,7 +10,7 @@ from typing import Any
 from app.services.providers.base import BaseProvider, ImageInput
 from app.services.providers.schemas import normalize_analysis
 
-RULE_TEMPLATES = [
+RULE_TEMPLATES: list[dict[str, Any]] = [
     {
         "category": "占用疏散通道",
         "keywords": [

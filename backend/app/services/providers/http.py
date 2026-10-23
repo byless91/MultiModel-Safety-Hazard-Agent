@@ -11,6 +11,11 @@ from typing import Any
 
 import httpx
 
+from app.core.logging import mask_secrets
+from app.services.guardrail.input_guard import (
+    GUARD_STATEMENT,
+    build_external_text,
+)
 from app.services.providers.base import (
     BaseProvider,
     ImageInput,
@@ -18,11 +23,6 @@ from app.services.providers.base import (
     ModelUnavailableError,
 )
 from app.services.providers.schemas import normalize_analysis
-from app.services.guardrail.input_guard import (
-    GUARD_STATEMENT,
-    build_external_text,
-)
-from app.core.logging import mask_secrets
 
 logger = logging.getLogger("safety_hazard.providers")
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from app.core.config import Settings
 from app.services.providers.base import BaseProvider
 from app.services.providers.mock import MockProvider

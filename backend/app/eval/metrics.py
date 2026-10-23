@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 METRIC_ORDER = (
     "category_accuracy",
     "level_accuracy",
@@ -119,7 +118,9 @@ def failure_case_reason(item: dict[str, Any], error_type: str) -> str:
     if error_type == "evidence_failure":
         claims = (item.get("evidence") or {}).get("unsupported_claims") or []
         detail = "；".join(str(claim) for claim in claims[:2])
-        return f"结论缺少法规证据支持（{item.get('evidence_status') or 'insufficient'}）{('：' + detail) if detail else ''}"
+        status = item.get("evidence_status") or "insufficient"
+        suffix = f"：{detail}" if detail else ""
+        return f"结论缺少法规证据支持（{status}）{suffix}"
     if error_type == "severity_error":
         expected = (item.get("case") or {}).get("expected_level")
         return f"类别正确但等级偏差（期望 {expected}，预测 {item.get('predicted_level')}）"

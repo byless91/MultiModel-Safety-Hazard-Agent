@@ -90,7 +90,7 @@ def _judge_one(
     best_overlap = 0
     best_score = 0.0
     matched_evidence: list[dict[str, Any]] = []
-    for index, item in enumerate(retrieval):
+    for _index, item in enumerate(retrieval):
         evidence_text = str(item.get("text") or "")
         overlap = len(query_tokens & cjk_bigrams(evidence_text))
         if overlap <= 0:

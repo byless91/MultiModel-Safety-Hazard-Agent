@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from app.core.config import get_settings
@@ -76,15 +77,35 @@ def setup_logging() -> None:
         log_dir = Path(settings.upload_dir).parent / "logs"
         try:
             log_dir.mkdir(parents=True, exist_ok=True)
-            file_handler = logging.FileHandler(log_dir / "app.log", encoding="utf-8")
+            file_handler = RotatingFileHandler(
+                log_dir / "app.log",
+                maxBytes=10 * 1024 * 1024,
+                backupCount=5,
+                encoding="utf-8",
+            )
             file_handler.setFormatter(
                 SecretMaskingFormatter(
                     "%(asctime)s %(levelname)s %(name)s: %(message)s"
                 )
             )
             root.addHandler(file_handler)
-        except OSError:
-            pass
+        except OSError as exc:
+            # 文件日志不可用时降级为仅控制台输出，但不能完全无声
+            stream_handler = next(
+                (h for h in root.handlers if isinstance(h, logging.StreamHandler)), None
+            )
+            if stream_handler is not None:
+                stream_handler.emit(
+                    logging.LogRecord(
+                        "safety_hazard.logging",
+                        logging.WARNING,
+                        __file__,
+                        0,
+                        f"无法创建日志文件（{exc}），仅输出到控制台",
+                        None,
+                        None,
+                    )
+                )
     for handler in root.handlers:
         if not any(
             isinstance(filter_item, SecretMaskingFilter)

@@ -13,8 +13,7 @@ from app.eval.evaluation import (
     run_evaluation_case,
 )
 from app.services.providers import MockProvider
-from app.services.providers.base import BaseProvider
-from app.services.providers.base import ModelUnavailableError
+from app.services.providers.base import BaseProvider, ModelUnavailableError
 
 
 def _eval_case(overrides=None):

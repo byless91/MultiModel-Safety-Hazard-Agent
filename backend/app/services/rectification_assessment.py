@@ -6,7 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 RULE_VERSION = "rectification-assessment-v1"
 RESOLVED_THRESHOLD = 0.8
 

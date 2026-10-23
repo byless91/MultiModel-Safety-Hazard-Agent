@@ -12,7 +12,6 @@ from app.eval.evaluation import (
     run_ablation,
 )
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -36,7 +35,7 @@ def _comparison(limit=1):
 
 def test_comparison_marks_each_variant_mode():
     comparison = _comparison()
-    for name, item in comparison["variants"].items():
+    for _name, item in comparison["variants"].items():
         assert item["mode"] == "mock"
         assert "metrics" in item
 

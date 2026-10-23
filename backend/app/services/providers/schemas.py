@@ -203,7 +203,8 @@ def normalize_analysis(
         if finding is not None:
             hazards.append(finding)
 
-    rule = raw.get("rule") if trust_rule and isinstance(raw.get("rule"), dict) else {}
+    rule_raw = raw.get("rule") if trust_rule else None
+    rule = rule_raw if isinstance(rule_raw, dict) else {}
     return ModelAnalysis(
         provider=provider,
         family=family,

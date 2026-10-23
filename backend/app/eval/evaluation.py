@@ -8,15 +8,13 @@ when the Evidence Judge said otherwise.
 from __future__ import annotations
 
 import json
-import os
 import time
-from collections import Counter, defaultdict
-from datetime import datetime, timezone
-from pathlib import Path
+from collections import Counter
+from datetime import UTC, datetime
 from typing import Any
 
 from app.core.config import Settings, get_settings
-from app.eval.dataset import EvalCase, EvalDataset, EvalSourceType, load_dataset
+from app.eval.dataset import EvalCase, EvalDataset
 from app.eval.metrics import (
     build_error_analysis,
     compute_metrics,
@@ -26,7 +24,6 @@ from app.eval.metrics import (
 from app.services.ensemble.categories import canonicalize_hazard_type
 from app.services.providers import BaseProvider, build_providers
 from app.services.rag import RAGService
-
 
 __all__ = [
     "build_ablation_markdown",
@@ -206,7 +203,8 @@ def build_ablation_markdown(comparison: dict[str, Any]) -> str:
         f"- 数据来源分布：{partition_text}",
         f"- 实际模型模式：{comparison.get('evaluation_mode', '-')}",
         "",
-        "| 变体 | 数据模式 | 类别准确率 | 等级准确率 | MAE | ±1 容差 | 条款命中 | 证据支持 | 无依据结论 | 复核率 | 分歧率 | Unsafe Auto-Pass |",
+        "| 变体 | 数据模式 | 类别准确率 | 等级准确率 | MAE | ±1 容差 | 条款命中 | 证据支持 "
+        "| 无依据结论 | 复核率 | 分歧率 | Unsafe Auto-Pass |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for name, item in comparison.get("variants", {}).items():
@@ -557,7 +555,7 @@ def run_evaluation_case(
         "variant": variant["id"],
         "label": variant["label"],
         "models": variant["models"],
-        "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
+        "evaluation_timestamp": datetime.now(UTC).isoformat(),
         "latency_s": round(elapsed, 2),
         "provider_mode": evaluation_mode(settings),
         "system_version": "eval-runner-3",
@@ -747,7 +745,10 @@ def build_evaluation_report(
     scenario_rows: dict[str, dict[str, float | int]] = {}
     for item in results:
         scenario = item["case"]["scenario"]
-        entry = scenario_rows.setdefault(scenario, {"total": 0, "category_accuracy": 0, "level_accuracy": 0, "review_rate": 0, "clause_hit_rate": 0})
+        entry = scenario_rows.setdefault(
+            scenario,
+            {"total": 0, "category_accuracy": 0, "level_accuracy": 0, "review_rate": 0, "clause_hit_rate": 0},
+        )
         entry["total"] += 1
         entry["category_accuracy"] += int(item["metric_flags"]["category_match"])
         entry["level_accuracy"] += int(item["metric_flags"]["level_match"])
@@ -766,7 +767,7 @@ def build_evaluation_report(
         "severity_counts": dict(severities),
         "scenario_breakdown": scenario_rows,
         "evaluation_mode": provider_mode,
-        "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
+        "evaluation_timestamp": datetime.now(UTC).isoformat(),
         "system_version": "eval-runner-3",
         **metrics,
         "metrics": metrics,
@@ -796,7 +797,8 @@ def build_evaluation_report(
         f"- 等级分布：{json.dumps(overview['severity_counts'], ensure_ascii=False)}",
         f"- 场景分布：{json.dumps(overview['scenario_counts'], ensure_ascii=False)}",
         f"- 有隐患样本：{overview['hazard_case_count']}；无隐患负样本：{overview['safe_negative_case_count']}",
-        f"- 含图片案例：{overview['image_case_count']}；标注 expected_evidence_supported：{overview['evidence_labeled_count']}",
+        f"- 含图片案例：{overview['image_case_count']}；"
+        f"标注 expected_evidence_supported：{overview['evidence_labeled_count']}",
         "",
         "## 总体指标",
         "",

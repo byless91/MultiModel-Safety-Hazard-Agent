@@ -1,5 +1,5 @@
-import io
 import atexit
+import io
 import os
 import shutil
 import tempfile

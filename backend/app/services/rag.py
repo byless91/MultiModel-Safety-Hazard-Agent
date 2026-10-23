@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from app.services.embedding_cache import (
     text_hash,
 )
 from app.services.providers import get_provider, hash_embed
+
+logger = logging.getLogger("safety_hazard.rag")
 
 DEMO_SOURCE_MARKERS = ("演示",)
 DEMO_VERSION_MARKERS = ("demo",)
@@ -216,8 +219,9 @@ class RAGService:
                     "embedding_fallback": bool(self.embedding_fallback),
                 },
             )
-        except OSError:
-            pass
+        except Exception:
+            # 持久化失败不阻断检索，但静默吞掉会导致下次启动重复全量付费 embed
+            logger.warning("FAISS 索引持久化失败，下次启动将全量重建", exc_info=True)
 
     def rebuild(self) -> None:
         if len(self.hashes) != len(self.texts):
@@ -253,12 +257,12 @@ class RAGService:
         cache = load_embedding_cache(cache_path, self.model_key)
         missing = [
             (index, text)
-            for index, (item_hash, text) in enumerate(zip(self.hashes, self.texts))
+            for index, (item_hash, text) in enumerate(zip(self.hashes, self.texts, strict=False))
             if item_hash not in cache
         ]
         if missing:
             fresh = self.provider.embed([text for _, text in missing])
-            for (index, _), vector in zip(missing, fresh):
+            for (index, _), vector in zip(missing, fresh, strict=False):
                 cache[self.hashes[index]] = np.asarray(vector, dtype=np.float32)
             save_embedding_cache(cache_path, self.model_key, cache)
         self.embedding_fallback = False
@@ -299,7 +303,7 @@ class RAGService:
 
         if self._index is not None:
             scores, indexes = self._index.search(query_vector, candidate_window)
-            pairs = [(int(i), float(s)) for i, s in zip(indexes[0], scores[0]) if i >= 0]
+            pairs = [(int(i), float(s)) for i, s in zip(indexes[0], scores[0], strict=False) if i >= 0]
         else:
             dots = self.vectors @ query_vector[0]
             order = np.argsort(dots)[::-1]

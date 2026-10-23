@@ -1,12 +1,25 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import get_settings
 
 settings = get_settings()
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+_IS_SQLITE = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if _IS_SQLITE else {}
 engine = create_engine(settings.database_url, connect_args=connect_args)
+
+if _IS_SQLITE:
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        """WAL 允许读写并发；busy_timeout 避免瞬时锁冲突直接抛 database is locked。"""
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
+        finally:
+            cursor.close()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

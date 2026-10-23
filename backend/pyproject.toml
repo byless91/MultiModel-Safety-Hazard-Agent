@@ -18,12 +18,16 @@ dependencies = [
     "langgraph>=0.2",
     "httpx>=0.27",
     "python-dotenv>=1.0",
-    "pytest>=8.0",
     "markitdown[pdf,docx]>=0.1.8",
 ]
 
 [project.optional-dependencies]
 faiss = ["faiss-cpu>=1.8.0"]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -36,3 +40,23 @@ exclude = ["data*", "tests*"]
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 依赖注入在参数默认值中调用 Depends/Form/File 属正常用法
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Form", "fastapi.File", "fastapi.Query"]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试需先注入 sys.path 再导入被测脚本
+"tests/*" = ["E402"]
+# StrEnum 迁移涉及 str() 序列化语义，推迟到专门批次处理
+"app/eval/dataset.py" = ["UP042"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+# 渐进式接入：B0 只检查核心模块；依赖模块静默分析仅提供类型信息
+files = ["app/core", "app/services/providers"]
+follow_imports = "silent"

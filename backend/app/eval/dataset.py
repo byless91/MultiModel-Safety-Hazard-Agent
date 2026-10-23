@@ -12,7 +12,7 @@ import json
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -94,7 +94,7 @@ class EvalCase(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _review_default_for_hazard(self) -> "EvalCase":
+    def _review_default_for_hazard(self) -> EvalCase:
         if self.expected_review_required is None:
             self.expected_review_required = self.ground_truth_hazard_present
         return self

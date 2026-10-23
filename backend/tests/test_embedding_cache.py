@@ -151,7 +151,7 @@ def test_persisted_index_is_reused_when_corpus_unchanged(tmp_path):
     settings = _settings(tmp_path, knowledge)
 
     provider_one = _CountingProvider()
-    rag_one = RAGService(settings, provider_one)
+    RAGService(settings, provider_one)
 
     provider_two = _CountingProvider()
     rag_two = RAGService(settings, provider_two)

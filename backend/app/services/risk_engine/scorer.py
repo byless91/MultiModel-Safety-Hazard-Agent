@@ -11,8 +11,8 @@ from app.services.risk_engine.rules import (
     HIGH_BAND,
     IMMEDIATE_DANGER_KEYWORDS,
     LOW_BAND,
-    RULE_WEIGHTS,
     RULE_VERSION,
+    RULE_WEIGHTS,
 )
 from app.services.risk_engine.schemas import RiskAssessment
 

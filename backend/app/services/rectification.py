@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 RECTIFICATION_STATUSES = [
     "open",
@@ -118,7 +117,7 @@ def append_rectification_history(
             "to_status": to_status,
             "note": note or "",
             "by": by or "",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
     )
     meta["current_status"] = to_status
