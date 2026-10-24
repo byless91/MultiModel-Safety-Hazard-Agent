@@ -24,6 +24,9 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.0",
     "prometheus-client>=0.20",
     "alembic>=1.13",
+    "pyjwt>=2.8",
+    "bcrypt>=4.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]

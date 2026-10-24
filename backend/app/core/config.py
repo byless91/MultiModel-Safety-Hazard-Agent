@@ -54,6 +54,15 @@ class Settings(BaseSettings):
 
     # B3：异步任务化。sync = 现状（同步等待结果）；async = 202 + 任务表 + 轮询
     workflow_mode: Literal["sync", "async"] = "sync"
+    # B4：认证模式。none = 本地开发不鉴权；token = 静态 Bearer（兼容旧部署）；
+    # jwt = 用户体系（/api/v1/auth/token + 角色权限）。生产必须 jwt 或 token。
+    auth_mode: Literal["none", "token", "jwt"] = "none"
+    auth_jwt_secret: str = "dev-insecure-secret-change-me"
+    auth_token_expire_minutes: int = 720
+    upload_url_ttl_minutes: int = 60
+    rate_limit_enabled: bool = False
+    rate_limit_assessments_per_minute: int = 5
+    rate_limit_login_per_minute: int = 10
     langgraph_checkpoint_path: Path = BACKEND_DIR / "data" / "langgraph.db"
     job_stale_minutes: int = 10
     idempotency_ttl_hours: int = 24

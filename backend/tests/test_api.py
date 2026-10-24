@@ -371,15 +371,18 @@ def test_upload_knowledge_document_rejects_traversal_filename(monkeypatch):
 
 
 def test_api_bearer_token_auth(monkeypatch):
-    from app import main
+    """token 模式：静态 Bearer 守卫业务路由；/health 始终开放。"""
+    from app.core.config import get_settings
 
-    class FakeSettings:
-        api_bearer_token = "test-token"
-
-    monkeypatch.setattr(main, "get_settings", lambda: FakeSettings())
+    monkeypatch.setattr(get_settings(), "auth_mode", "token")
+    monkeypatch.setattr(get_settings(), "api_bearer_token", "test-token")
     with TestClient(app) as client:
-        denied = client.get("/api/v1/health")
-        allowed = client.get("/api/v1/health", headers={"Authorization": "Bearer test-token"})
+        health = client.get("/api/v1/health")
+        denied = client.get("/api/v1/assessments")
+        allowed = client.get(
+            "/api/v1/assessments", headers={"Authorization": "Bearer test-token"}
+        )
+    assert health.status_code == 200
     assert denied.status_code == 401
     assert allowed.status_code == 200
 

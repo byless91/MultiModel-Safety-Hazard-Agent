@@ -48,6 +48,9 @@ class Assessment(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+    # B4/WP2.2：复核审计身份（jwt 模式取认证身份，不可由客户端伪造）
+    confirmed_by_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    confirmed_by_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     images: Mapped[list["AssessmentImage"]] = relationship(
         back_populates="assessment", cascade="all, delete-orphan"
@@ -101,6 +104,22 @@ class IdempotencyKey(Base):
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     assessment_id: Mapped[str] = mapped_column(String(36), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class User(Base):
+    """登录用户（B4/WP2.1）。密码只存 bcrypt 哈希。"""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(128))
+    role: Mapped[str] = mapped_column(String(16), default="inspector")  # admin|inspector|reviewer
+    disabled: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
 
 
 class KnowledgeDocument(Base):

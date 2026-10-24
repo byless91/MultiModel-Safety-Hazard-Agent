@@ -73,9 +73,13 @@ def test_existing_db_upgrade_head_is_lossless(tmp_path: Path):
     engine = create_engine(f"sqlite:///{old_db.as_posix()}")
     Base.metadata.create_all(engine)
     with engine.begin() as conn:
-        # 模拟 B2 时代结构：删掉 B3 新增的表
+        # 模拟 B2 时代结构：删掉 B3/B4 新增的表与列
         conn.execute(text("DROP TABLE IF EXISTS idempotency_keys"))
         conn.execute(text("DROP TABLE IF EXISTS assessment_jobs"))
+        conn.execute(text("DROP TABLE IF EXISTS users"))
+        conn.execute(text("DROP INDEX IF EXISTS ix_assessments_confirmed_by_id"))
+        conn.execute(text("ALTER TABLE assessments DROP COLUMN confirmed_by_id"))
+        conn.execute(text("ALTER TABLE assessments DROP COLUMN confirmed_by_name"))
         conn.execute(
             text(
                 "INSERT INTO assessments (id, description, status, followup_used, "
@@ -145,4 +149,5 @@ def test_future_incremental_migration_applies_on_adopted_db(tmp_path: Path):
         "assessment_jobs",
         "idempotency_keys",
         "knowledge_documents",
+        "users",
     } == set(snapshot)

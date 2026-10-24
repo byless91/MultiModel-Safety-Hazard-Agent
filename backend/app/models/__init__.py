@@ -1,4 +1,11 @@
-from app.models.entities import Assessment, AssessmentImage, AssessmentJob, IdempotencyKey, KnowledgeDocument
+from app.models.entities import (
+    Assessment,
+    AssessmentImage,
+    AssessmentJob,
+    IdempotencyKey,
+    KnowledgeDocument,
+    User,
+)
 
 __all__ = [
     "Assessment",
@@ -6,5 +13,6 @@ __all__ = [
     "AssessmentJob",
     "IdempotencyKey",
     "KnowledgeDocument",
+    "User",
 ]
 

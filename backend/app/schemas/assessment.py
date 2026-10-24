@@ -99,6 +99,37 @@ class HealthOut(BaseModel):
     rag_loaded: bool
     reranker_enabled: bool = True
     version: str
+    auth_required: bool = False
+
+
+class AuthUserOut(BaseModel):
+    id: str
+    username: str
+    role: str
+
+
+class TokenOut(BaseModel):
+    """POST /api/v1/auth/token 的响应（OAuth2 密码流）。"""
+
+    access_token: str
+    token_type: str = "bearer"
+    user: AuthUserOut
+
+
+class UserCreateIn(BaseModel):
+    username: str
+    password: str
+    role: str = "inspector"
+
+
+class UserAdminOut(BaseModel):
+    """用户管理列表项：绝不包含 password_hash。"""
+
+    id: str
+    username: str
+    role: str
+    disabled: bool
+    created_at: datetime
 
 
 class ProviderInfo(BaseModel):

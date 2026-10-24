@@ -7,19 +7,33 @@ from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
-from app.models import Assessment, AssessmentImage, AssessmentJob, IdempotencyKey, KnowledgeDocument
+from app.core.rate_limit import limiter
+from app.core.security import (
+    ALL_ROLES,
+    authenticate,
+    create_access_token,
+    get_request_user,
+    hash_password,
+    require_roles,
+    sign_upload_url,
+    verify_password,
+)
+from app.models import Assessment, AssessmentImage, AssessmentJob, IdempotencyKey, KnowledgeDocument, User
 from app.models.entities import utcnow
 from app.schemas.assessment import (
     AssessmentOut,
+    AuthUserOut,
     ConfirmIn,
     DocumentOut,
     FollowupIn,
@@ -28,6 +42,9 @@ from app.schemas.assessment import (
     ProviderInfo,
     RectificationConfirmIn,
     RectificationTransitionIn,
+    TokenOut,
+    UserAdminOut,
+    UserCreateIn,
 )
 from app.services.assessment_io import apply_state, images_from_db
 from app.services.document_converter import (
@@ -87,7 +104,10 @@ UNSAFE_FILENAME_RE = re.compile(
     r"(\.\./|\.\.\\|[/\\]{2}|[\x00-\x1f]|^[A-Za-z]:[\\/])"
 )
 
-router = APIRouter(prefix="/api/v1")
+# guarded：全部业务路由经 authenticate 守卫（none 模式放行）
+router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
+# public：健康检查与登录换 token
+public_router = APIRouter(prefix="/api/v1")
 
 
 def parse_json(text: str | None):
@@ -103,7 +123,7 @@ def to_out(item: Assessment) -> AssessmentOut:
     def image_url(image: AssessmentImage) -> str | None:
         try:
             relative = Path(image.stored_path).relative_to(settings.upload_dir)
-            return f"/uploads/{relative.as_posix()}"
+            return sign_upload_url(f"/uploads/{relative.as_posix()}")
         except ValueError:
             return None
 
@@ -280,7 +300,7 @@ def _reject_text(text: str, *, max_length: int | None = None) -> None:
 def _image_row_url(row: AssessmentImage) -> str | None:
     try:
         relative = Path(row.stored_path).relative_to(settings.upload_dir)
-        return f"/uploads/{relative.as_posix()}"
+        return sign_upload_url(f"/uploads/{relative.as_posix()}")
     except ValueError:
         return None
 
@@ -423,7 +443,7 @@ def _run_rectification_compare(item: Assessment, db: Session) -> None:
     _record_compare_meta(item)
 
 
-@router.get("/health", response_model=HealthOut)
+@public_router.get("/health", response_model=HealthOut)
 def health() -> HealthOut:
     rag = get_rag()
     return HealthOut(
@@ -432,6 +452,85 @@ def health() -> HealthOut:
         rag_loaded=len(rag.texts) > 0,
         reranker_enabled=rag.reranker_enabled,
         version=settings.app_version,
+        auth_required=settings.auth_mode != "none",
+    )
+
+
+@public_router.post("/auth/token", response_model=TokenOut)
+@limiter.limit(lambda: f"{get_settings().rate_limit_login_per_minute}/minute", key_func=get_remote_address)
+def login(
+    request: Request,
+    form: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: Session = Depends(get_db),
+) -> TokenOut:
+    """OAuth2 密码流登录：换取 JWT。失败统一 401，不暴露用户是否存在。"""
+    user = db.scalars(select(User).where(User.username == form.username)).first()
+    if user is None or user.disabled or not verify_password(form.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    return TokenOut(
+        access_token=create_access_token(user),
+        user=AuthUserOut(id=user.id, username=user.username, role=user.role),
+    )
+
+
+@router.get("/auth/me", response_model=AuthUserOut)
+def whoami(request: Request) -> AuthUserOut:
+    user = get_request_user(request)
+    if user is None:
+        raise HTTPException(status_code=403, detail="当前未启用用户体系")
+    return AuthUserOut(id=user.id, username=user.username, role=user.role)
+
+
+@router.get(
+    "/admin/users",
+    response_model=list[UserAdminOut],
+    dependencies=[Depends(require_roles("admin"))],
+)
+def list_users(db: Session = Depends(get_db)) -> list[UserAdminOut]:
+    users = db.scalars(select(User).order_by(User.created_at)).all()
+    # UserAdminOut 不含 password_hash，绝不可把哈希带出服务端
+    return [
+        UserAdminOut(
+            id=u.id,
+            username=u.username,
+            role=u.role,
+            disabled=u.disabled,
+            created_at=u.created_at,
+        )
+        for u in users
+    ]
+
+
+@router.post(
+    "/admin/users",
+    response_model=UserAdminOut,
+    status_code=201,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def create_user(payload: UserCreateIn, db: Session = Depends(get_db)) -> UserAdminOut:
+    if payload.role not in ALL_ROLES:
+        raise HTTPException(status_code=422, detail=f"角色必须是 {'/'.join(ALL_ROLES)}")
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=422, detail="密码至少 8 位")
+    if not payload.username.strip():
+        raise HTTPException(status_code=422, detail="用户名不能为空")
+    exists = db.scalars(select(User).where(User.username == payload.username.strip())).first()
+    if exists is not None:
+        raise HTTPException(status_code=409, detail="用户名已存在")
+    user = User(
+        username=payload.username.strip(),
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return UserAdminOut(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        disabled=user.disabled,
+        created_at=user.created_at,
     )
 
 
@@ -560,7 +659,9 @@ def _idempotent_replay(
 
 
 @router.post("/assessments", response_model=AssessmentOut | JobOut, status_code=201)
+@limiter.limit(lambda: f"{get_settings().rate_limit_assessments_per_minute}/minute")
 async def create_assessment(
+    request: Request,
     description: Annotated[str, Form()] = "",
     followup_answer: Annotated[str, Form()] = "",
     ocr_texts: Annotated[str, Form()] = "",
@@ -765,16 +866,27 @@ def followup_assessment(
     return to_out(item)
 
 
-@router.post("/assessments/{assessment_id}/confirm", response_model=AssessmentOut)
+@router.post(
+    "/assessments/{assessment_id}/confirm",
+    response_model=AssessmentOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
 def confirm_assessment(
     assessment_id: str,
     payload: ConfirmIn,
+    request: Request,
+    response: Response = None,
     db: Session = Depends(get_db),
 ) -> AssessmentOut:
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
+    # 审计身份以认证身份为准；无用户体系（none/token）时回退请求体字段（兼容旧客户端）
+    user = get_request_user(request)
+    reviewer_name = user.username if user else (payload.reviewer or "")
     item.confirmed = payload.confirmed
+    item.confirmed_by_id = user.id if user else None
+    item.confirmed_by_name = reviewer_name or None
     edits = payload.edits or {}
     if edits.get("hazard_category"):
         item.hazard_category = str(edits["hazard_category"])
@@ -792,7 +904,7 @@ def confirm_assessment(
     human_review = parse_json(item.human_review_json) or {}
     human_review["resolution"] = {
         "confirmed": payload.confirmed,
-        "reviewer": payload.reviewer or "",
+        "reviewer": reviewer_name,
         "note": payload.note or "",
         "edits": payload.edits or {},
         "resolved_at": utcnow().isoformat(),
@@ -820,6 +932,7 @@ def confirm_assessment(
 @router.post("/assessments/{assessment_id}/rectification", response_model=AssessmentOut)
 async def submit_rectification(
     assessment_id: str,
+    request: Request,
     note: Annotated[str, Form()] = "",
     files: Annotated[list[UploadFile] | None, File()] = None,
     db: Session = Depends(get_db),
@@ -870,10 +983,12 @@ async def submit_rectification(
             )
         )
     db.flush()
+    submit_user = get_request_user(request)
+    submit_by = submit_user.username if submit_user else "user"
     submit_rectification_photos(
         item,
         note=note or "提交整改照片并进入人工验证",
-        by="user",
+        by=submit_by,
     )
     if note:
         item.rectification_note = note
@@ -908,10 +1023,12 @@ def compare_rectification(
 @router.post(
     "/assessments/{assessment_id}/rectification/confirm",
     response_model=AssessmentOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
 )
 def confirm_rectification(
     assessment_id: str,
     payload: RectificationConfirmIn,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> AssessmentOut:
     item = db.get(Assessment, assessment_id)
@@ -921,8 +1038,10 @@ def confirm_rectification(
     note = payload.note or (
         "人工确认整改完成" if payload.resolved else "人工退回整改"
     )
+    confirm_user = get_request_user(request)
+    by = confirm_user.username if confirm_user else "user"
     try:
-        transition_rectification(item, target, note=note, by="user")
+        transition_rectification(item, target, note=note, by=by)
     except RectificationTransitionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if payload.note:
@@ -935,21 +1054,26 @@ def confirm_rectification(
 @router.post(
     "/assessments/{assessment_id}/rectification/transition",
     response_model=AssessmentOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
 )
 def transition_rectification_status(
     assessment_id: str,
     payload: RectificationTransitionIn,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> AssessmentOut:
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
+    # 审计身份优先认证身份（jwt），无用户体系时回退请求体 by 字段
+    trans_user = get_request_user(request)
+    by = trans_user.username if trans_user else (payload.by or "user")
     try:
         transition_rectification(
             item,
             payload.to_status,
             note=payload.note,
-            by=payload.by or "user",
+            by=by,
         )
     except RectificationTransitionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -990,7 +1114,12 @@ def export_assessment(assessment_id: str, db: Session = Depends(get_db)) -> JSON
     return JSONResponse({"filename": f"{assessment_id}.md", "content": _export_content(item)})
 
 
-@router.post("/knowledge/documents", response_model=DocumentOut, status_code=201)
+@router.post(
+    "/knowledge/documents",
+    response_model=DocumentOut,
+    status_code=201,
+    dependencies=[Depends(require_roles("admin"))],
+)
 async def upload_knowledge_document(
     title: Annotated[str, Form()] = "未命名文档",
     source: Annotated[str, Form()] = "user-upload",
@@ -1067,7 +1196,11 @@ def get_knowledge_document(document_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.delete("/knowledge/documents/{document_id}", status_code=204)
+@router.delete(
+    "/knowledge/documents/{document_id}",
+    status_code=204,
+    dependencies=[Depends(require_roles("admin"))],
+)
 def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -> Response:
     item = db.get(KnowledgeDocument, document_id)
     if not item:
@@ -1082,7 +1215,10 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
     return Response(status_code=204)
 
 
-@router.post("/knowledge/rebuild")
+@router.post(
+    "/knowledge/rebuild",
+    dependencies=[Depends(require_roles("admin"))],
+)
 def rebuild_knowledge_endpoint(db: Session = Depends(get_db)):
     result = rebuild_knowledge(db=db)
     return {
