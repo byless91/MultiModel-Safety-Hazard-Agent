@@ -51,8 +51,10 @@ def stamp_if_unversioned(db_engine) -> bool:
     backend_dir = Path(__file__).resolve().parents[2]
     config = Config(str(backend_dir / "alembic.ini"))
     config.set_main_option("script_location", str(backend_dir / "migrations"))
+    # str(url) 会把密码渲染成 ***，必须用 render_as_string 显式保留；
     # configparser 的 % 是插值语法，Windows 盘符 URL（C%3A）需转义
-    config.set_main_option("sqlalchemy.url", str(db_engine.url).replace("%", "%%"))
+    raw_url = db_engine.url.render_as_string(hide_password=False)
+    config.set_main_option("sqlalchemy.url", raw_url.replace("%", "%%"))
     command.stamp(config, "head")
     return True
 
