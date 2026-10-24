@@ -67,6 +67,33 @@ EMBEDDING_MODEL=text-embedding-v3
 
 也支持智谱：配置 `ZHIPU_API_KEY` 与 `ZHIPU_BASE_URL`。
 
+## 部署（B6：Docker 与 PostgreSQL）
+
+```powershell
+# 默认（SQLite 单节点）：构建并启动全栈，前端 http://localhost:8080
+docker compose up -d --build
+
+# PostgreSQL 变体（多副本/多 worker 部署必须使用）
+docker compose -f docker-compose.pg.yml up -d --build
+
+# 首次使用 jwt 认证时建管理员（容器内）
+docker compose exec backend python scripts/create_user.py --username admin --role admin
+```
+
+- 后端镜像启动时自动执行 `alembic upgrade head`（旧库自动纳入版本管理）；
+- `DATABASE_URL` 切 `postgresql+psycopg://...` 即用 PG（安装 `.[pg]` extra），CI 有 PG 全量测试矩阵；
+- `/metrics` 供内网监控抓取；健康检查 `/api/v1/health`。
+
+## 质量保障（B6：评测回归门禁）
+
+`scripts/check_eval_baseline.py`：mock 模式跑 60 条评测（v2 数据集）并与
+`docs/evaluation` 基线对比——类别准确率、人工复核率劣化 >2pp 或不安全自动
+通过率上升 >2pp 即失败。CI 的 `eval-gate` job 每次 push 都会执行；本地：
+
+```powershell
+.ackend\.venv\Scripts\python.exe scripts\check_eval_baseline.py
+```
+
 ## 认证与权限（B4）
 
 `AUTH_MODE` 三档：
