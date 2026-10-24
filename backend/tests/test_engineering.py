@@ -123,15 +123,18 @@ def test_delete_document_rebuild_failure_is_logged(monkeypatch, caplog):
 
 def test_analyze_node_silent_degradation_is_logged(monkeypatch, caplog):
     """模型故障降级 Mock 必须留下 warning 日志，禁止无声降级。"""
-    from app.services import langgraph_flow
+    from app.core.config import get_settings
+    from app.services import langgraph_flow, workflow_nodes
+    from app.services.providers import MockProvider
+    from app.services.rag import get_rag
 
     def broken_analysis(*args, **kwargs):
         raise RuntimeError("vision provider timeout")
 
-    monkeypatch.setattr(langgraph_flow, "run_parallel_analysis", broken_analysis)
-    settings = langgraph_flow.get_settings()
-    rag = langgraph_flow.get_rag()
-    provider = langgraph_flow.MockProvider()
+    monkeypatch.setattr(workflow_nodes, "run_parallel_analysis", broken_analysis)
+    settings = get_settings()
+    rag = get_rag()
+    provider = MockProvider()
     with caplog.at_level(logging.WARNING, logger="safety_hazard.workflow"):
         state = langgraph_flow.node_analyze(
             {
@@ -149,19 +152,22 @@ def test_analyze_node_silent_degradation_is_logged(monkeypatch, caplog):
 
 def test_analyze_node_programming_error_is_not_masked(monkeypatch):
     """编程错误（如 TypeError）不得被 Mock 兜底掩盖，必须显式抛出。"""
-    from app.services import langgraph_flow
+    from app.core.config import get_settings
+    from app.services import langgraph_flow, workflow_nodes
+    from app.services.providers import MockProvider
+    from app.services.rag import get_rag
 
     def broken_analysis(*args, **kwargs):
         raise TypeError("bad downstream call")
 
-    monkeypatch.setattr(langgraph_flow, "run_parallel_analysis", broken_analysis)
+    monkeypatch.setattr(workflow_nodes, "run_parallel_analysis", broken_analysis)
     with pytest.raises(TypeError):
         langgraph_flow.node_analyze(
             {
                 "description": "楼道堆物",
                 "images": [],
-                "settings": langgraph_flow.get_settings(),
-                "provider": langgraph_flow.MockProvider(),
-                "rag": langgraph_flow.get_rag(),
+                "settings": get_settings(),
+                "provider": MockProvider(),
+                "rag": get_rag(),
             }
         )

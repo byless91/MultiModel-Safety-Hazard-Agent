@@ -184,7 +184,7 @@ def test_langgraph_workflow_runs_refine_with_real_provider(monkeypatch):
         return _fake_run()
 
     monkeypatch.setattr(
-        "app.services.langgraph_flow.run_parallel_analysis",
+        "app.services.workflow_nodes.run_parallel_analysis",
         fake_run,
     )
     monkeypatch.setattr(

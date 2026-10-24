@@ -33,6 +33,19 @@ class StandardizedModelResult(BaseModel):
     findings: list[StandardizedFinding] = Field(default_factory=list)
 
 
+
+def coerce_standardized_results(
+    standardized_results: list[dict[str, Any]] | list[StandardizedModelResult],
+) -> list[StandardizedModelResult]:
+    """dict 与模型实例混合输入统一为模型实例列表（judge/disagreement 共用）。"""
+    models: list[StandardizedModelResult] = []
+    for item in standardized_results:
+        if isinstance(item, StandardizedModelResult):
+            models.append(item)
+        elif isinstance(item, dict):
+            models.append(StandardizedModelResult.model_validate(item))
+    return models
+
 def _as_text_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []

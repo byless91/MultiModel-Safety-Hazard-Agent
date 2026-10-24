@@ -7,7 +7,10 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.services.ensemble.disagreement import DisagreementResult
-from app.services.ensemble.standardize import StandardizedModelResult
+from app.services.ensemble.standardize import (
+    StandardizedModelResult,
+    coerce_standardized_results,
+)
 from app.services.evidence import judge_evidence
 
 
@@ -62,18 +65,6 @@ class EnsembleJudgeResult(BaseModel):
     risk_level: str | None = None
     rule_version: str | None = None
     version: str = "v1"
-
-
-def _as_models(
-    standardized_results: list[dict[str, Any]] | list[StandardizedModelResult],
-) -> list[StandardizedModelResult]:
-    models: list[StandardizedModelResult] = []
-    for item in standardized_results:
-        if isinstance(item, StandardizedModelResult):
-            models.append(item)
-        elif isinstance(item, dict):
-            models.append(StandardizedModelResult.model_validate(item))
-    return models
 
 
 def _location_signature(location: dict[str, Any] | None) -> tuple:
@@ -209,7 +200,7 @@ def judge_ensemble(
     risk score and review suggestion enter the decision, and evidence support
     is checked per finding before the final assessment is returned.
     """
-    models = _as_models(standardized_results)
+    models = coerce_standardized_results(standardized_results)
     disagree = (
         disagreement
         if isinstance(disagreement, DisagreementResult)

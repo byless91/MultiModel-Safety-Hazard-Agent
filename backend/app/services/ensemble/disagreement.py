@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.services.ensemble.standardize import (
     StandardizedFinding,
     StandardizedModelResult,
+    coerce_standardized_results,
 )
 
 NEGATION_PREFIXES = ("未发现", "未见", "没有", "无", "不存在", "无法确认")
@@ -53,18 +54,6 @@ class _PairOutcome:
     fact_score: float
     max_severity_difference: int | None
     critical: bool
-
-
-def _as_models(
-    standardized_results: list[dict[str, Any]] | list[StandardizedModelResult],
-) -> list[StandardizedModelResult]:
-    models: list[StandardizedModelResult] = []
-    for item in standardized_results:
-        if isinstance(item, StandardizedModelResult):
-            models.append(item)
-        elif isinstance(item, dict):
-            models.append(StandardizedModelResult.model_validate(item))
-    return models
 
 
 def _has_negation(finding: StandardizedFinding) -> bool:
@@ -144,7 +133,7 @@ def detect_disagreement(
     *,
     ensemble_mode: str = "mock",
 ) -> DisagreementResult:
-    models = _as_models(standardized_results)
+    models = coerce_standardized_results(standardized_results)
     configured = [model for model in models if model.status != "mock_fallback"]
     successful = [model for model in models if model.status == "success"]
     model_count = len(models)
