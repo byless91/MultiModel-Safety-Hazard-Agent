@@ -169,7 +169,7 @@ def test_http_provider_returns_normalized_analysis(monkeypatch):
             },
             ensure_ascii=False,
         )
-        return {"choices": [{"message": {"content": content}}]}
+        return http_module._CallResult(data={"choices": [{"message": {"content": content}}]})
 
     monkeypatch.setattr(provider, "_post", fake_post)
     data = provider.analyze([], "配电箱破损")

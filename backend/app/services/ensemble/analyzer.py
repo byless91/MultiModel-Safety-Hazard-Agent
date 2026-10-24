@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import contextvars
+import functools
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from app.core.config import get_settings
 from app.core.metrics import record_model_run
 from app.services.ensemble.schemas import ModelRunResult, MultiModelResult
 from app.services.providers.base import (
@@ -14,6 +17,12 @@ from app.services.providers.base import (
     ModelUnavailableError,
 )
 from app.services.providers.mock import MockProvider
+
+# B5/WP3.2：全局共享线程池，池大小即跨请求的模型并发上限（复用，不再按请求创建）
+_ANALYSIS_POOL = ThreadPoolExecutor(
+    max_workers=get_settings().max_concurrent_llm_calls,
+    thread_name_prefix="llm-analysis",
+)
 
 
 def _run_one(
@@ -136,19 +145,23 @@ def run_parallel_analysis(
             )
         ]
     else:
-        with ThreadPoolExecutor(max_workers=len(real)) as pool:
-            futures = [
-                pool.submit(
+        # copy_context 把业务线程的 contextvars（request_id、台账的
+        # assessment/purpose 上下文）带进池内线程——ThreadPoolExecutor 不会自动传播
+        futures = [
+            _ANALYSIS_POOL.submit(
+                contextvars.copy_context().run,
+                functools.partial(
                     _run_one,
                     provider,
                     images,
                     text,
                     rag_evidence=rag_evidence,
                     ocr_texts=ocr_texts,
-                )
-                for provider in real
-            ]
-            runs = [future.result() for future in futures]
+                ),
+            )
+            for provider in real
+        ]
+        runs = [future.result() for future in futures]
 
     succeeded = [run for run in runs if run.status == "success"]
     if succeeded:

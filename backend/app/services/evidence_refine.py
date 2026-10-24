@@ -38,13 +38,19 @@ def refine_with_evidence(
     if not any(getattr(provider, "name", "") != "mock" for provider in providers):
         return {}
 
-    multi = run_parallel_analysis(
-        providers,
-        state.get("images") or [],
-        state.get("description") or "",
-        rag_evidence=texts,
-        ocr_texts=state.get("ocr_texts") or [],
-    )
+    from app.services import llm_ledger
+
+    purpose_token = llm_ledger.current_purpose.set("refine")
+    try:
+        multi = run_parallel_analysis(
+            providers,
+            state.get("images") or [],
+            state.get("description") or "",
+            rag_evidence=texts,
+            ocr_texts=state.get("ocr_texts") or [],
+        )
+    finally:
+        llm_ledger.current_purpose.reset(purpose_token)
     primary = multi.primary
     result = primary.analysis or {}
     standardized = standardize_model_runs(

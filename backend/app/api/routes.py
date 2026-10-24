@@ -46,6 +46,7 @@ from app.schemas.assessment import (
     UserAdminOut,
     UserCreateIn,
 )
+from app.services import llm_ledger
 from app.services.assessment_io import apply_state, images_from_db
 from app.services.document_converter import (
     LEGACY_SUFFIX_HINTS,
@@ -414,11 +415,17 @@ def _run_rectification_compare(item: Assessment, db: Session) -> None:
         _record_compare_meta(item)
         return
     try:
-        result = provider.compare(
-            originals,
-            rectifications,
-            item.rectification_note or "",
-        )
+        purpose_token = llm_ledger.current_purpose.set("compare")
+        ctx_token = llm_ledger.current_assessment_id.set(item.id)
+        try:
+            result = provider.compare(
+                originals,
+                rectifications,
+                item.rectification_note or "",
+            )
+        finally:
+            llm_ledger.current_purpose.reset(purpose_token)
+            llm_ledger.current_assessment_id.reset(ctx_token)
         score = round(
             min(1.0, max(0.0, float(result.get("completion_score", 0.5)))),
             3,
@@ -499,6 +506,21 @@ def list_users(db: Session = Depends(get_db)) -> list[UserAdminOut]:
         )
         for u in users
     ]
+
+
+@router.get(
+    "/admin/llm-usage",
+    dependencies=[Depends(require_roles("admin"))],
+)
+def llm_usage(days: int = 7) -> dict:
+    """LLM 台账聚合视图（B5/WP3.2）：按天×provider×purpose 的调用量与 token 消耗。"""
+    days = max(1, min(days, 90))
+    return {
+        "days": days,
+        "tokens_used_today": llm_ledger.tokens_used_today(),
+        "daily_token_budget": settings.daily_token_budget,
+        "items": llm_ledger.usage_summary(days=days),
+    }
 
 
 @router.post(
@@ -620,6 +642,16 @@ def evaluation_reports() -> dict:
     return payload
 
 
+def _check_token_budget() -> None:
+    """日预算熔断：超限后拒绝新研判，进行中的任务不受影响。"""
+    budget = settings.daily_token_budget
+    if budget > 0 and llm_ledger.tokens_used_today() >= budget:
+        raise HTTPException(
+            status_code=429,
+            detail=f"今日模型调用预算已耗尽（{budget} tokens），请明天再试或联系管理员调整 DAILY_TOKEN_BUDGET",
+        )
+
+
 def job_to_out(job: AssessmentJob) -> JobOut:
     return JobOut(
         id=job.id,
@@ -704,6 +736,7 @@ async def create_assessment(
     ocr_list = _parse_ocr_texts(ocr_texts)
     _reject_ocr_texts(ocr_list)
     _reject_uploaded_input(description, [data for _, data in staged])
+    _check_token_budget()
 
     assessment = Assessment(description=description)
     db.add(assessment)
@@ -755,15 +788,20 @@ async def create_assessment(
         return job_to_out(job)
 
     try:
-        # 多模型研判是长耗时同步调用，必须移出事件循环，否则阻塞全站请求
-        state = await run_in_threadpool(
-            run_workflow,
-            description=description or "（未填写描述）",
-            images=images,
-            followup_answer=followup_answer or None,
-            followup_used=0,
-            ocr_texts=ocr_list,
-        )
+        # 台账关联：contextvar 经 run_in_threadpool 复制进工作流线程与模型线程池
+        ctx_token = llm_ledger.current_assessment_id.set(assessment.id)
+        try:
+            # 多模型研判是长耗时同步调用，必须移出事件循环，否则阻塞全站请求
+            state = await run_in_threadpool(
+                run_workflow,
+                description=description or "（未填写描述）",
+                images=images,
+                followup_answer=followup_answer or None,
+                followup_used=0,
+                ocr_texts=ocr_list,
+            )
+        finally:
+            llm_ledger.current_assessment_id.reset(ctx_token)
     except Exception as exc:
         assessment.status = "failed"
         db.commit()
@@ -834,6 +872,7 @@ def followup_assessment(
     _reject_text(payload.answer)
     if item.followup_used >= settings.max_followups:
         raise HTTPException(status_code=400, detail="已达追问上限")
+    _check_token_budget()
     if settings.workflow_mode == "async":
         # 异步模式：从 info 中断点恢复（不重跑视觉模型），完成后回写结果
         thread_id = find_create_thread_id(db, assessment_id)
@@ -849,12 +888,16 @@ def followup_assessment(
         response.status_code = 202
         return job_to_out(job)
     try:
-        state = run_workflow(
-            description=item.description,
-            images=images_from_db(db, assessment_id, kind="original"),
-            followup_answer=payload.answer,
-            followup_used=item.followup_used,
-        )
+        ctx_token = llm_ledger.current_assessment_id.set(item.id)
+        try:
+            state = run_workflow(
+                description=item.description,
+                images=images_from_db(db, assessment_id, kind="original"),
+                followup_answer=payload.answer,
+                followup_used=item.followup_used,
+            )
+        finally:
+            llm_ledger.current_assessment_id.reset(ctx_token)
     except Exception as exc:
         item.status = "failed"
         db.commit()

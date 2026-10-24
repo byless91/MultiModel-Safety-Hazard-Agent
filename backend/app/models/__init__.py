@@ -4,6 +4,7 @@ from app.models.entities import (
     AssessmentJob,
     IdempotencyKey,
     KnowledgeDocument,
+    LLMCall,
     User,
 )
 
@@ -13,6 +14,7 @@ __all__ = [
     "AssessmentJob",
     "IdempotencyKey",
     "KnowledgeDocument",
+    "LLMCall",
     "User",
 ]
 

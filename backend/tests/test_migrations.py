@@ -77,6 +77,7 @@ def test_existing_db_upgrade_head_is_lossless(tmp_path: Path):
         conn.execute(text("DROP TABLE IF EXISTS idempotency_keys"))
         conn.execute(text("DROP TABLE IF EXISTS assessment_jobs"))
         conn.execute(text("DROP TABLE IF EXISTS users"))
+        conn.execute(text("DROP TABLE IF EXISTS llm_calls"))
         conn.execute(text("DROP INDEX IF EXISTS ix_assessments_confirmed_by_id"))
         conn.execute(text("ALTER TABLE assessments DROP COLUMN confirmed_by_id"))
         conn.execute(text("ALTER TABLE assessments DROP COLUMN confirmed_by_name"))
@@ -149,5 +150,6 @@ def test_future_incremental_migration_applies_on_adopted_db(tmp_path: Path):
         "assessment_jobs",
         "idempotency_keys",
         "knowledge_documents",
+        "llm_calls",
         "users",
     } == set(snapshot)

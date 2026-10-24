@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     auth_token_expire_minutes: int = 720
     upload_url_ttl_minutes: int = 60
     rate_limit_enabled: bool = False
+    # B5：LLM 并发与预算
+    max_concurrent_llm_calls: int = 4
+    daily_token_budget: int = 0  # 0 = 不限；>0 时当日 tokens 超限后拒绝新研判
+    # B5：演示模式置信度加成（默认关；生产与评测路径不得开启）
+    mock_demo_boost: bool = False
+    # B5：检索参数收敛
+    retrieval_top_k: int = 5
+    rerank_vector_weight: float = 0.4
+    rerank_lexical_weight: float = 0.4
+    rerank_metadata_weight: float = 0.2
     rate_limit_assessments_per_minute: int = 5
     rate_limit_login_per_minute: int = 10
     langgraph_checkpoint_path: Path = BACKEND_DIR / "data" / "langgraph.db"

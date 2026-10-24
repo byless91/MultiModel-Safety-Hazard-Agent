@@ -49,6 +49,15 @@ def validate_model_analysis(
             )
         )
     else:
+        if analysis.get("parse_failed"):
+            violations.append(
+                GuardViolation(
+                    code="model_output_unparsed",
+                    severity="error",
+                    message="模型输出解析失败（未得到结构化 JSON），结论不可信，需人工复核",
+                    source="model_output",
+                )
+            )
         vision_confidence = analysis.get("vision_confidence")
         if vision_confidence is None or not isinstance(vision_confidence, (int, float)):
             violations.append(

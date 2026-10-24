@@ -141,6 +141,10 @@ def execute_job(job_id: str) -> None:
             job.progress_step = step
             db.commit()
 
+        # 台账关联：本线程及下游模型线程池（copy_context）都携带 assessment_id
+        from app.services import llm_ledger
+
+        ctx_token = llm_ledger.current_assessment_id.set(assessment.id)
         try:
             if job.kind == "create":
                 from app.services.workflow import run_workflow
@@ -186,6 +190,8 @@ def execute_job(job_id: str) -> None:
             job.status = "failed"
             job.error = str(exc)[:500]
             assessment.status = "failed"
+        finally:
+            llm_ledger.current_assessment_id.reset(ctx_token)
         db.commit()
     finally:
         db.close()

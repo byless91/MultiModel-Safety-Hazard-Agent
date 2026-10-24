@@ -122,6 +122,28 @@ class User(Base):
     )
 
 
+class LLMCall(Base):
+    """LLM 调用台账（B5/WP3.2）：真实模型调用（含失败）逐条落库。"""
+
+    __tablename__ = "llm_calls"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    assessment_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str] = mapped_column(String(64))
+    purpose: Mapped[str] = mapped_column(String(16), default="analyze")  # analyze|refine|compare|embed
+    prompt_version: Mapped[str] = mapped_column(String(32), default="")
+    status: Mapped[str] = mapped_column(String(16), default="success")  # success|failed|parse_failed
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_type: Mapped[str] = mapped_column(String(128), default="")
+    parse_failed: Mapped[bool] = mapped_column(default=False)
+    latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"
 

@@ -11,7 +11,6 @@ from app.services.providers import (
     build_provider,
     build_providers,
 )
-from app.services.providers import http as http_module
 
 
 def test_mock_fallback_without_keys():
@@ -170,37 +169,170 @@ def _make_http_provider(**overrides: object) -> OpenAICompatibleProvider:
     )
 
 
-def test_http_post_retries_then_succeeds(monkeypatch):
-    fake = _FakeClient(retry_failures=2)
-    monkeypatch.setattr(http_module.httpx, "Client", lambda **kw: fake)
-    provider = _make_http_provider(max_retries=3)
+def _transport_mock(handler) -> "httpx.MockTransport":
+    return httpx.MockTransport(handler)
+
+
+def test_http_post_retries_then_succeeds():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise httpx.TimeoutException("simulated timeout")
+        return httpx.Response(200, json={"status_code": 200})
+
+    provider = _make_http_provider(max_retries=3, transport=_transport_mock(handler))
     result = provider._post("/chat/completions", {})
-    assert result["status_code"] == 200
-    assert fake.calls == 3
+    assert result.data["status_code"] == 200
+    assert calls["n"] == 3
+    provider.close()
 
 
-def test_http_post_raises_typed_timeout_after_retries(monkeypatch):
-    fake = _FakeClient(retry_failures=10)
-    monkeypatch.setattr(http_module.httpx, "Client", lambda **kw: fake)
-    provider = _make_http_provider(max_retries=2)
+def test_http_post_raises_typed_timeout_after_retries():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.TimeoutException("simulated timeout")
+
+    provider = _make_http_provider(max_retries=2, transport=_transport_mock(handler))
     with pytest.raises(ModelTimeoutError):
         provider._post("/chat/completions", {})
-    assert fake.calls == 3
+    provider.close()
 
 
-def test_http_post_4xx_raises_without_retry(monkeypatch):
-    fake = _FakeClient(status_code=401)
-    monkeypatch.setattr(http_module.httpx, "Client", lambda **kw: fake)
-    provider = _make_http_provider(max_retries=2)
+def test_http_post_4xx_raises_without_retry():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(401, json={"error": "denied"})
+
+    provider = _make_http_provider(max_retries=2, transport=_transport_mock(handler))
     with pytest.raises(ModelUnavailableError):
         provider._post("/chat/completions", {})
-    assert fake.calls == 1
+    assert calls["n"] == 1  # 4xx（非 429）不重试
+    provider.close()
 
 
-def test_http_post_429_is_retried(monkeypatch):
-    fake = _FakeClient(status_code=429)
-    monkeypatch.setattr(http_module.httpx, "Client", lambda **kw: fake)
-    provider = _make_http_provider(max_retries=2)
+def test_http_post_429_is_retried():
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(429, json={"error": "rate limited"})
+
+    provider = _make_http_provider(max_retries=2, transport=_transport_mock(handler))
     with pytest.raises(ModelUnavailableError):
         provider._post("/chat/completions", {})
-    assert fake.calls == 3
+    assert calls["n"] == 3
+    provider.close()
+
+
+# ---------- B5/WP3.1+3.2：台账、解析失败标记、重试计数线程隔离 ----------
+
+
+def _ledger_rows(provider_name: str) -> list:
+    from app.core.db import SessionLocal
+    from app.models import LLMCall
+
+    db = SessionLocal()
+    try:
+        return list(
+            db.query(LLMCall)
+            .filter(LLMCall.provider == provider_name)
+            .order_by(LLMCall.created_at)
+            .all()
+        )
+    finally:
+        db.close()
+
+
+def test_usage_tokens_recorded_in_ledger():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "{}"}}],
+                "usage": {"prompt_tokens": 120, "completion_tokens": 45},
+            },
+        )
+
+    from app.services import llm_ledger
+
+    provider = _make_http_provider(
+        name="ledger-usage-provider", transport=_transport_mock(handler)
+    )
+    purpose_token = llm_ledger.current_purpose.set("analyze")
+    try:
+        result = provider._post("/chat/completions", {"model": "vision-model"})
+    finally:
+        llm_ledger.current_purpose.reset(purpose_token)
+    provider.close()
+
+    rows = _ledger_rows("ledger-usage-provider")
+    assert rows, "调用后必须写入台账"
+    row = rows[-1]
+    assert row.tokens_in == 120 and row.tokens_out == 45
+    assert row.purpose == "analyze"
+    assert row.status == "success"
+    assert row.prompt_version  # prompt 版本必须可归因
+    assert result.usage == {"prompt_tokens": 120, "completion_tokens": 45}
+
+
+def test_parse_failure_flagged_and_marked():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "这不是 JSON，模型跑偏了"}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+            },
+        )
+
+    from app.services.guardrail import validate_model_analysis
+
+    provider = _make_http_provider(
+        name="ledger-parse-provider", transport=_transport_mock(handler)
+    )
+    output = provider.analyze([], "楼道堆物")
+    provider.close()
+
+    assert output["parse_failed"] is True, "解析失败必须在结果中显式标记"
+    guard = validate_model_analysis(output, provider=output.get("provider", ""), model="")
+    codes = [v.code for v in guard.violations]
+    assert "model_output_unparsed" in codes, "解析失败必须触发人工复核"
+
+    rows = _ledger_rows("ledger-parse-provider")
+    assert rows and rows[-1].status == "parse_failed" and rows[-1].parse_failed
+
+
+def test_retry_count_is_thread_local():
+    """并发调用共享 provider 实例时，重试计数不得互相污染。"""
+    import threading
+
+    per_thread = threading.local()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        count = getattr(per_thread, "failures_left", 0)
+        if count > 0:
+            per_thread.failures_left = count - 1
+            raise httpx.TimeoutException("simulated timeout")
+        return httpx.Response(200, json={"ok": True})
+
+    provider = _make_http_provider(max_retries=3, transport=_transport_mock(handler))
+    observed: dict[str, int] = {}
+    barrier = threading.Barrier(2)
+
+    def worker(tag: str, failures: int) -> None:
+        per_thread.failures_left = failures
+        barrier.wait()
+        provider._post("/chat/completions", {})
+        observed[tag] = provider.last_retry_count
+
+    t1 = threading.Thread(target=worker, args=("zero", 0))
+    t2 = threading.Thread(target=worker, args=("two", 2))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    provider.close()
+    assert observed == {"zero": 0, "two": 2}

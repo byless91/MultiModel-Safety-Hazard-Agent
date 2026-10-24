@@ -49,6 +49,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         from app.services.job_runner import get_job_runner
 
         await get_job_runner().stop()
+    # 释放 provider 持久连接池（B5/WP3.1）
+    from app.services.providers import get_providers
+
+    for provider in get_providers():
+        close = getattr(provider, "close", None)
+        if close is not None:
+            close()
 
 
 def create_app() -> FastAPI:

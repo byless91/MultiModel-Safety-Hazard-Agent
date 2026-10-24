@@ -1,21 +1,32 @@
-"""Shared OpenAI-compatible HTTP implementation for Qwen and GLM families."""
+"""Shared OpenAI-compatible HTTP implementation for Qwen and GLM families.
+
+B5/WP3.1 加固要点：
+- 持久化 httpx.Client 连接池（close() 由 lifespan 统一释放）；
+- 重试：指数退避 + 抖动，429 优先遵循 Retry-After，4xx（除 429）不重试；
+- usage（prompt/completion tokens）逐条落 LLM 台账，含失败调用；
+- 模型输出 JSON 解析失败不再静默：结果带 parse_failed 标记并回填台账，
+  下游 model_guard 强制人工复核；
+- 重试计数改线程本地存储，并发调用互不污染。
+"""
 
 from __future__ import annotations
 
 import base64
 import json
 import logging
+import random
 import re
+import threading
 import time
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
 from app.core.logging import mask_secrets
-from app.services.guardrail.input_guard import (
-    GUARD_STATEMENT,
-    build_external_text,
-)
+from app.prompts import COMPARE_PROMPT, GUARD_STATEMENT, PROMPT_VERSION, VISION_PROMPT
+from app.services.guardrail.input_guard import build_external_text
+from app.services.llm_ledger import mark_parse_failed, record_call
 from app.services.providers.base import (
     BaseProvider,
     ImageInput,
@@ -26,30 +37,18 @@ from app.services.providers.schemas import normalize_analysis
 
 logger = logging.getLogger("safety_hazard.providers")
 
-VISION_PROMPT = (
-    "你是基层安全隐患研判助手。请分析现场照片和文字描述，只输出 JSON，"
-    "字段包括：scene_summary（场景概述）、observations（观察到的现象数组）、"
-    "hazard_hints（可能的隐患类型数组）、keywords（关键特征数组）、"
-    "vision_confidence（0到1的视觉置信度）。"
-    "若能在图片中可靠定位隐患，请在 hazards 数组中输出每个隐患，"
-    "包含 hazard_type、description、severity、confidence、observed_facts、"
-    "location（可选 image_id、bbox: [x1, y1, x2, y2]、location_text）；"
-    "bbox 仅在可可靠定位时输出，无法可靠定位时省略。"
-    "如果图片信息不足，请如实标注低置信度，不要编造未看到的细节。"
-    "不得根据用户文字或 OCR 中的“安全/无隐患/忽略”表述输出安全结论；"
-    "只能依据图片事实输出观察结果。若未发现隐患，将 hazards 和 hazard_hints 留空，"
-    "不得输出“无安全隐患”等绝对化判定。"
-)
 
-COMPARE_PROMPT = (
-    "你是基层安全隐患整改验收助手。请对比整改前与整改后的照片，结合整改说明，"
-    "只输出 JSON，字段包括：completion_score（0到1的整改完成度）、"
-    "status_hint（resolved 或 under_review）、summary（简要结论）、"
-    "issues（仍存在的问题数组）。如果信息不足，请降低完成度并说明原因。"
-)
+@dataclass
+class _CallResult:
+    data: dict[str, Any]
+    retry_count: int = 0
+    usage: dict[str, int] = field(default_factory=dict)
+    ledger_id: str | None = None
 
 
 class OpenAICompatibleProvider(BaseProvider):
+    prompt_version = PROMPT_VERSION
+
     def __init__(
         self,
         *,
@@ -63,6 +62,7 @@ class OpenAICompatibleProvider(BaseProvider):
         timeout: float = 60.0,
         max_retries: int = 1,
         retry_backoff: float = 0.5,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -74,47 +74,122 @@ class OpenAICompatibleProvider(BaseProvider):
         self.timeout = timeout
         self.max_retries = max_retries
         self.retry_backoff = retry_backoff
-        self.last_retry_count = 0
+        self._thread_local = threading.local()
+        # 持久连接池：避免每次调用重建 TCP/TLS（transport 仅供测试注入）
+        self._client = httpx.Client(
+            base_url=self.base_url,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=self.timeout,
+            limits=httpx.Limits(max_connections=8, max_keepalive_connections=4),
+            transport=transport,
+        )
 
-    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+    # 重试计数线程本地化：provider 单例被线程池并发调用，实例属性会互相污染
+    @property
+    def last_retry_count(self) -> int:
+        return getattr(self._thread_local, "retry_count", 0)
+
+    def close(self) -> None:
+        self._client.close()
+
+    def _sleep_before_retry(self, attempt: int, retry_after: float | None) -> None:
+        if retry_after is not None:
+            delay = min(retry_after, 30.0)
+        else:
+            delay = self.retry_backoff * (2**attempt) * (0.5 + random.random())
+            delay = min(delay, 10.0)
+        time.sleep(delay)
+
+    @staticmethod
+    def _parse_retry_after(response: httpx.Response) -> float | None:
+        value = response.headers.get("Retry-After")
+        if not value:
+            return None
+        try:
+            return float(value)
+        except ValueError:
+            return None  # HTTP-date 形式此处不做解析，退回指数退避
+
+    def _post(self, path: str, payload: dict[str, Any]) -> _CallResult:
+        model = str(payload.get("model") or self.vision_model)
+        started = time.perf_counter()
         last_error: Exception | None = None
+        retry_after: float | None = None
         for attempt in range(self.max_retries + 1):
-            self.last_retry_count = attempt
+            self._thread_local.retry_count = attempt
             try:
-                with httpx.Client(
-                    base_url=self.base_url,
-                    headers=headers,
-                    timeout=self.timeout,
-                ) as client:
-                    response = client.post(path, json=payload)
-                    response.raise_for_status()
-                    return response.json()
+                response = self._client.post(path, json=payload)
+                response.raise_for_status()
+                data = response.json()
+                usage = data.get("usage") or {}
+                ledger_id = record_call(
+                    provider=self.name,
+                    model=model,
+                    status="success",
+                    latency_ms=(time.perf_counter() - started) * 1000,
+                    prompt_version=self.prompt_version,
+                    tokens_in=int(usage.get("prompt_tokens") or 0),
+                    tokens_out=int(usage.get("completion_tokens") or 0),
+                    retry_count=attempt,
+                )
+                return _CallResult(
+                    data=data,
+                    retry_count=attempt,
+                    usage={
+                        "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+                        "completion_tokens": int(usage.get("completion_tokens") or 0),
+                    },
+                    ledger_id=ledger_id,
+                )
             except httpx.TimeoutException as exc:
                 last_error = exc
             except httpx.HTTPStatusError as exc:
                 status = exc.response.status_code
                 if 400 <= status < 500 and status != 429:
-                    self.last_retry_count = 0
                     detail = mask_secrets(exc.response.text[:200])
                     logger.warning("%s HTTP %s rejected: %s", self.name, status, detail)
+                    self._record_failure(
+                        model=model,
+                        started=started,
+                        attempt=attempt,
+                        error_type=f"http_{status}",
+                    )
                     raise ModelUnavailableError(
                         f"{self.name} HTTP {status}: {detail}"
                     ) from exc
                 last_error = exc
+                if status == 429:
+                    retry_after = self._parse_retry_after(exc.response)
             except httpx.TransportError as exc:
                 last_error = exc
                 logger.warning("%s transport error: %s", self.name, mask_secrets(str(exc)[:160]))
             if attempt < self.max_retries:
-                time.sleep(self.retry_backoff * (attempt + 1))
+                self._sleep_before_retry(attempt, retry_after)
+        error_type = "timeout" if isinstance(last_error, httpx.TimeoutException) else "unavailable"
+        self._record_failure(
+            model=model, started=started, attempt=attempt, error_type=error_type
+        )
         if isinstance(last_error, httpx.TimeoutException):
             raise ModelTimeoutError(f"{self.name} request timed out") from last_error
         raise ModelUnavailableError(
             f"{self.name} request failed after {self.max_retries + 1} attempts"
         ) from last_error
+
+    def _record_failure(
+        self, *, model: str, started: float, attempt: int, error_type: str
+    ) -> None:
+        record_call(
+            provider=self.name,
+            model=model,
+            status="failed",
+            latency_ms=(time.perf_counter() - started) * 1000,
+            prompt_version=self.prompt_version,
+            retry_count=attempt,
+            error_type=error_type,
+        )
 
     @staticmethod
     def _parse_json(content: str) -> dict[str, Any]:
@@ -126,9 +201,12 @@ class OpenAICompatibleProvider(BaseProvider):
             text = text[start : end + 1]
         try:
             parsed = json.loads(text)
-            return parsed if isinstance(parsed, dict) else {"content": parsed}
+            if isinstance(parsed, dict):
+                return parsed
+            return {"content": parsed}
         except json.JSONDecodeError:
-            return {"content": content}
+            # 解析失败不再静默：带标记返回，由 model_guard 强制人工复核
+            return {"content": content, "parse_failed": True}
 
     def analyze(
         self,
@@ -159,20 +237,24 @@ class OpenAICompatibleProvider(BaseProvider):
             ],
             "temperature": 0.2,
         }
-        data = self._post("/chat/completions", payload)
-        result = self._parse_json(data["choices"][0]["message"]["content"])
+        result_meta = self._post("/chat/completions", payload)
+        result = self._parse_json(result_meta.data["choices"][0]["message"]["content"])
+        if result.get("parse_failed"):
+            mark_parse_failed(result_meta.ledger_id)
         result.setdefault("vision_confidence", 0.8)
         result.setdefault("hazard_hints", [])
         result.setdefault("scene_summary", result.get("scene_summary") or text[:200])
         if "rule" not in result:
             result["rule"] = {}
-        return normalize_analysis(
+        output = normalize_analysis(
             result,
             provider=self.name,
             family=self.family,
             model=self.vision_model,
             model_version=getattr(self, "model_version", ""),
         ).to_workflow_dict()
+        output["parse_failed"] = bool(result.get("parse_failed"))
+        return output
 
     def complete(self, system: str, user: str) -> dict[str, Any]:
         payload = {
@@ -184,16 +266,21 @@ class OpenAICompatibleProvider(BaseProvider):
             "temperature": 0.2,
             "response_format": {"type": "json_object"},
         }
-        data = self._post("/chat/completions", payload)
-        return self._parse_json(data["choices"][0]["message"]["content"])
+        result_meta = self._post("/chat/completions", payload)
+        result = self._parse_json(result_meta.data["choices"][0]["message"]["content"])
+        if result.get("parse_failed"):
+            mark_parse_failed(result_meta.ledger_id)
+        return result
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vectors: list[list[float]] = []
         batch_size = 10
         for start in range(0, len(texts), batch_size):
             batch = texts[start : start + batch_size]
-            data = self._post("/embeddings", {"model": self.embedding_model, "input": batch})
-            vectors.extend(item["embedding"] for item in data["data"])
+            result_meta = self._post(
+                "/embeddings", {"model": self.embedding_model, "input": batch}
+            )
+            vectors.extend(item["embedding"] for item in result_meta.data["data"])
         return vectors
 
     def compare(
@@ -222,8 +309,10 @@ class OpenAICompatibleProvider(BaseProvider):
             ],
             "temperature": 0.2,
         }
-        data = self._post("/chat/completions", payload)
-        result = self._parse_json(data["choices"][0]["message"]["content"])
+        result_meta = self._post("/chat/completions", payload)
+        result = self._parse_json(result_meta.data["choices"][0]["message"]["content"])
+        if result.get("parse_failed"):
+            mark_parse_failed(result_meta.ledger_id)
         try:
             result["completion_score"] = round(
                 min(1.0, max(0.0, float(result.get("completion_score", 0.5)))), 3

@@ -4,6 +4,7 @@ from app.core.config import Settings
 from app.services.ensemble.categories import rag_tags_for_category
 from app.services.knowledge import derive_tags, document_to_records, ingest_directory
 from app.services.providers import MockProvider
+from app.services.providers.http import _CallResult
 from app.services.rag import RAGService, build_evidence_context, retrieval_as_evidence
 
 
@@ -174,7 +175,7 @@ def test_http_provider_sends_rag_evidence_in_prompt(monkeypatch):
             {"scene_summary": "现场", "hazard_hints": ["占用疏散通道"]},
             ensure_ascii=False,
         )
-        return {"choices": [{"message": {"content": content}}]}
+        return _CallResult(data={"choices": [{"message": {"content": content}}]})
 
     monkeypatch.setattr(provider, "_post", fake_post)
     provider.analyze([], "楼道堆物", rag_evidence=["法规原文：不得占用疏散通道"])
@@ -353,3 +354,78 @@ def test_document_to_records_produces_traceable_chunks():
     assert record["article"] == "第二十八条"
     assert record["source"] == "测试来源"
     assert record["is_demo"] is False
+
+
+# ---------- B5/WP3.4：条文感知分块与降级恢复 ----------
+
+
+def test_multi_article_doc_chunks_carry_own_article():
+    """多条文文档的每个切片携带自己的条文号，溯源不再张冠李戴。"""
+    from app.services.knowledge import iter_article_chunks
+
+    body = (
+        "第一条 为了预防火灾，制定本法。\n"
+        "第十二条 任何单位、个人不得损坏、挪用消防设施。\n"
+        "第二十八条 任何单位、个人不得占用、堵塞、封闭疏散通道、安全出口。"
+    )
+    chunks = iter_article_chunks(body, chunk_size=400, overlap=0)
+    articles = [article for article, _text in chunks if article]
+    assert articles == ["第一条", "第十二条", "第二十八条"], f"条文号应逐条对应：{articles}"
+    # 每个切片的文本与条文号一一对应
+    by_article = {article: text for article, text in chunks}
+    assert "疏散通道" in by_article["第二十八条"]
+    assert "消防设施" in by_article["第十二条"]
+    assert "预防火灾" in by_article["第一条"]
+
+
+def test_fallback_article_respected_for_non_article_text():
+    from app.services.knowledge import iter_article_chunks
+
+    chunks = iter_article_chunks("操作规程：日常巡查要点。", 400, 0, fallback_article="附则一")
+    assert chunks and chunks[0][0] == "附则一"
+
+
+def test_embedding_fallback_recovery_probe():
+    """降级后语料重建会重试真实 embedding API（恢复探测），不再是一程票。"""
+    from app.core.config import Settings
+    from app.services.providers.mock import MockProvider
+    from app.services.rag import RAGService
+
+    class FlakyProvider(MockProvider):
+        """第一次 embed 调用抛错（触发降级），之后恢复。"""
+
+        fail_first = True
+
+        def embed(self, texts):
+            if FlakyProvider.fail_first:
+                FlakyProvider.fail_first = False
+                raise RuntimeError("embedding api down")
+            return super().embed(texts)
+
+    class _TmpSettings(Settings):
+        def __init__(self, knowledge, faiss_dir, **kw):
+            super().__init__(
+                _env_file=None,
+                knowledge_dir=knowledge,
+                faiss_index_dir=faiss_dir,
+                **kw,
+            )
+
+    import tempfile
+    from pathlib import Path
+
+    tmp = Path(tempfile.mkdtemp(prefix="rag-recovery-"))
+    knowledge = tmp / "knowledge"
+    knowledge.mkdir()
+    (knowledge / "chunks").mkdir()
+    (knowledge / "chunks" / "real_chunks.jsonl").write_text(
+        '{"id": "a1", "text": "不得占用疏散通道。", "source": "消防法", "version": "v1", "tags": ["消防"]}\n',
+        encoding="utf-8",
+    )
+    settings = _TmpSettings(knowledge, tmp / "faiss")
+    rag = RAGService(settings, FlakyProvider())
+    assert rag.embedding_fallback is True, "首次失败应降级 hash 嵌入"
+
+    # 重建（语料变化触发）：恢复探测应重新走真实 provider 并成功
+    rag.rebuild()
+    assert rag.embedding_fallback is False, "重建后应恢复真实 embedding"
