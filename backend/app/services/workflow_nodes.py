@@ -149,19 +149,25 @@ def _analysis_state(
 
 
 def step_analyze(state: dict[str, Any]) -> dict[str, Any]:
+    from app.services import llm_ledger
+
     providers = state.get("providers") or [state["provider"]]
     rag = state["rag"]
     pre_evidence = rag.search(state["description"], top_k=3) if rag.texts else []
     if not state["settings"].enable_evidence_rag:
         pre_evidence = []
     rag_context = [item["text"] for item in pre_evidence]
-    multi = run_parallel_analysis(
-        providers,
-        state["images"],
-        state["description"],
-        rag_evidence=rag_context,
-        ocr_texts=state.get("ocr_texts") or [],
-    )
+    purpose_token = llm_ledger.current_purpose.set("analyze")
+    try:
+        multi = run_parallel_analysis(
+            providers,
+            state["images"],
+            state["description"],
+            rag_evidence=rag_context,
+            ocr_texts=state.get("ocr_texts") or [],
+        )
+    finally:
+        llm_ledger.current_purpose.reset(purpose_token)
     return _analysis_state(state, multi, rag_context)
 
 
@@ -220,12 +226,19 @@ def step_retrieve(state: dict[str, Any]) -> dict[str, Any]:
     hint = state.get("hazard_hints") or []
     category = rule.get("category") or (hint[0] if hint else None)
     tags = rag_tags_for_category(category)
-    results = state["rag"].search(query, top_k=5, tags=tags) if tags else []
+    top_k = int(getattr(state["settings"], "retrieval_top_k", 5))
+    results = state["rag"].search(query, top_k=top_k, tags=tags) if tags else []
     if not results:
-        results = state["rag"].search(query, top_k=5)
+        results = state["rag"].search(query, top_k=top_k)
     vector_confidence = sum(item["score"] for item in results) / max(1, len(results))
     retrieval_confidence = vector_confidence
-    if state["provider"].name == "mock" and results:
+    # MOCK_DEMO_BOOST：演示模式显式开关（默认关）。生产与评测路径不再有
+    # 隐藏的 mock 特判——此前该分支会系统性抬升 mock 置信度污染评测（C7）
+    if (
+        getattr(state["settings"], "mock_demo_boost", False)
+        and state["provider"].name == "mock"
+        and results
+    ):
         lexical_confidence = _keyword_overlap(query, [item["text"] for item in results])
         retrieval_confidence = min(1.0, 0.6 * lexical_confidence + 0.4 * vector_confidence + 0.15)
     return {
@@ -252,7 +265,11 @@ def step_judge(state: dict[str, Any]) -> dict[str, Any]:
     retrieval_conf = state.get("retrieval_conf", 0.5)
     rule_score = max(0.15, state.get("rule_score", 0.0))
     rule_conf = rule_score
-    if state["provider"].name == "mock":
+    demo_boost = (
+        getattr(state["settings"], "mock_demo_boost", False)
+        and state["provider"].name == "mock"
+    )
+    if demo_boost:
         rule_conf = min(1.0, max(0.25, rule_score * 0.9 + 0.25))
     llm_conf_raw = state["analysis"].get("llm_confidence", vision_conf)
     llm_conf = vision_conf if llm_conf_raw is None else float(llm_conf_raw)
@@ -262,7 +279,7 @@ def step_judge(state: dict[str, Any]) -> dict[str, Any]:
         + weights[2] * rule_conf
         + weights[3] * llm_conf
     )
-    if state["provider"].name == "mock" and rule_score >= 0.35:
+    if demo_boost and rule_score >= 0.35:
         rule_based_confidence = min(0.95, 0.68 + rule_score * 0.3)
         confidence = max(confidence, rule_based_confidence)
     confidence = min(0.99, max(0.05, confidence))

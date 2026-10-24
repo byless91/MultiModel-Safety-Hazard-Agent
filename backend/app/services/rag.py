@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -60,7 +61,13 @@ def _metadata_boost(item: dict, query: str) -> float:
 
 
 def rerank_results(query: str, results: list[dict], top_n: int) -> list[dict]:
-    """Deterministic lexical+metadata rerank over the vector candidates."""
+    """Deterministic lexical+metadata rerank over the vector candidates.
+
+    权重收敛在 Settings（B5/WP3.4）：RERANK_VECTOR/LEXICAL/METADATA_WEIGHT。
+    """
+    from app.core.config import get_settings as _get_settings
+
+    weights = _get_settings()
     scored: list[dict] = []
     for item in results:
         vector = float(item.get("score") or 0.0)
@@ -69,7 +76,9 @@ def rerank_results(query: str, results: list[dict], top_n: int) -> list[dict]:
         clone = dict(item)
         clone["vector_score"] = round(vector, 4)
         clone["rerank_score"] = round(
-            0.4 * vector + 0.4 * lexical + 0.2 * min(1.0, metadata),
+            weights.rerank_vector_weight * vector
+            + weights.rerank_lexical_weight * lexical
+            + weights.rerank_metadata_weight * min(1.0, metadata),
             4,
         )
         scored.append(clone)
@@ -120,6 +129,8 @@ class RAGService:
         self.embedding_fallback = False
         self.reranker_enabled = settings.reranker_enabled
         self.model_key = self._model_key()
+        # 读写锁：重建期间查询读不到半新半旧的状态（B1 审查项竞态）
+        self._lock = threading.RLock()
         self.load()
 
     @property
@@ -132,6 +143,10 @@ class RAGService:
         return f"{provider}:{model}"
 
     def load(self) -> None:
+        with self._lock:
+            self._load_locked()
+
+    def _load_locked(self) -> None:
         chunks = []
         knowledge_dir = self.settings.knowledge_dir
         paths = sorted(knowledge_dir.glob("*.jsonl")) + sorted(
@@ -224,6 +239,10 @@ class RAGService:
             logger.warning("FAISS 索引持久化失败，下次启动将全量重建", exc_info=True)
 
     def rebuild(self) -> None:
+        with self._lock:
+            self._rebuild_locked()
+
+    def _rebuild_locked(self) -> None:
         if len(self.hashes) != len(self.texts):
             self.hashes = [text_hash(text) for text in self.texts]
         if not self.texts:
@@ -231,8 +250,15 @@ class RAGService:
             self._index = None
             self.embedding_dim = 0
             return
+        # 恢复探测：重建时先重试真实 embedding API，降级不再是一程票
+        self.embedding_fallback = False
         vectors = self._embed_texts()
         self.vectors = np.asarray(vectors, dtype=np.float32)
+        # L2 归一化：IndexFlatIP 是内积检索，未归一化向量的分数无上界、
+        # 与 cosine 语义不可比（B1 审查项）
+        if self.vectors.ndim == 2 and self.vectors.shape[0] > 0:
+            norms = np.linalg.norm(self.vectors, axis=1, keepdims=True)
+            self.vectors = self.vectors / np.clip(norms, 1e-12, None)
         self.embedding_dim = (
             int(self.vectors.shape[1]) if self.vectors.ndim == 2 else 0
         )
@@ -248,6 +274,11 @@ class RAGService:
         try:
             return self._embed_with_cache()
         except Exception:
+            # 降级必须留痕：静默降级会让置信度语义失真且无法恢复（B1 审查项 C5）
+            logger.warning(
+                "真实 embedding 调用失败，降级 hash 嵌入（分数语义将失真，重建时自动重试真实 API）",
+                exc_info=True,
+            )
             self.embedding_fallback = True
             return hash_embed(self.texts)
 
@@ -261,7 +292,13 @@ class RAGService:
             if item_hash not in cache
         ]
         if missing:
-            fresh = self.provider.embed([text for _, text in missing])
+            from app.services import llm_ledger
+
+            purpose_token = llm_ledger.current_purpose.set("embed")
+            try:
+                fresh = self.provider.embed([text for _, text in missing])
+            finally:
+                llm_ledger.current_purpose.reset(purpose_token)
             for (index, _), vector in zip(missing, fresh, strict=False):
                 cache[self.hashes[index]] = np.asarray(vector, dtype=np.float32)
             save_embedding_cache(cache_path, self.model_key, cache)
@@ -279,6 +316,24 @@ class RAGService:
     ) -> list[dict]:
         if not self.texts:
             return []
+        with self._lock:
+            return self._search_locked(
+                query,
+                top_k=top_k,
+                tags=tags,
+                include_demo=include_demo,
+                reranker_enabled=reranker_enabled,
+            )
+
+    def _search_locked(
+        self,
+        query: str,
+        *,
+        top_k: int,
+        tags: list[str] | None,
+        include_demo: bool,
+        reranker_enabled: bool | None,
+    ) -> list[dict]:
         use_reranker = (
             self.settings.reranker_enabled
             if reranker_enabled is None
@@ -294,7 +349,17 @@ class RAGService:
         try:
             if self.embedding_fallback:
                 raise RuntimeError("fallback embedding mode")
-            query_vector = np.asarray(self.provider.embed([query]), dtype=np.float32)
+            from app.services import llm_ledger
+
+            _purpose_token = llm_ledger.current_purpose.set("embed")
+            try:
+                query_vector = np.asarray(self.provider.embed([query]), dtype=np.float32)
+            finally:
+                llm_ledger.current_purpose.reset(_purpose_token)
+            # 查询向量同样归一化，与语料向量保持 cosine 语义
+            norm = float(np.linalg.norm(query_vector))
+            if norm > 0:
+                query_vector = query_vector / norm
         except Exception:
             if self.embedding_dim != 256:
                 self.embedding_fallback = True

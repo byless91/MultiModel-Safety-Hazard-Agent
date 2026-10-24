@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +79,42 @@ def extract_article(text: str) -> str:
     return match.group(0).replace(" ", "") if match else ""
 
 
+def split_by_article(text: str) -> list[tuple[str, str]]:
+    """按「第X条」边界切分文档，每段携带自己的条文号。
+
+    修复 B1 审查项 E5：此前整篇文档共用第一个匹配到的条文号，
+    多条文法规的溯源会张冠李戴。
+    """
+    matches = list(ARTICLE_RE.finditer(text))
+    if not matches:
+        return [("", text)]
+    segments: list[tuple[str, str]] = []
+    preamble = text[: matches[0].start()].strip()
+    if preamble:
+        segments.append(("", preamble))
+    for position, match in enumerate(matches):
+        end = matches[position + 1].start() if position + 1 < len(matches) else len(text)
+        segments.append(
+            (match.group(0).replace(" ", ""), text[match.start() : end].strip())
+        )
+    return segments
+
+
+def iter_article_chunks(
+    body: str,
+    chunk_size: int,
+    overlap: int,
+    fallback_article: str = "",
+) -> list[tuple[str, str]]:
+    """(条文号, 切片) 序列：条内超长再按句子窗口切分。"""
+    output: list[tuple[str, str]] = []
+    for article, segment in split_by_article(body):
+        resolved = article or fallback_article
+        for chunk in chunk_text(segment, chunk_size, overlap):
+            output.append((resolved, chunk))
+    return output
+
+
 def chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> list[str]:
     chunks: list[str] = []
     buffer = ""
@@ -116,12 +154,14 @@ def collect_directory_records(
         tags = meta.get("tags") or []
         if not tags:
             tags = derive_tags(body)
-        article = meta.get("article") or extract_article(body)
+        fallback_article = str(meta.get("article") or "")
         document = meta.get("document") or title
         risk_type = meta.get("risk_type") or (tags[0] if tags else "")
         scene = meta.get("scene") or (tags[1] if len(tags) > 1 else "")
         effective_date = meta.get("effective_date") or meta.get("collected_at") or ""
-        for index, chunk in enumerate(chunk_text(body, chunk_size, overlap)):
+        for index, (article, chunk) in enumerate(
+            iter_article_chunks(body, chunk_size, overlap, fallback_article)
+        ):
             records.append(
                 {
                     "id": f"{item_id}-chunk-{index}",
@@ -154,11 +194,18 @@ def ingest_directory(
 
 
 def write_records(records: list[dict], output_dir: Path) -> Path:
+    """原子写：先写临时文件再替换，重建中途崩溃不会损坏既有语料。"""
     output_dir.mkdir(parents=True, exist_ok=True)
     out_path = output_dir / "real_chunks.jsonl"
-    with out_path.open("w", encoding="utf-8") as handle:
-        for record in records:
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    fd, tmp_name = tempfile.mkstemp(dir=output_dir, suffix=".jsonl.tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            for record in records:
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        os.replace(tmp_name, out_path)
+    except Exception:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
     return out_path
 
 
@@ -174,7 +221,7 @@ def document_to_records(
     if _knowledge_content_rejected(body):
         return []
     title = str(doc.get("title") or "未命名文档")
-    article = str(doc.get("article") or extract_article(body))
+    fallback_article = str(doc.get("article") or "")
     tags = [
         str(item)
         for item in list(dict.fromkeys((doc.get("tags") or []) + (doc.get("meta_tags") or [])))
@@ -182,7 +229,9 @@ def document_to_records(
     if not tags:
         tags = derive_tags(body)
     records: list[dict] = []
-    for index, chunk in enumerate(chunk_text(body, chunk_size, overlap)):
+    for index, (article, chunk) in enumerate(
+        iter_article_chunks(body, chunk_size, overlap, fallback_article)
+    ):
         records.append(
             {
                 "id": f"doc-{doc.get('id')}-chunk-{index}",
