@@ -4,6 +4,19 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class JobOut(BaseModel):
+    """异步研判任务状态（B3/WP1.1，async 模式）。"""
+
+    id: str
+    assessment_id: str
+    kind: str = "create"
+    status: str = "queued"  # queued | running | succeeded | failed
+    progress_step: str = "queued"
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ImageOut(BaseModel):
     id: str
     filename: str

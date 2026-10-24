@@ -2,19 +2,21 @@ import json
 import logging
 import re
 import tempfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
-from app.models import Assessment, AssessmentImage, KnowledgeDocument
+from app.models import Assessment, AssessmentImage, AssessmentJob, IdempotencyKey, KnowledgeDocument
 from app.models.entities import utcnow
 from app.schemas.assessment import (
     AssessmentOut,
@@ -22,10 +24,12 @@ from app.schemas.assessment import (
     DocumentOut,
     FollowupIn,
     HealthOut,
+    JobOut,
     ProviderInfo,
     RectificationConfirmIn,
     RectificationTransitionIn,
 )
+from app.services.assessment_io import apply_state, images_from_db
 from app.services.document_converter import (
     LEGACY_SUFFIX_HINTS,
     PLAIN_SUFFIXES,
@@ -38,6 +42,11 @@ from app.services.guardrail import (
     inspect_ocr_texts,
     inspect_text,
     validate_uploaded_input,
+)
+from app.services.job_runner import (
+    enqueue_job,
+    find_create_thread_id,
+    get_job_runner,
 )
 from app.services.knowledge import rebuild_knowledge
 from app.services.providers import ImageInput, get_provider, get_providers
@@ -159,74 +168,6 @@ def to_out(item: Assessment) -> AssessmentOut:
                 ),
             )
         ],
-    )
-
-
-def images_from_db(
-    db: Session,
-    assessment_id: str,
-    kind: str | None = None,
-) -> list[ImageInput]:
-    query = select(AssessmentImage).where(AssessmentImage.assessment_id == assessment_id)
-    if kind:
-        query = query.where(AssessmentImage.image_kind == kind)
-    query = query.order_by(AssessmentImage.created_at, AssessmentImage.id)
-    rows = db.scalars(query).all()
-    images = []
-    for row in rows:
-        path = Path(row.stored_path)
-        if path.exists():
-            images.append(ImageInput(filename=row.filename, path=path, mime_type=row.mime_type))
-    return images
-
-
-def _apply_state(assessment: Assessment, state: dict, db: Session) -> None:
-    assessment.status = state.get("status", "completed")
-    assessment.scene_summary = state.get("scene_summary")
-    assessment.hazard_category = state.get("hazard_category")
-    assessment.risk_level = state.get("risk_level")
-    assessment.confidence = state.get("confidence")
-    assessment.conclusion = state.get("conclusion")
-    assessment.evidence_json = json.dumps(state.get("evidence", []), ensure_ascii=False)
-    assessment.report_json = (
-        json.dumps(state.get("report"), ensure_ascii=False) if state.get("report") else None
-    )
-    assessment.review_reasons_json = json.dumps(
-        state.get("review_reasons", []), ensure_ascii=False
-    )
-    assessment.human_review_json = (
-        json.dumps(state.get("human_review"), ensure_ascii=False)
-        if state.get("human_review")
-        else None
-    )
-    risk_result = state.get("risk_result")
-    assessment.risk_result_json = (
-        json.dumps(risk_result, ensure_ascii=False) if risk_result else None
-    )
-    if isinstance(risk_result, dict) and risk_result.get("operational_level"):
-        assessment.risk_level = int(risk_result["operational_level"])
-    assessment.evidence_judge_json = (
-        json.dumps(state.get("evidence_judge"), ensure_ascii=False)
-        if state.get("evidence_judge")
-        else None
-    )
-    assessment.ensemble_judge_json = (
-        json.dumps(state.get("ensemble_judge"), ensure_ascii=False)
-        if state.get("ensemble_judge")
-        else None
-    )
-    assessment.multi_model_json = (
-        json.dumps(state.get("multi_model"), ensure_ascii=False)
-        if state.get("multi_model")
-        else None
-    )
-    assessment.disagreement_json = (
-        json.dumps(state.get("disagreement"), ensure_ascii=False)
-        if state.get("disagreement")
-        else None
-    )
-    assessment.followup_questions_json = json.dumps(
-        state.get("followup_questions", []), ensure_ascii=False
     )
 
 
@@ -384,6 +325,35 @@ def _comparison_meta(
     }
 
 
+def _record_compare_meta(item: Assessment) -> None:
+    """记录最近一次 AI 比对的时间与当时的整改状态，用于窗口内去重。"""
+    meta = parse_json(item.rectification_meta_json) or {}
+    meta["last_compare_at"] = utcnow().isoformat()
+    meta["last_compare_rectification_status"] = normalize_rectification_status(
+        item.rectification_status
+    )
+    item.rectification_meta_json = json.dumps(meta, ensure_ascii=False)
+
+
+def _compare_recently_run(item: Assessment) -> bool:
+    """同整改状态下窗口内的重复比对直接复用缓存结果，不再重复调用模型。"""
+    meta = parse_json(item.rectification_meta_json) or {}
+    last_at = meta.get("last_compare_at")
+    last_status = meta.get("last_compare_rectification_status")
+    if not last_at or not item.rectification_analysis_json:
+        return False
+    if last_status != normalize_rectification_status(item.rectification_status):
+        return False
+    try:
+        last_dt = datetime.fromisoformat(str(last_at))
+    except ValueError:
+        return False
+    if last_dt.tzinfo is None:
+        last_dt = last_dt.replace(tzinfo=UTC)
+    window = timedelta(minutes=settings.compare_dedup_minutes)
+    return datetime.now(UTC) - last_dt < window
+
+
 def _run_rectification_compare(item: Assessment, db: Session) -> None:
     provider = get_provider()
     original_rows = _rectification_image_rows(db, item.id, "original")
@@ -421,6 +391,7 @@ def _run_rectification_compare(item: Assessment, db: Session) -> None:
             },
             ensure_ascii=False,
         )
+        _record_compare_meta(item)
         return
     try:
         result = provider.compare(
@@ -449,6 +420,7 @@ def _run_rectification_compare(item: Assessment, db: Session) -> None:
     result["assessment"] = assessment.model_dump()
     item.rectification_score = score
     item.rectification_analysis_json = json.dumps(result, ensure_ascii=False)
+    _record_compare_meta(item)
 
 
 @router.get("/health", response_model=HealthOut)
@@ -549,14 +521,72 @@ def evaluation_reports() -> dict:
     return payload
 
 
-@router.post("/assessments", response_model=AssessmentOut, status_code=201)
+def job_to_out(job: AssessmentJob) -> JobOut:
+    return JobOut(
+        id=job.id,
+        assessment_id=job.assessment_id,
+        kind=job.kind,
+        status=job.status,
+        progress_step=job.progress_step,
+        error=job.error,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+
+IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{8,128}$")
+
+
+def _idempotent_replay(
+    db: Session,
+    key: str,
+    response: Response,
+) -> AssessmentOut | None:
+    """同 key 重复请求返回首次创建的 assessment（200）；过期键放行新请求。"""
+    existing = db.get(IdempotencyKey, key)
+    if existing is None:
+        return None
+    ttl = timedelta(hours=settings.idempotency_ttl_hours)
+    if datetime.now(UTC) - existing.created_at.replace(tzinfo=UTC) > ttl:
+        db.delete(existing)
+        db.commit()
+        return None
+    item = db.get(Assessment, existing.assessment_id)
+    if item is None:
+        return None
+    response.status_code = 200
+    response.headers["Idempotency-Replayed"] = "true"
+    return to_out(item)
+
+
+@router.post("/assessments", response_model=AssessmentOut | JobOut, status_code=201)
 async def create_assessment(
     description: Annotated[str, Form()] = "",
     followup_answer: Annotated[str, Form()] = "",
     ocr_texts: Annotated[str, Form()] = "",
     files: Annotated[list[UploadFile] | None, File()] = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    response: Response = None,
     db: Session = Depends(get_db),
-) -> AssessmentOut:
+) -> AssessmentOut | JobOut:
+    if idempotency_key and not IDEMPOTENCY_KEY_RE.match(idempotency_key):
+        raise HTTPException(status_code=400, detail="Idempotency-Key 需为 8-128 位字母数字或 -_")
+    if idempotency_key:
+        replayed = _idempotent_replay(db, idempotency_key, response)
+        if replayed is not None:
+            if settings.workflow_mode == "async" and replayed.status == "pending":
+                # 首次任务仍在排队/执行中：重放返回任务状态供前端继续轮询
+                job = db.scalars(
+                    select(AssessmentJob)
+                    .where(AssessmentJob.assessment_id == replayed.id)
+                    .order_by(AssessmentJob.created_at.desc(), AssessmentJob.id.desc())
+                    .limit(1)
+                ).first()
+                if job is not None:
+                    response.status_code = 202
+                    return job_to_out(job)
+            return replayed
+
     file_list = files or []
     if len(file_list) > settings.max_images:
         raise HTTPException(status_code=400, detail=f"最多上传 {settings.max_images} 张图片")
@@ -577,6 +607,9 @@ async def create_assessment(
     assessment = Assessment(description=description)
     db.add(assessment)
     db.flush()
+
+    if idempotency_key:
+        db.add(IdempotencyKey(key=idempotency_key, assessment_id=assessment.id))
 
     upload_root = settings.upload_dir / assessment.id
     upload_root.mkdir(parents=True, exist_ok=True)
@@ -601,7 +634,25 @@ async def create_assessment(
         db.add(image)
         images.append(ImageInput(filename=original_name, path=target, mime_type=sniffed_mime))
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 并发同 key：另一请求已创建，回退返回已有结果
+        db.rollback()
+        if idempotency_key:
+            replayed = _idempotent_replay(db, idempotency_key, response)
+            if replayed is not None:
+                return replayed
+        raise
+
+    if settings.workflow_mode == "async":
+        # 异步模式：入队后立即返回 202，worker 串行执行并逐步更新进度
+        job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list)
+        db.commit()
+        get_job_runner().wake()
+        response.status_code = 202
+        return job_to_out(job)
+
     try:
         # 多模型研判是长耗时同步调用，必须移出事件循环，否则阻塞全站请求
         state = await run_in_threadpool(
@@ -616,10 +667,29 @@ async def create_assessment(
         assessment.status = "failed"
         db.commit()
         raise HTTPException(status_code=502, detail=f"研判服务异常：{exc}") from exc
-    _apply_state(assessment, state, db)
+    apply_state(assessment, state, db)
     db.commit()
     db.refresh(assessment)
     return to_out(assessment)
+
+
+@router.get("/assessments/{assessment_id}/job", response_model=JobOut)
+def get_latest_job(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+) -> JobOut:
+    """查询该研判最近一次异步任务的状态（async 模式轮询入口）。"""
+    if db.get(Assessment, assessment_id) is None:
+        raise HTTPException(status_code=404, detail="研判记录不存在")
+    job = db.scalars(
+        select(AssessmentJob)
+        .where(AssessmentJob.assessment_id == assessment_id)
+        .order_by(AssessmentJob.created_at.desc(), AssessmentJob.id.desc())
+        .limit(1)
+    ).first()
+    if job is None:
+        raise HTTPException(status_code=404, detail="该研判无异步任务（sync 模式直接返回结果）")
+    return job_to_out(job)
 
 
 @router.get("/assessments", response_model=list[AssessmentOut])
@@ -647,18 +717,36 @@ def get_assessment(assessment_id: str, db: Session = Depends(get_db)) -> Assessm
     return to_out(item)
 
 
-@router.post("/assessments/{assessment_id}/followup", response_model=AssessmentOut)
+@router.post(
+    "/assessments/{assessment_id}/followup",
+    response_model=AssessmentOut | JobOut,
+)
 def followup_assessment(
     assessment_id: str,
     payload: FollowupIn,
+    response: Response = None,
     db: Session = Depends(get_db),
-) -> AssessmentOut:
+) -> AssessmentOut | JobOut:
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
     _reject_text(payload.answer)
     if item.followup_used >= settings.max_followups:
         raise HTTPException(status_code=400, detail="已达追问上限")
+    if settings.workflow_mode == "async":
+        # 异步模式：从 info 中断点恢复（不重跑视觉模型），完成后回写结果
+        thread_id = find_create_thread_id(db, assessment_id)
+        job = enqueue_job(
+            db,
+            assessment_id,
+            "followup",
+            answer=payload.answer,
+            thread_id=thread_id,
+        )
+        db.commit()
+        get_job_runner().wake()
+        response.status_code = 202
+        return job_to_out(job)
     try:
         state = run_workflow(
             description=item.description,
@@ -671,7 +759,7 @@ def followup_assessment(
         db.commit()
         raise HTTPException(status_code=502, detail=f"研判服务异常：{exc}") from exc
     item.followup_used += 1
-    _apply_state(item, state, db)
+    apply_state(item, state, db)
     db.commit()
     db.refresh(item)
     return to_out(item)
@@ -712,6 +800,20 @@ def confirm_assessment(
     item.human_review_json = json.dumps(human_review, ensure_ascii=False)
     db.commit()
     db.refresh(item)
+    if settings.workflow_mode == "async":
+        # 人工复核结论回写图线程状态（checkpointer），保持图状态与业务记录一致
+        from app.services.langgraph_flow import append_thread_state
+
+        thread_id = find_create_thread_id(db, assessment_id)
+        if thread_id:
+            append_thread_state(
+                thread_id,
+                {
+                    "confirmed": bool(item.confirmed),
+                    "status": item.status,
+                    "human_review": human_review,
+                },
+            )
     return to_out(item)
 
 
@@ -794,6 +896,9 @@ def compare_rectification(
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
+    if _compare_recently_run(item):
+        # 同状态窗口内重复比对：复用缓存结果，避免重复调用付费模型
+        return to_out(item)
     _run_rectification_compare(item, db)
     db.commit()
     db.refresh(item)

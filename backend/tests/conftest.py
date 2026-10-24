@@ -20,9 +20,16 @@ atexit.register(shutil.rmtree, _TEST_KNOWLEDGE_DIR, ignore_errors=True)
 
 os.environ["PROVIDER_MODE"] = "mock"
 os.environ["DATABASE_URL"] = f"sqlite:///{(BACKEND_DIR / 'data' / 'test.db').as_posix()}"
+# 每个测试会话开始前清空测试库（含 WAL 边车），避免跨次运行的数据残留
+for _suffix in ("", "-wal", "-shm"):
+    Path(str(BACKEND_DIR / "data" / "test.db") + _suffix).unlink(missing_ok=True)
 os.environ["UPLOAD_DIR"] = str(BACKEND_DIR / "data" / "uploads" / "test")
 os.environ["KNOWLEDGE_DIR"] = str(_TEST_KNOWLEDGE_DIR)
 os.environ["FAISS_INDEX_DIR"] = str(BACKEND_DIR / "data" / "faiss" / "test")
+os.environ["LANGGRAPH_CHECKPOINT_PATH"] = str(BACKEND_DIR / "data" / "langgraph-test.db")
+# 每个测试进程开始前清空 checkpoint 测试库，避免跨次运行的线程残留
+for _suffix in ("", "-wal", "-shm"):
+    Path(str(BACKEND_DIR / "data" / "langgraph-test.db") + _suffix).unlink(missing_ok=True)
 os.environ["MAX_FOLLOWUPS"] = "2"
 
 

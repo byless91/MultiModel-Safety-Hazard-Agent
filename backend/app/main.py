@@ -34,7 +34,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 预热含同步 IO（建索引/embedding），放线程池避免阻塞事件循环
     await run_in_threadpool(get_provider)
     await run_in_threadpool(get_rag)
+    if settings.workflow_mode == "async":
+        from app.services.job_runner import get_job_runner
+
+        await get_job_runner().start()
     yield
+    if settings.workflow_mode == "async":
+        from app.services.job_runner import get_job_runner
+
+        await get_job_runner().stop()
 
 
 def create_app() -> FastAPI:

@@ -1,9 +1,11 @@
 """研判工作流入口：优先 LangGraph 图，未安装时回退函数式流程。
 
 节点实现共享自 workflow_nodes.py；本文件只负责编排、兜底语义与指标埋点。
+progress 回调用于异步任务（job_runner）逐步上报节点进度。
 """
 
 import time
+from collections.abc import Callable
 from typing import Any
 
 from app.core import metrics
@@ -21,6 +23,8 @@ from app.services.workflow_nodes import (
     step_retrieve,
 )
 
+ProgressCallback = Callable[[str], None]
+
 
 def run_workflow(
     description: str,
@@ -32,6 +36,9 @@ def run_workflow(
     settings: Any | None = None,
     rag: Any | None = None,
     providers: list | None = None,
+    progress: ProgressCallback | None = None,
+    thread_id: str | None = None,
+    use_checkpointer: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     try:
@@ -45,6 +52,9 @@ def run_workflow(
                 settings=settings,
                 rag=rag,
                 providers=providers,
+                progress=progress,
+                thread_id=thread_id,
+                use_checkpointer=use_checkpointer,
             )
         else:
             state = run_functional(
@@ -56,6 +66,7 @@ def run_workflow(
                 settings=settings,
                 rag=rag,
                 providers=providers,
+                progress=progress,
             )
     except Exception:
         metrics.WORKFLOW_TOTAL.labels(status="failed").inc()
@@ -75,6 +86,7 @@ def run_functional(
     settings: Any | None = None,
     rag: Any | None = None,
     providers: list | None = None,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     settings, providers, rag = build_runtime(
         settings=settings, rag=rag, providers=providers
@@ -89,15 +101,27 @@ def run_functional(
         rag,
         providers,
     )
+    if progress:
+        progress("analyze")
     state.update(step_analyze(state))
     state.update(step_info(state))
     if state.get("needs_more_info"):
         state["status"] = "needs_more_info"
         return state
+    if progress:
+        progress("retrieve")
     state.update(step_retrieve(state))
+    if progress:
+        progress("refine")
     state.update(step_refine(state))
+    if progress:
+        progress("judge")
     state.update(step_judge(state))
+    if progress:
+        progress("evidence")
     state.update(step_evidence(state))
+    if progress:
+        progress("generate")
     state.update(step_generate(state))
     # 与 LangGraph 路径的已知差异：函数式路径在复核判定前对置信度取 3 位小数
     state["confidence"] = round(state["confidence"], 3)

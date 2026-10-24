@@ -401,14 +401,17 @@ def test_list_with_legacy_null_image_kind():
             files=[("files", ("before.jpg", FAKE_PNG, "image/png"))],
         )
         assessment_id = created.json()["id"]
+        # 模拟遗留脏数据：image_kind 为空（列现为 NOT NULL，用空串走同一容错路径）
         db_path = re.sub(r"^sqlite:///", "", os.environ["DATABASE_URL"])
         conn = sqlite3.connect(db_path)
-        conn.execute(
-            "UPDATE assessment_images SET image_kind=NULL WHERE assessment_id=?",
-            (assessment_id,),
-        )
-        conn.commit()
-        conn.close()
+        try:
+            conn.execute(
+                "UPDATE assessment_images SET image_kind='' WHERE assessment_id=?",
+                (assessment_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
         response = client.get("/api/v1/assessments")
     assert response.status_code == 200

@@ -71,6 +71,38 @@ class AssessmentImage(Base):
     assessment: Mapped[Assessment] = relationship(back_populates="images")
 
 
+class AssessmentJob(Base):
+    """异步研判任务（B3/WP1.1）：POST 立即返回 202，worker 串行消费。"""
+
+    __tablename__ = "assessment_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    assessment_id: Mapped[str] = mapped_column(
+        ForeignKey("assessments.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), default="create")  # create | followup
+    answer: Mapped[str | None] = mapped_column(Text, nullable=True)  # followup 的补充回答
+    payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # create 的 ocr_texts 等
+    thread_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    progress_step: Mapped[str] = mapped_column(String(32), default="queued")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class IdempotencyKey(Base):
+    """POST /assessments 的幂等键（B3/WP1.3）：同 key 重复请求返回首次结果。"""
+
+    __tablename__ = "idempotency_keys"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    assessment_id: Mapped[str] = mapped_column(String(36), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"
 

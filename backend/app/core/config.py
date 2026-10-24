@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,6 +52,13 @@ class Settings(BaseSettings):
     max_document_bytes: int = 20 * 1024 * 1024
     conf_weights: str = "0.3,0.3,0.2,0.2"
 
+    # B3：异步任务化。sync = 现状（同步等待结果）；async = 202 + 任务表 + 轮询
+    workflow_mode: Literal["sync", "async"] = "sync"
+    langgraph_checkpoint_path: Path = BACKEND_DIR / "data" / "langgraph.db"
+    job_stale_minutes: int = 10
+    idempotency_ttl_hours: int = 24
+    compare_dedup_minutes: int = 5
+
     @property
     def origins(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
@@ -72,7 +80,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def resolve_relative_paths(self) -> "Settings":
-        for field in ("upload_dir", "knowledge_dir", "faiss_index_dir"):
+        for field in ("upload_dir", "knowledge_dir", "faiss_index_dir", "langgraph_checkpoint_path"):
             value = getattr(self, field)
             if isinstance(value, Path) and not value.is_absolute():
                 setattr(self, field, BACKEND_DIR / value)
