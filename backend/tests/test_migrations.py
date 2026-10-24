@@ -66,14 +66,16 @@ def test_fresh_db_alembic_matches_create_all(tmp_path: Path):
 
 
 def test_existing_db_upgrade_head_is_lossless(tmp_path: Path):
-    """旧库（create_all/ensure_columns 时代的最终结构）直接 upgrade head：
-
-    防御性 baseline 应跳过建表、写入版本号，且既有数据一条不丢。
+    """旧库（B2 时代的结构：有业务表、无 assessment_jobs/idempotency_keys、
+    无 alembic_version）直接 upgrade head：增量迁移补建新表，存量数据不丢。
     """
     old_db = tmp_path / "legacy.db"
     engine = create_engine(f"sqlite:///{old_db.as_posix()}")
     Base.metadata.create_all(engine)
     with engine.begin() as conn:
+        # 模拟 B2 时代结构：删掉 B3 新增的表
+        conn.execute(text("DROP TABLE IF EXISTS idempotency_keys"))
+        conn.execute(text("DROP TABLE IF EXISTS assessment_jobs"))
         conn.execute(
             text(
                 "INSERT INTO assessments (id, description, status, followup_used, "
@@ -94,10 +96,36 @@ def test_existing_db_upgrade_head_is_lossless(tmp_path: Path):
         versioned = conn.execute(
             "SELECT version_num FROM alembic_version"
         ).fetchall()
+        tables = {
+            row[0]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
     finally:
         conn.close()
     assert rows == [("legacy-1", "旧库存量研判记录")]
     assert len(versioned) == 1, "旧库未被纳入 alembic 版本管理"
+    assert {"assessment_jobs", "idempotency_keys"} <= tables, "增量迁移未补建新表"
+
+
+def test_create_all_bootstrap_is_stamped(tmp_path: Path):
+    """create_all 引导的库（init_db 路径）自动 stamp head，后续 upgrade 不炸。"""
+    from app.core.db import stamp_if_unversioned
+
+    db_path = tmp_path / "bootstrapped.db"
+    engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+    Base.metadata.create_all(engine)
+
+    # stamp_if_unversioned 默认用全局 engine 的 URL，这里直接对全局逻辑做等价验证：
+    # 无版本号 + 有表 → stamp；已版本化 → 不重复 stamp
+    assert stamp_if_unversioned(engine) is True
+    # stamp 后 alembic_version 存在，且指向 head
+    with engine.connect() as conn:
+        version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+        assert version
+    assert stamp_if_unversioned(engine) is False
+    engine.dispose()
 
 
 def test_future_incremental_migration_applies_on_adopted_db(tmp_path: Path):
@@ -111,4 +139,10 @@ def test_future_incremental_migration_applies_on_adopted_db(tmp_path: Path):
     command.downgrade(config, "base")
     command.upgrade(config, "head")
     snapshot = _schema_snapshot(db_path)
-    assert {"assessments", "assessment_images", "knowledge_documents"} == set(snapshot)
+    assert {
+        "assessments",
+        "assessment_images",
+        "assessment_jobs",
+        "idempotency_keys",
+        "knowledge_documents",
+    } == set(snapshot)
