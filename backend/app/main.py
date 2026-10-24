@@ -1,23 +1,28 @@
 import logging
+import re
 import secrets
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.api.routes import router
 from app.core.config import get_settings
 from app.core.db import init_db
-from app.core.logging import setup_logging
+from app.core.logging import request_id_var, setup_logging
 
 settings = get_settings()
 setup_logging()
 logger = logging.getLogger("safety_hazard.api")
+
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 @asynccontextmanager
@@ -42,6 +47,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(router)
+
+    # HTTP 通用指标（延迟/状态码/QPS）；/metrics 走与业务一致的鉴权中间件，
+    # 抓取端需带凭证。B4 认证批次再决定是否对内网放开。
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -74,6 +83,20 @@ def create_app() -> FastAPI:
             if not secrets.compare_digest(header, expected):
                 return JSONResponse(status_code=401, content={"detail": "未授权"})
         return await call_next(request)
+
+    @app.middleware("http")
+    async def request_id_middleware(request, call_next):
+        # 最后注册 = 最外层：此后所有中间件与业务日志都携带同一 request_id
+        request_id = (request.headers.get("X-Request-ID") or "").strip()
+        if not _REQUEST_ID_RE.match(request_id):
+            request_id = uuid4().hex[:16]
+        token = request_id_var.set(request_id)
+        try:
+            response = await call_next(request)
+        finally:
+            request_id_var.reset(token)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")

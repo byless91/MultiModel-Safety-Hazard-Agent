@@ -19,6 +19,9 @@ dependencies = [
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "markitdown[pdf,docx]>=0.1.8",
+    "structlog>=24.1",
+    "prometheus-fastapi-instrumentator>=7.0",
+    "prometheus-client>=0.20",
 ]
 
 [project.optional-dependencies]

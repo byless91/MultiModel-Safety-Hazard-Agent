@@ -1,11 +1,21 @@
-"""Process-wide logging with secret masking."""
+"""Process-wide structured logging with secret masking and request correlation.
+
+- 文件日志为 JSON（structlog ProcessorFormatter），控制台为人类可读格式
+- 每条日志（原生 structlog 与 stdlib logging 记录）自动携带 request_id
+- 渲染前对所有字符串值做密钥脱敏，覆盖两种来源的记录
+"""
 
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping, MutableMapping
+from contextvars import ContextVar
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Any
+
+import structlog
 
 from app.core.config import get_settings
 
@@ -50,7 +60,11 @@ class SecretMaskingFormatter(logging.Formatter):
 
 
 class SecretMaskingFilter(logging.Filter):
-    """Rewrite log records before any handler formats them."""
+    """Rewrite log records before any handler formats them.
+
+    历史挂载点；structlog 化之后脱敏由 ``_mask_event_dict`` 在渲染前完成，
+    本类保留供兼容与既有单测使用，不再自动挂到 handler 上。
+    """
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
@@ -62,18 +76,88 @@ class SecretMaskingFilter(logging.Filter):
         return True
 
 
+request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
+
+
+def get_request_id() -> str:
+    """当前请求关联键；无请求上下文时返回 '-'。"""
+    return request_id_var.get()
+
+
+def _inject_request_id(
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any]:
+    event_dict.setdefault("request_id", request_id_var.get())
+    return event_dict
+
+
+def _mask_event_dict(
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any]:
+    """渲染前对事件字典中的全部字符串值脱敏（原生与 stdlib 记录均经过此处）。"""
+    for key, value in list(event_dict.items()):
+        if isinstance(value, str):
+            event_dict[key] = mask_secrets(value)
+    return event_dict
+
+
+def _foreign_pre_chain() -> list[Any]:
+    """stdlib logging 记录进入 structlog 渲染前的处理链。"""
+    return [
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        _inject_request_id,
+        structlog.processors.format_exc_info,
+        _mask_event_dict,
+    ]
+
+
+def _configure_structlog() -> None:
+    structlog.configure(
+        processors=[
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            _inject_request_id,
+            structlog.processors.format_exc_info,
+            _mask_event_dict,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
+
+def _json_formatter() -> structlog.stdlib.ProcessorFormatter:
+    return structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.JSONRenderer(ensure_ascii=False),
+        ],
+        foreign_pre_chain=_foreign_pre_chain(),
+    )
+
+
+def _console_formatter() -> structlog.stdlib.ProcessorFormatter:
+    return structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.dev.ConsoleRenderer(),
+        ],
+        foreign_pre_chain=_foreign_pre_chain(),
+    )
+
+
 def setup_logging() -> None:
     settings = get_settings()
     root = logging.getLogger()
     root.setLevel(logging.INFO)
     if not root.handlers:
-        stream = logging.StreamHandler()
-        stream.setFormatter(
-            SecretMaskingFormatter(
-                "%(asctime)s %(levelname)s %(name)s: %(message)s"
-            )
-        )
-        root.addHandler(stream)
+        console = logging.StreamHandler()
+        console.setFormatter(_console_formatter())
+        root.addHandler(console)
         log_dir = Path(settings.upload_dir).parent / "logs"
         try:
             log_dir.mkdir(parents=True, exist_ok=True)
@@ -83,11 +167,7 @@ def setup_logging() -> None:
                 backupCount=5,
                 encoding="utf-8",
             )
-            file_handler.setFormatter(
-                SecretMaskingFormatter(
-                    "%(asctime)s %(levelname)s %(name)s: %(message)s"
-                )
-            )
+            file_handler.setFormatter(_json_formatter())
             root.addHandler(file_handler)
         except OSError as exc:
             # 文件日志不可用时降级为仅控制台输出，但不能完全无声
@@ -106,9 +186,4 @@ def setup_logging() -> None:
                         None,
                     )
                 )
-    for handler in root.handlers:
-        if not any(
-            isinstance(filter_item, SecretMaskingFilter)
-            for filter_item in handler.filters
-        ):
-            handler.addFilter(SecretMaskingFilter())
+    _configure_structlog()

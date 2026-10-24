@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from app.core.metrics import record_model_run
 from app.services.ensemble.schemas import ModelRunResult, MultiModelResult
 from app.services.providers.base import (
     BaseProvider,
@@ -50,7 +51,7 @@ def _run_one(
         error_type = "unexpected"
         error_message = str(exc)[:120]
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
-    return ModelRunResult(
+    run = ModelRunResult(
         provider=provider.name,
         family=provider.family,
         model=getattr(provider, "vision_model", ""),
@@ -62,6 +63,8 @@ def _run_one(
         retry_count=getattr(provider, "last_retry_count", 0),
         analysis=analysis,
     )
+    record_model_run(run.provider, run.status, run.retry_count)
+    return run
 
 
 def _mock_fallback_run(
@@ -77,7 +80,7 @@ def _mock_fallback_run(
         0.5,
     )
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
-    return ModelRunResult(
+    run = ModelRunResult(
         provider="mock",
         family="mock",
         model="mock-vision",
@@ -86,6 +89,8 @@ def _mock_fallback_run(
         retry_count=0,
         analysis=analysis,
     )
+    record_model_run(run.provider, run.status)
+    return run
 
 
 def run_parallel_analysis(
