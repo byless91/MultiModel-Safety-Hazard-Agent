@@ -67,6 +67,23 @@ EMBEDDING_MODEL=text-embedding-v3
 
 也支持智谱：配置 `ZHIPU_API_KEY` 与 `ZHIPU_BASE_URL`。
 
+## 异步研判模式（B3，可选）
+
+默认 `WORKFLOW_MODE=sync`：提交后同步等待结果（与历史行为一致）。
+
+设为 `async` 后：
+
+- `POST /assessments` 与 followup 立即返回 `202 + 任务状态`，前端轮询 `GET /api/v1/assessments/{id}/job` 直到 `succeeded`；
+- 进程内 worker 串行消费任务，`progress_step` 逐步推进（分析→检索→研判→证据校验→生成），前端已内置轮询与进度提示；
+- 追问走 LangGraph checkpointer 断点恢复（`interrupt`/`Command(resume)`），**不再重新调用视觉模型**；进程重启后可从 checkpoint 恢复线程；
+- 人工复核结论会回写图线程状态；
+- 启动时自动清扫超时僵尸任务（`JOB_STALE_MINUTES`）。
+
+### 幂等与去重
+
+- `POST /assessments` 支持 `Idempotency-Key` 请求头（8-128 位字母数字或 `-_`）：同 key 24 小时内重复请求返回首次结果（响应头 `Idempotency-Replayed: true`），网络重试不再重复付费；
+- `POST /assessments/{id}/rectification/compare` 在同整改状态的 `COMPARE_DEDUP_MINUTES` 窗口内复用上次比对结果，不重复调用模型。
+
 ## 已实现能力
 
 - 多图上传 + 文字描述的多模态研判
