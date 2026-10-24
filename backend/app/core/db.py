@@ -28,49 +28,16 @@ class Base(DeclarativeBase):
 
 
 def init_db() -> None:
+    """Bootstrap missing tables only; all schema evolution goes through Alembic.
+
+    create_all 只负责为全新空库（开发/测试）补齐缺失的表，不会修改已存在
+    的表结构。任何列级变更（新增/修改/删除列）必须通过 Alembic 迁移：
+    `uv run alembic revision --autogenerate -m "..."` 后随代码提交，
+    部署时执行 `uv run alembic upgrade head`。
+    """
     from app.models import entities  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    ensure_columns(engine)
-
-
-def ensure_columns(db_engine) -> None:
-    """Lightweight migration: add new columns to pre-existing SQLite tables."""
-    additions = {
-        "assessments": [
-            ("rectification_status", "VARCHAR(32)"),
-            ("rectification_note", "TEXT"),
-            ("rectification_score", "FLOAT"),
-            ("rectification_analysis_json", "TEXT"),
-            ("rectification_meta_json", "TEXT"),
-            ("rectified_at", "DATETIME"),
-            ("review_reasons_json", "TEXT"),
-            ("human_review_json", "TEXT"),
-            ("risk_result_json", "TEXT"),
-            ("evidence_judge_json", "TEXT"),
-            ("ensemble_judge_json", "TEXT"),
-            ("multi_model_json", "TEXT"),
-            ("disagreement_json", "TEXT"),
-        ],
-        "assessment_images": [("image_kind", "VARCHAR(32)")],
-    }
-    with db_engine.connect() as conn:
-        for table, columns in additions.items():
-            existing = {
-                row[1]
-                for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")
-            }
-            for name, ddl in columns:
-                if name not in existing:
-                    conn.exec_driver_sql(
-                        f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"
-                    )
-            if table == "assessment_images" and "image_kind" in existing:
-                conn.exec_driver_sql(
-                    "UPDATE assessment_images SET image_kind='original' "
-                    "WHERE image_kind IS NULL OR image_kind=''"
-                )
-        conn.commit()
 
 
 def get_db():
