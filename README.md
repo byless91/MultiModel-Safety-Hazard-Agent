@@ -91,6 +91,24 @@ cd backend
 python -m pytest
 ```
 
+## 数据库迁移（Alembic）
+
+自 B2 起所有表结构变更走 Alembic，不再手写 ALTER：
+
+```powershell
+# 模型改动后生成增量迁移（自动 diff 模型与库结构）
+.\backend\.venv\Scripts\python.exe -m alembic revision --autogenerate -m "add jobs table"
+
+# 部署/升级时执行
+.\backend\.venv\Scripts\python.exe -m alembic upgrade head
+```
+
+- 连接串与应用一致：读取 `backend/.env` 或 `DATABASE_URL` 环境变量，无需在 `alembic.ini` 里单独配置
+- 全新空库：`upgrade head` 完整建表（与 `create_all` 产物一致，有测试保障）
+- 旧库（`ensure_columns` 时代的结构）：baseline 带存在检查，直接 `upgrade head` 即可无损纳入版本管理，无需手工 stamp
+- 应用启动时的 `create_all` 只为开发/测试补齐缺失的表，**不会**修改已有表结构——列级变更必须提交迁移文件
+
+
 ## 知识库与向量重建
 
 法规原文放在 `backend/data/knowledge/source_raw/`，文件顶部使用 YAML 形式的元数据记录来源、版本和标签，模板见 `source_raw/sources.md`。
