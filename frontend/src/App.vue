@@ -21,6 +21,12 @@
         >
           {{ provider === 'mock' ? '演示模式' : '真实模型' }}
         </el-tag>
+        <template v-if="auth.isLoggedIn && auth.user">
+          <el-tag class="mode-tag" size="small" type="info">
+            {{ auth.user.username }}（{{ roleLabel }}）
+          </el-tag>
+          <el-button class="logout-btn" link size="small" @click="onLogout">退出</el-button>
+        </template>
       </div>
     </header>
     <main>
@@ -30,11 +36,27 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { api } from './api/client'
+import { useAuthStore } from './stores/auth'
 
 const provider = ref('')
+const auth = useAuthStore()
+const router = useRouter()
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: '管理员',
+  reviewer: '复核员',
+  inspector: '巡查员',
+}
+const roleLabel = computed(() => ROLE_LABELS[auth.user?.role || ''] || auth.user?.role || '')
+
+function onLogout() {
+  auth.logout()
+  router.push('/login')
+}
 
 onMounted(async () => {
   try {
@@ -105,6 +127,15 @@ onMounted(async () => {
 
 .mode-tag {
   flex: none;
+}
+
+.logout-btn {
+  color: #cbd5e1;
+  margin-left: calc(var(--s-1) * -1);
+}
+
+.logout-btn:hover {
+  color: #ffffff;
 }
 
 @media (max-width: 720px) {

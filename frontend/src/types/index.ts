@@ -424,6 +424,18 @@ export interface EvaluationReport {
   metrics: EvaluationMetrics
 }
 
+export interface AuthUser {
+  id: string
+  username: string
+  role: string
+}
+
+export interface TokenOut {
+  access_token: string
+  token_type: string
+  user: AuthUser
+}
+
 /** 异步研判任务状态（B3，后端 WORKFLOW_MODE=async 时返回） */
 export interface JobOut {
   id: string
