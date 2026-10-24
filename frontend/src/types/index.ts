@@ -424,6 +424,18 @@ export interface EvaluationReport {
   metrics: EvaluationMetrics
 }
 
+/** 异步研判任务状态（B3，后端 WORKFLOW_MODE=async 时返回） */
+export interface JobOut {
+  id: string
+  assessment_id: string
+  kind: 'create' | 'followup'
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  progress_step: string
+  error?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface EvaluationReportsPayload {
   evaluation_report: EvaluationReport | null
   ablation_report: AblationReport | null

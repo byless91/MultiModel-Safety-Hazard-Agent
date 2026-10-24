@@ -58,6 +58,15 @@
     </el-card>
 
     <el-alert
+      v-if="store.activeJob && store.loading"
+      class="job-progress-alert"
+      :title="`研判进行中：${PROGRESS_LABELS[store.activeJob.progress_step] || store.activeJob.progress_step}`"
+      type="info"
+      :closable="false"
+      show-icon
+    />
+
+    <el-alert
       v-if="store.error"
       class="error-alert"
       :title="store.error"
@@ -94,6 +103,19 @@ const store = useAssessmentStore()
 const description = ref('')
 const fileList = ref<UploadFile[]>([])
 const assessment = ref<Assessment | null>(null)
+
+const PROGRESS_LABELS: Record<string, string> = {
+  queued: '排队中',
+  analyze: '多模型分析中',
+  retrieve: '法规检索中',
+  refine: '证据二次研判中',
+  judge: '融合研判中',
+  evidence: '证据校验中',
+  generate: '生成报告中',
+  needs_more_info: '等待补充信息',
+  completed: '已完成',
+  done: '已完成',
+}
 
 async function submit() {
   if (!description.value.trim()) return
