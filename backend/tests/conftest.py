@@ -19,7 +19,8 @@ if _REAL_KNOWLEDGE_DIR.exists():
 atexit.register(shutil.rmtree, _TEST_KNOWLEDGE_DIR, ignore_errors=True)
 
 os.environ["PROVIDER_MODE"] = "mock"
-os.environ["DATABASE_URL"] = f"sqlite:///{(BACKEND_DIR / 'data' / 'test.db').as_posix()}"
+# CI 的 PG 矩阵通过环境变量注入 DATABASE_URL；本地默认用临时 SQLite 测试库
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{(BACKEND_DIR / 'data' / 'test.db').as_posix()}")
 # 每个测试会话开始前清空测试库（含 WAL 边车），避免跨次运行的数据残留
 for _suffix in ("", "-wal", "-shm"):
     Path(str(BACKEND_DIR / "data" / "test.db") + _suffix).unlink(missing_ok=True)

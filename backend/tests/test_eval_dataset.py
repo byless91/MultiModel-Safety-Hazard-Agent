@@ -231,10 +231,10 @@ def test_validate_case_row_writes_issue_for_bad_case():
     assert issues[0].case_id == "bad"
 
 
-def test_real_dataset_v1_loads_30_cases_without_issues():
+def test_real_dataset_v2_loads_60_cases_without_issues():
     path = Path(__file__).resolve().parents[1] / "data" / "eval_cases" / "cases.jsonl"
-    dataset = load_dataset(path, dataset_version="v1", expected_count=30)
-    assert len(dataset.cases) == 30
+    dataset = load_dataset(path, dataset_version="v2", expected_count=60)
+    assert len(dataset.cases) == 60
     assert dataset.issues == []
-    assert dataset.manifest.case_count == 30
-    assert sum(dataset.manifest.category_counts.values()) == 30
+    assert dataset.manifest.case_count == 60
+    assert sum(dataset.manifest.category_counts.values()) == 60

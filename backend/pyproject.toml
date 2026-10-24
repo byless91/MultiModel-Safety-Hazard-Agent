@@ -31,6 +31,7 @@ dependencies = [
 
 [project.optional-dependencies]
 faiss = ["faiss-cpu>=1.8.0"]
+pg = ["psycopg[binary]>=3.2"]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

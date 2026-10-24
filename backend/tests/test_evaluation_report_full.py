@@ -78,7 +78,7 @@ def test_report_contains_overview_performance_and_limitations():
         provider_mode="mock",
     )
     overview = summary["dataset_overview"]
-    assert overview["case_count"] == 30
+    assert overview["case_count"] == 60
     assert overview["safe_negative_case_count"] == 0
     assert "缺少无隐患负样本" in overview["limitation_notes"][0]
     assert "模块表现" in markdown

@@ -1,0 +1,22 @@
+# 后端镜像：uv 锁定依赖 + 启动时执行 Alembic 迁移
+FROM python:3.11-slim
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+WORKDIR /app
+
+# 先装依赖（利用层缓存：pyproject/uv.lock 不变则跳过）
+COPY pyproject.toml uv.lock alembic.ini ./
+COPY migrations ./migrations
+RUN uv sync --frozen --no-dev --extra faiss --extra pg
+
+COPY app ./app
+
+ENV UV_RUNTINE_PYTHON=/app/.venv/bin/python \
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8001
+
+# 启动即迁移（旧库自动 stamp/增量；全新库完整建表）
+CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port 8001"]

@@ -6,8 +6,16 @@
    数据保留，且纳入版本管理（后续增量迁移可执行）。
 """
 
+import os
 import sqlite3
 from pathlib import Path
+
+import pytest
+
+# 本文件验证 SQLite 方言下的迁移语义（PRAGMA/原子写/DROP COLUMN）；
+# PostgreSQL 方言由 alembic 本身保证，CI PG 矩阵跳过
+if not os.environ.get("DATABASE_URL", "sqlite").startswith("sqlite"):
+    pytest.skip("迁移方言测试仅针对 SQLite", allow_module_level=True)
 
 from alembic import command
 from alembic.config import Config

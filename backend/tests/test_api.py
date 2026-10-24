@@ -2,6 +2,7 @@ import os
 import re
 import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -396,6 +397,10 @@ def test_knowledge_rebuild():
     assert "records" in body
 
 
+@pytest.mark.skipif(
+    not os.environ.get("DATABASE_URL", "sqlite").startswith("sqlite"),
+    reason="该测试直接操作 SQLite 文件",
+)
 def test_list_with_legacy_null_image_kind():
     with TestClient(app) as client:
         created = client.post(
