@@ -67,6 +67,31 @@ EMBEDDING_MODEL=text-embedding-v3
 
 也支持智谱：配置 `ZHIPU_API_KEY` 与 `ZHIPU_BASE_URL`。
 
+## 认证与权限（B4）
+
+`AUTH_MODE` 三档：
+
+| 模式 | 行为 | 适用 |
+|---|---|---|
+| `none`（默认） | 全部接口开放 | 本地开发/演示 |
+| `token` | 静态 `API_BEARER_TOKEN` Bearer（兼容旧部署） | 简单服务间调用 |
+| `jwt` | 用户体系 + 角色 + 签名图片 URL（**生产推荐**） | 正式部署 |
+
+jwt 模式使用：
+
+```powershell
+# 创建管理员（密码交互输入，至少 8 位）
+.ackend\.venv\Scripts\python.exe scripts\create_user.py --username admin --role admin
+# 角色可选 admin / reviewer / inspector
+```
+
+- 登录：`POST /api/v1/auth/token`（OAuth2 密码流）换取 JWT，前端已内置登录页、路由守卫与 401 自动跳转；
+- 角色权限：inspector 提交研判/整改照片，reviewer 确认复核与整改关闭，admin 管理知识库与用户（`GET/POST /api/v1/admin/users`）；
+- 审计可信：复核人/整改操作人一律取认证身份，客户端传入的 `reviewer`/`by` 字段在 jwt 模式下不生效；
+- 图片保护：`/uploads` 改为短期 HMAC 签名 URL（`UPLOAD_URL_TTL_MINUTES`），浏览器 `<img>` 无需携带凭证，过期/篡改即拒绝；
+- 限流（`RATE_LIMIT_ENABLED=true` 开启）：登录 10 次/分/IP（防爆破），研判提交 5 次/分/用户；
+- `/health` 与 `/metrics` 保持开放（探活与内网监控）。
+
 ## 异步研判模式（B3，可选）
 
 默认 `WORKFLOW_MODE=sync`：提交后同步等待结果（与历史行为一致）。
