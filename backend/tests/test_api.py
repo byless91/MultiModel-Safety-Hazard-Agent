@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import sqlite3
@@ -20,7 +21,47 @@ def test_health():
     assert data["rag_loaded"] is True
 
 
-def test_evaluation_reports_endpoint_returns_structured_payload():
+def test_evaluation_reports_endpoint_returns_structured_payload(tmp_path, monkeypatch):
+    """接口结构解析不应依赖本地评测产物：自造最小 report.json 验证。"""
+    from app.api import routes as routes_module
+
+    eval_dir = tmp_path / "eval"
+    eval_dir.mkdir()
+    (eval_dir / "report.json").write_text(
+        json.dumps(
+            {
+                "total": 2,
+                "category_accuracy": 1.0,
+                "level_accuracy": 1.0,
+                "severity_mae": 0.0,
+                "level_accuracy_tolerance1": 1.0,
+                "clause_hit_rate": 0.5,
+                "evidence_hit_rate": 0.5,
+                "evidence_support_rate": 1.0,
+                "unsupported_claim_rate": 0.0,
+                "model_conflict_rate": 0.0,
+                "human_review_rate": 1.0,
+                "human_review_count": 2,
+                "unsafe_auto_pass_count": 0,
+                "unsafe_auto_pass_rate": 0.0,
+                "unsafe_hazard_base_count": 2,
+                "false_positive_count": 0,
+                "false_negative_count": 0,
+                "evidence_failure_count": 0,
+                "severity_error_count": 0,
+                "model_conflict_count": 0,
+                "avg_latency_s": 0.1,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    original_loader = routes_module.load_evaluation_reports
+    monkeypatch.setattr(
+        routes_module,
+        "load_evaluation_reports",
+        lambda eval_dir_arg=None: original_loader(eval_dir=eval_dir),
+    )
     with TestClient(app) as client:
         response = client.get("/api/v1/evaluation/reports")
     assert response.status_code == 200

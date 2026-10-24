@@ -33,6 +33,15 @@ for _suffix in ("", "-wal", "-shm"):
     Path(str(BACKEND_DIR / "data" / "langgraph-test.db") + _suffix).unlink(missing_ok=True)
 os.environ["MAX_FOLLOWUPS"] = "2"
 
+# CI 全新 checkout 不含 gitignore 的 chunks/eval 产物；离线重建知识库切片，
+# 保证依赖检索结果的测试（如 test_create_assessment 的 evidence 断言）稳定。
+# 本地已有 chunks 时为 no-op。
+if not (_TEST_KNOWLEDGE_DIR / "chunks" / "real_chunks.jsonl").exists():
+    from app.services.knowledge import collect_directory_records, write_records
+
+    _records = collect_directory_records(_TEST_KNOWLEDGE_DIR / "source_raw")
+    write_records(_records, _TEST_KNOWLEDGE_DIR / "chunks")
+
 
 def _build_pdf(text: str) -> bytes:
     """Build a minimal single-page PDF containing ``text`` (ASCII only)."""

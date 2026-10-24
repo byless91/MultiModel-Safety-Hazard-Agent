@@ -1,4 +1,8 @@
-# 仅允许以下依赖执行安装期构建脚本，其余一律禁止（供应链防护）
+# pnpm 11 构建脚本审批（allowBuilds 是 pnpm 11 的生效语义，
+# onlyBuiltDependencies 保留兼容 pnpm 10 及 config get）
+allowBuilds:
+  esbuild: true
+  vue-demi: true
 onlyBuiltDependencies:
   - esbuild
   - vue-demi

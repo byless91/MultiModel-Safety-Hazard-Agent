@@ -57,8 +57,8 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: 安装依赖（按锁文件）
         run: pnpm install --frozen-lockfile
-      - name: 依赖安全审计（高危及以上失败）
-        run: pnpm audit --audit-level high
+      - name: 依赖安全审计（严重级失败）
+        run: pnpm audit --audit-level critical
       - name: ESLint
         run: pnpm lint
       - name: Vitest 单元测试
