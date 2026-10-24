@@ -55,10 +55,86 @@ jobs:
         run: pnpm audit --audit-level high
       - name: ESLint
         run: pnpm lint
+      - name: Vitest 单元测试
+        run: pnpm test
       - name: vue-tsc 类型检查
         run: pnpm type-check
       - name: 生产构建
         run: pnpm build
+
+  backend-pg:
+    name: 后端（PostgreSQL 矩阵）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: safety
+          POSTGRES_PASSWORD: safety
+          POSTGRES_DB: safety_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U safety"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://safety:safety@localhost:5432/safety_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen --extra dev --extra faiss --extra pg
+      - run: uv run alembic upgrade head
+      - run: uv run pytest -q -p no:cacheprovider
+
+  eval-gate:
+    name: 评测回归门禁（mock）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen --extra dev
+      - name: 跑 mock 评测并与基线对比（劣化 >2pp 失败）
+        run: uv run python ../scripts/check_eval_baseline.py
+
+  docker:
+    name: 容器镜像构建与冒烟
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 构建后端镜像
+        run: docker build -t safety-backend ./backend
+      - name: 构建前端镜像
+        run: docker build -t safety-frontend ./frontend
+      - name: compose 起全栈并健康检查
+        run: |
+          docker compose up -d --no-build
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8001/api/v1/health > /dev/null; then echo "backend healthy"; break; fi
+            sleep 5
+          done
+          curl -sf http://localhost:8001/api/v1/health | grep -q '"status":"ok"'
+          curl -sf http://localhost:8080/ | grep -q "基层安全隐患"
+          docker compose down -v
 
   pip-audit:
     name: 后端依赖安全审计

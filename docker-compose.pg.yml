@@ -1,0 +1,50 @@
+# PostgreSQL 变体：docker compose -f docker-compose.pg.yml up
+# 多副本/多 worker 部署必须使用 PostgreSQL（SQLite 仅适合单节点）。
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: safety
+      POSTGRES_PASSWORD: safety
+      POSTGRES_DB: safety_hazard
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U safety"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://safety:safety@db:5432/safety_hazard
+      AUTH_MODE: ${AUTH_MODE:-none}
+      WORKFLOW_MODE: ${WORKFLOW_MODE:-sync}
+      PROVIDER_MODE: auto
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-insecure-secret-change-me}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backend-data:/app/data
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  backend-data:

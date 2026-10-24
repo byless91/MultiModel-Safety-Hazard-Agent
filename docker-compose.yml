@@ -1,0 +1,37 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    environment:
+      # 默认 SQLite（数据落在挂载卷）；切 PostgreSQL 用 docker-compose.pg.yml
+      AUTH_MODE: ${AUTH_MODE:-none}
+      WORKFLOW_MODE: ${WORKFLOW_MODE:-sync}
+      PROVIDER_MODE: auto
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-insecure-secret-change-me}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+    volumes:
+      - backend-data:/app/data
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  backend-data:
