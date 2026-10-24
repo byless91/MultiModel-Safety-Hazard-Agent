@@ -32,7 +32,12 @@ jobs:
           DATABASE_URL="sqlite:///./data/ci-migrate.db" uv run alembic upgrade head
           rm -f data/ci-migrate.db
       - name: Pytest 单元测试
-        run: uv run pytest -q -p no:cacheprovider
+        run: |
+          set +e
+          uv run pytest -q -p no:cacheprovider 2>&1 | tee /tmp/pytest.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then grep -E "^FAILED|^ERROR|failed|error" /tmp/pytest.log | head -12 | while read -r line; do echo "::error::$line"; done; fi
+          exit "$code"
 
   frontend:
     name: 前端（eslint / vue-tsc / build）
@@ -43,10 +48,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        # 版本读取自 frontend/package.json 的 packageManager 字段
+        with:
+          version: 11.21.0  # package.json 在子目录，action 读不到 packageManager，显式指定
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22  # pnpm 11 要求 Node >= 22.13（node:sqlite）
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: 安装依赖（按锁文件）
@@ -95,7 +101,13 @@ jobs:
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --frozen --extra dev --extra faiss --extra pg
       - run: uv run alembic upgrade head
-      - run: uv run pytest -q -p no:cacheprovider
+      - name: Pytest 单元测试（PG）
+        run: |
+          set +e
+          uv run pytest -q -p no:cacheprovider 2>&1 | tee /tmp/pytest.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then grep -E "^FAILED|^ERROR|failed|error" /tmp/pytest.log | head -12 | while read -r line; do echo "::error::$line"; done; fi
+          exit "$code"
 
   eval-gate:
     name: 评测回归门禁（mock）

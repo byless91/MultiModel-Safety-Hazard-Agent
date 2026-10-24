@@ -1,5 +1,5 @@
 # 前端镜像：node 构建 → nginx 托管（/api 与 /uploads 反代到 backend）
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
