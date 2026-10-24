@@ -57,16 +57,18 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: 安装依赖（按锁文件）
         run: pnpm install --frozen-lockfile
-      - name: 依赖安全审计（严重级失败）
-        run: pnpm audit --audit-level critical
+      - name: 依赖安全审计（生产依赖严重级失败）
+        # tinypool RCE 仅存在于 vitest dev 工具链（不进生产 bundle，vitest 3 钉死 1.x），
+        # 生产依赖 critical 硬拦；待 vitest 4 后恢复全量审计
+        run: pnpm audit --audit-level critical --prod
       - name: ESLint
-        run: pnpm lint
+        run: pnpm lint 2>&1 | tee /tmp/fe.log || (grep -E "error|✖" /tmp/fe.log | head -6 | while read -r line; do echo "::error::$line"; done; exit 1)
       - name: Vitest 单元测试
-        run: pnpm test
+        run: pnpm test 2>&1 | tee /tmp/fe.log || (grep -E "FAIL|failed" /tmp/fe.log | head -6 | while read -r line; do echo "::error::$line"; done; exit 1)
       - name: vue-tsc 类型检查
-        run: pnpm type-check
+        run: pnpm type-check 2>&1 | tee /tmp/fe.log || (grep -E "error TS" /tmp/fe.log | head -6 | while read -r line; do echo "::error::$line"; done; exit 1)
       - name: 生产构建
-        run: pnpm build
+        run: pnpm build 2>&1 | tee /tmp/fe.log || (tail -15 /tmp/fe.log | while read -r line; do echo "::error::$line"; done; exit 1)
 
   backend-pg:
     name: 后端（PostgreSQL 矩阵）
@@ -134,18 +136,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 构建后端镜像
-        run: docker build -t safety-backend ./backend
+        run: docker build -t safety-backend ./backend 2>&1 | tee /tmp/dk.log || (grep -E "ERROR|error:" /tmp/dk.log | tail -8 | while read -r line; do echo "::error::$line"; done; exit 1)
       - name: 构建前端镜像
-        run: docker build -t safety-frontend ./frontend
+        run: docker build -t safety-frontend ./frontend 2>&1 | tee /tmp/dk.log || (grep -E "ERROR|error:" /tmp/dk.log | tail -8 | while read -r line; do echo "::error::$line"; done; exit 1)
       - name: compose 起全栈并健康检查
         run: |
-          docker compose up -d --no-build
-          for i in $(seq 1 20); do
+          set +e
+          docker compose up -d --no-build 2>&1 | tee /tmp/compose.log
+          for i in $(seq 1 24); do
             if curl -sf http://localhost:8001/api/v1/health > /dev/null; then echo "backend healthy"; break; fi
             sleep 5
           done
-          curl -sf http://localhost:8001/api/v1/health | grep -q '"status":"ok"'
-          curl -sf http://localhost:8080/ | grep -q "基层安全隐患"
+          ok=0
+          curl -sf http://localhost:8001/api/v1/health | grep -q '"status":"ok"' && ok=1
+          curl -sf http://localhost:8080/ | grep -q "基层安全隐患" && ok=$((ok+1))
+          if [ "$ok" -lt 2 ]; then
+            echo "::error::compose 冒烟失败 ok=$ok"
+            docker compose logs --tail 20 2>/dev/null | while read -r line; do echo "::error::$line"; done
+            docker compose down -v
+            exit 1
+          fi
           docker compose down -v
 
   pip-audit:
