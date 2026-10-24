@@ -135,14 +135,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 构建后端镜像
-        run: docker build -t safety-backend ./backend 2>&1 | tee /tmp/dk.log || (grep -E "ERROR|error:" /tmp/dk.log | tail -8 | while read -r line; do echo "::error::$line"; done; exit 1)
-      - name: 构建前端镜像
-        run: docker build -t safety-frontend ./frontend 2>&1 | tee /tmp/dk.log || (grep -E "ERROR|error:" /tmp/dk.log | tail -8 | while read -r line; do echo "::error::$line"; done; exit 1)
-      - name: compose 起全栈并健康检查
+      - name: compose 构建并起全栈
+        run: docker compose up -d --build 2>&1 | tee /tmp/compose.log || (grep -E "ERROR|error:" /tmp/compose.log | tail -8 | while read -r line; do echo "::error::$line"; done; exit 1)
+      - name: 全栈健康检查
         run: |
           set +e
-          docker compose up -d --no-build 2>&1 | tee /tmp/compose.log
           for i in $(seq 1 24); do
             if curl -sf http://localhost:8001/api/v1/health > /dev/null; then echo "backend healthy"; break; fi
             sleep 5
