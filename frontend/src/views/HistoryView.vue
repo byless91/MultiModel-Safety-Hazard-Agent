@@ -64,7 +64,10 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { ElMessage } from 'element-plus'
+
 import { useAssessmentStore } from '../stores/assessment'
+import { extractError } from '../utils/errors'
 import type { Assessment } from '../types'
 
 const router = useRouter()
@@ -75,7 +78,11 @@ const statusFilter = ref('')
 onMounted(load)
 
 async function load() {
-  items.value = await store.list(statusFilter.value || undefined)
+  try {
+    items.value = await store.list(statusFilter.value || undefined)
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 function open(id: string) {

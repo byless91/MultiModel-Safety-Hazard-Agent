@@ -31,6 +31,7 @@
 
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
+import { extractError } from '../utils/errors'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -57,13 +58,21 @@ async function load() {
 
 async function onFollowup(answer: string) {
   if (!assessment.value) return
-  assessment.value = await store.followup(assessment.value.id, answer)
+  try {
+    assessment.value = await store.followup(assessment.value.id, answer)
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 async function onConfirm() {
   if (!assessment.value) return
-  assessment.value = await store.confirm(assessment.value.id, true, {})
-  ElMessage.success('结果已确认')
+  try {
+    assessment.value = await store.confirm(assessment.value.id, true, {})
+    ElMessage.success('结果已确认')
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 function onUpdated(updated: Assessment) {

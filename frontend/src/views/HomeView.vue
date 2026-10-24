@@ -122,8 +122,13 @@ async function submit() {
   const files = fileList.value
     .map((item) => (item.raw ? item.raw : (item as unknown as File)))
     .filter((item) => item instanceof File)
-  assessment.value = await store.create(description.value.trim(), files)
-  ElMessage.success('研判完成')
+  try {
+    assessment.value = await store.create(description.value.trim(), files)
+    ElMessage.success('研判完成')
+  } catch (err) {
+    // store.error 已在页面展示，这里只吞掉未处理的 Promise rejection
+    console.warn('研判失败', err)
+  }
 }
 
 async function onFollowup(answer: string) {

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 
 import { api } from '../api/client'
+import { extractError } from '../utils/errors'
 import type {
   Assessment,
   JobOut,
@@ -243,11 +244,3 @@ export const useAssessmentStore = defineStore('assessment', {
     },
   },
 })
-
-function extractError(err: unknown): string {
-  if (typeof err === 'object' && err !== null) {
-    const anyErr = err as { response?: { data?: { detail?: string } }; message?: string }
-    return anyErr.response?.data?.detail || anyErr.message || '请求失败'
-  }
-  return String(err)
-}

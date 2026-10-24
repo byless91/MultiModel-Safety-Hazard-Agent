@@ -78,6 +78,7 @@
 
 <script setup lang="ts">
 import { ElMessage, type UploadFile } from 'element-plus'
+import { extractError } from '../utils/errors'
 import { onMounted, ref } from 'vue'
 
 import { useAssessmentStore } from '../stores/assessment'
@@ -99,7 +100,11 @@ const rebuildResult = ref<{
 onMounted(load)
 
 async function load() {
-  documents.value = await store.listDocuments()
+  try {
+    documents.value = await store.listDocuments()
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 function onFileChange(file: UploadFile) {
@@ -125,19 +130,31 @@ async function upload() {
 }
 
 async function rebuild() {
-  rebuildResult.value = await store.rebuildKnowledge()
-  ElMessage.success('知识库已重建')
+  try {
+    rebuildResult.value = await store.rebuildKnowledge()
+    ElMessage.success('知识库已重建')
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 async function openPreview(id: string) {
-  preview.value = await store.getDocument(id)
-  previewOpen.value = true
+  try {
+    preview.value = await store.getDocument(id)
+    previewOpen.value = true
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 async function remove(id: string) {
-  await store.deleteDocument(id)
-  ElMessage.success('文档已删除并已重建知识库')
-  await load()
+  try {
+    await store.deleteDocument(id)
+    ElMessage.success('文档已删除并已重建知识库')
+    await load()
+  } catch (err) {
+    ElMessage.error(extractError(err))
+  }
 }
 
 function formatTime(value: string) {
