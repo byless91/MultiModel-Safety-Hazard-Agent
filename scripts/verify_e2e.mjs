@@ -34,7 +34,9 @@ try {
   }
 
   async function expectText(text, timeout = 15000) {
-    await page.getByText(text).first().waitFor({ timeout })
+    // 子串匹配必须过滤隐藏元素：非激活页签里的复核原因等文本
+    // （如"法规证据不足：…"）会抢先命中 DOM 序更靠前的隐藏节点
+    await page.getByText(text).filter({ visible: true }).first().waitFor({ timeout })
   }
 
   await page.goto(BASE, { waitUntil: 'domcontentloaded' })
