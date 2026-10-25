@@ -34,46 +34,60 @@ class Base(DeclarativeBase):
 
 
 def stamp_if_unversioned(db_engine) -> bool:
-    """create_all 引导出的库（无 alembic_version）自动 stamp 到 head。
+    """create_all 引导但未版本化的库：stamp 到 base 再由 init_db upgrade 调和。
 
-    create_all 产出的必然是当前模型的完整结构，等价于 head；
-    不 stamp 的话，后续 `alembic upgrade head` 会重放全部迁移并撞
-    "table already exists"。返回是否执行了 stamp。
+    create_all 只补表不加列，半新半旧的库不能直接 stamp head（会跳过
+    补列迁移），因此 stamp 到 baseline，随后的 upgrade head 借助各迁移的
+    存在性守卫把缺口补齐。返回是否执行了 stamp。
     """
     from alembic import command
     from alembic.config import Config
     from sqlalchemy import inspect
 
-    inspector = inspect(db_engine)
-    tables = inspector.get_table_names()
+    tables = inspect(db_engine).get_table_names()
     if not tables or "alembic_version" in tables:
         return False
     backend_dir = Path(__file__).resolve().parents[2]
     config = Config(str(backend_dir / "alembic.ini"))
     config.set_main_option("script_location", str(backend_dir / "migrations"))
-    # str(url) 会把密码渲染成 ***，必须用 render_as_string 显式保留；
-    # configparser 的 % 是插值语法，Windows 盘符 URL（C%3A）需转义
+    # configparser 的 % 是插值语法，Windows 盘符 URL（C%3A）需转义；
+    # str(url) 会把密码渲染成 ***，必须用 render_as_string 显式保留
     raw_url = db_engine.url.render_as_string(hide_password=False)
     config.set_main_option("sqlalchemy.url", raw_url.replace("%", "%%"))
-    command.stamp(config, "head")
+    command.stamp(config, "base")
     return True
 
 
-def init_db() -> None:
-    """Bootstrap missing tables only; all schema evolution goes through Alembic.
+def upgrade_to_head(db_engine) -> None:
+    """把任意状态的库调和到 head（带守卫的迁移可安全重入）。"""
+    from alembic import command
+    from alembic.config import Config
 
-    create_all 只负责为全新空库（开发/测试）补齐缺失的表，不会修改已存在
-    的表结构。任何列级变更（新增/修改/删除列）必须通过 Alembic 迁移：
-    `uv run alembic revision --autogenerate -m "..."` 后随代码提交，
-    部署时执行 `uv run alembic upgrade head`。
+    backend_dir = Path(__file__).resolve().parents[2]
+    config = Config(str(backend_dir / "alembic.ini"))
+    config.set_main_option("script_location", str(backend_dir / "migrations"))
+    raw_url = db_engine.url.render_as_string(hide_password=False)
+    config.set_main_option("sqlalchemy.url", raw_url.replace("%", "%%"))
+    command.upgrade(config, "head")
+
+
+def init_db() -> None:
+    """把任意状态的库调和到当前模型：全新/半旧/已版本化三条路径统一。
+
+    - 全新空库：create_all 直接建成当前结构 → stamp base → upgrade（守卫全部空转）
+    - 旧库（pre-alembic 或 create_all 半引导）：create_all 补缺失的表 →
+      stamp base → upgrade 借助迁移守卫补缺失的列
+    - 已版本化：upgrade 直接追平（通常为 no-op）
+    列级变更必须通过 Alembic 迁移提交，create_all 永不修改既有表。
     """
     from app.models import entities  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     try:
         stamp_if_unversioned(engine)
+        upgrade_to_head(engine)
     except Exception:
-        logger.warning("alembic 版本标记失败（不影响启动，下次将重试）", exc_info=True)
+        logger.warning("数据库调和失败（不影响启动，下次将重试）", exc_info=True)
 
 
 def get_db():

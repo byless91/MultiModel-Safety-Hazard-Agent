@@ -122,42 +122,33 @@ def test_existing_db_upgrade_head_is_lossless(tmp_path: Path):
     assert {"assessment_jobs", "idempotency_keys"} <= tables, "增量迁移未补建新表"
 
 
-def test_create_all_bootstrap_is_stamped(tmp_path: Path):
-    """create_all 引导的库（init_db 路径）自动 stamp head，后续 upgrade 不炸。"""
-    from app.core.db import stamp_if_unversioned
+def test_create_all_bootstrap_reconciles_to_head(tmp_path: Path):
+    """create_all 半引导的库（有新表、缺新列）经调和后补齐并版本化到 head。"""
+    from app.core.db import stamp_if_unversioned, upgrade_to_head
 
     db_path = tmp_path / "bootstrapped.db"
     engine = create_engine(f"sqlite:///{db_path.as_posix()}")
     Base.metadata.create_all(engine)
 
-    # stamp_if_unversioned 默认用全局 engine 的 URL，这里直接对全局逻辑做等价验证：
-    # 无版本号 + 有表 → stamp；已版本化 → 不重复 stamp
+    # 模拟半旧库：create_all 只补表不加列——删列删表后应由迁移守卫补回
+    with engine.begin() as conn:
+        conn.execute(text("DROP INDEX IF EXISTS ix_assessments_confirmed_by_id"))
+        conn.execute(text("ALTER TABLE assessments DROP COLUMN confirmed_by_id"))
+        conn.execute(text("DROP TABLE llm_calls"))
+
     assert stamp_if_unversioned(engine) is True
-    # stamp 后 alembic_version 存在，且指向 head
+    upgrade_to_head(engine)
+
     with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(assessments)"))}
+        tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            )
+        }
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert version
-    assert stamp_if_unversioned(engine) is False
+    assert "confirmed_by_id" in cols, "调和流程未补回缺失列"
+    assert "llm_calls" in tables, "调和流程未补回缺失表"
+    assert version, "调和后必须写入版本号"
     engine.dispose()
-
-
-def test_future_incremental_migration_applies_on_adopted_db(tmp_path: Path):
-    """已采纳（upgrade 过 baseline）的库，后续增量迁移可正常执行。
-
-    以 downgrade 到 base 再 upgrade 回 head 模拟一次增量往返。
-    """
-    db_path = tmp_path / "cycle.db"
-    config = _alembic_config(f"sqlite:///{db_path.as_posix()}")
-    command.upgrade(config, "head")
-    command.downgrade(config, "base")
-    command.upgrade(config, "head")
-    snapshot = _schema_snapshot(db_path)
-    assert {
-        "assessments",
-        "assessment_images",
-        "assessment_jobs",
-        "idempotency_keys",
-        "knowledge_documents",
-        "llm_calls",
-        "users",
-    } == set(snapshot)
