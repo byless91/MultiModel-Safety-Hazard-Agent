@@ -115,9 +115,9 @@ const agreementPercent = computed(() =>
 )
 
 const agreementColor = computed(() => {
-  if (agreementPercent.value >= 80) return '#16a34a'
-  if (agreementPercent.value >= 60) return '#d97706'
-  return '#dc2626'
+  if (agreementPercent.value >= 80) return '#34d399'
+  if (agreementPercent.value >= 60) return '#fbbf24'
+  return '#f87171'
 })
 
 const modeLabel = computed(() => {
@@ -181,14 +181,14 @@ function confidenceText(value: number) {
 
 .viz-score-label,
 .viz-section-title {
-  color: #334155;
+  color: #ccd4de;
   font-size: 13px;
   font-weight: 600;
 }
 
 .viz-score-hint {
   margin: 0;
-  color: #94a3b8;
+  color: #8a93a2;
   font-size: 12px;
 }
 
@@ -204,16 +204,16 @@ function confidenceText(value: number) {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  color: #475569;
+  color: #b3bcc8;
   font-size: 13px;
 }
 
 .flag-ok {
-  color: #16a34a;
+  color: #34d399;
 }
 
 .flag-bad {
-  color: #dc2626;
+  color: #f87171;
 }
 
 .viz-reasons {
@@ -223,7 +223,7 @@ function confidenceText(value: number) {
 .viz-reasons ul {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #b45309;
+  color: #fbbf24;
   font-size: 13px;
 }
 
@@ -240,8 +240,8 @@ function confidenceText(value: number) {
 
 .pair-card {
   padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 6px;
 }
 
@@ -254,7 +254,7 @@ function confidenceText(value: number) {
 }
 
 .pair-category {
-  color: #1e3a8a;
+  color: #7dd3fc;
   font-size: 13px;
   font-weight: 600;
 }
@@ -265,7 +265,7 @@ function confidenceText(value: number) {
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
-  color: #475569;
+  color: #b3bcc8;
   font-size: 12px;
 }
 
@@ -276,7 +276,7 @@ function confidenceText(value: number) {
 
 .viz-no-pair {
   margin: 0;
-  color: #64748b;
+  color: #9aa3af;
   font-size: 13px;
 }
 </style>

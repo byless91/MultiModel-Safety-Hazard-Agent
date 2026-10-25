@@ -110,7 +110,7 @@ function statusTag(item: EvidenceItem): 'success' | 'warning' | 'info' {
 }
 
 .legal-count {
-  color: #475569;
+  color: #b3bcc8;
   font-size: 13px;
 }
 
@@ -122,8 +122,8 @@ function statusTag(item: EvidenceItem): 'success' | 'warning' | 'info' {
 
 .legal-item {
   padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 6px;
 }
 
@@ -143,7 +143,7 @@ function statusTag(item: EvidenceItem): 'success' | 'warning' | 'info' {
 
 .legal-source {
   font-weight: 600;
-  color: #155e75;
+  color: #38bdf8;
   font-size: 13px;
 }
 
@@ -154,7 +154,7 @@ function statusTag(item: EvidenceItem): 'success' | 'warning' | 'info' {
 
 .legal-source-line {
   margin: 6px 0 0;
-  color: #64748b;
+  color: #9aa3af;
   font-size: 12px;
 }
 
@@ -163,13 +163,13 @@ function statusTag(item: EvidenceItem): 'success' | 'warning' | 'info' {
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 8px;
-  color: #64748b;
+  color: #9aa3af;
   font-size: 12px;
 }
 
 .legal-text {
   margin: 8px 0 0;
-  color: #475569;
+  color: #b3bcc8;
   font-size: 13px;
 }
 
@@ -182,7 +182,7 @@ function statusTag(item: EvidenceItem): 'success' | 'warning' | 'info' {
 
 .legal-demo {
   margin: 8px 0 0;
-  color: #b45309;
+  color: #fbbf24;
   font-size: 12px;
 }
 </style>

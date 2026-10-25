@@ -309,7 +309,7 @@ const canReopen = computed(
 
 const rectColor = computed(() => {
   const score = props.assessment.rectification_score ?? 0
-  return score >= 0.8 ? '#15803d' : score >= 0.5 ? '#b45309' : '#94a3b8'
+  return score >= 0.8 ? '#34d399' : score >= 0.5 ? '#fbbf24' : '#8a93a2'
 })
 
 function byImageTime(

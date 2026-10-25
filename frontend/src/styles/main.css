@@ -1,34 +1,59 @@
-/* Design tokens: one radius scale, one spacing scale, one type scale. */
+/*
+ * 设计令牌：Solid Glass 材质（参考 deeplethe/solid-glass 设计系统）
+ *
+ * 四法则：
+ *   1. 光在边缘——rim（顶部内发光）+ 发丝线（全周）+ 底部投影，面上零渐变；
+ *   2. 厚重不飘——中性灰烟熏玻璃，模糊柔化背景但不放大其色彩；
+ *   3. 厚度即层级——panel（最薄）< card < popover（最厚、近乎实心）；
+ *   4. 状态唯一——hover/选中/激活共用同一块小玻璃。
+ *
+ * 旧令牌名全部保留，各视图 scoped 样式自动换肤。
+ */
 :root {
-  /* Brand */
-  --brand: #155e75;
-  --brand-dark: #164e63;
-  --brand-soft: #ecfeff;
+  /* 品牌：深底上的青蓝强调色 */
+  --brand: #38bdf8;
+  --brand-strong: #7dd3fc;
+  --brand-dark: #10171d; /* 兼容旧名：深玻璃底 */
+  --brand-soft: rgba(56, 189, 248, 0.12);
 
-  /* Surfaces. Cards use a hairline border, never border + shadow. */
-  --bg: #f4f6f8;
-  --panel: #ffffff;
-  --panel-2: #f8fafc;
-  --border: #e3e8ef;
-  --border-strong: #cbd5e1;
+  /* 玻璃厚度刻度（核心） */
+  --sg-panel: rgba(255, 255, 255, 0.045); /* 最薄：顶栏、工具条 */
+  --sg-card: rgba(148, 158, 175, 0.13); /* 中厚：内容卡片 */
+  --sg-state: rgba(255, 255, 255, 0.07); /* 唯一状态玻璃 */
+  --sg-popover: #212429; /* 最厚：弹层、对话框（近实心） */
 
-  /* Text */
-  --text: #1f2937;
-  --text-strong: #0f172a;
-  --muted: #6b7280;
+  /* 边缘配方：rim + 发丝线 + 投影 */
+  --sg-rim: rgba(255, 255, 255, 0.16); /* 顶部一线光 */
+  --sg-rim-soft: rgba(255, 255, 255, 0.1);
+  --sg-hairline: rgba(255, 255, 255, 0.07);
+  --sg-blur: blur(26px);
+  --sg-shadow: 0 10px 28px rgba(0, 0, 0, 0.38), 0 2px 6px rgba(0, 0, 0, 0.28);
 
-  /* Semantic states */
-  --danger: #b91c1c;
-  --warning: #b45309;
-  --success: #15803d;
+  /* 页面与表面（旧名兼容） */
+  --bg: #17191d;
+  --panel: var(--sg-card);
+  --panel-2: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  /* 文字 */
+  --text: #c9ced8;
+  --text-strong: #eef0f4;
+  --muted: #9aa3af;
+  --muted-deep: #6d7683;
+
+  /* 语义状态（暗底适配） */
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #34d399;
   --info: var(--brand);
 
-  /* Radius: cards 12px, controls 8px, small tags pill. */
-  --r-card: 12px;
-  --r-control: 8px;
+  /* 圆角：卡片 14px、控件 11px（对齐参考项目 0.875rem / 0.7rem） */
+  --r-card: 14px;
+  --r-control: 11px;
   --r-pill: 999px;
 
-  /* Spacing scale */
+  /* 间距刻度 */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -36,7 +61,7 @@
   --s-5: 24px;
   --s-6: 32px;
 
-  /* Type scale, fixed px for a consistent-DPI product UI */
+  /* 字号刻度 */
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-md: 14px;
@@ -44,7 +69,7 @@
   --fs-xl: 20px;
   --fs-2xl: 24px;
 
-  --shadow-pop: 0 8px 24px rgba(15, 23, 42, 0.1);
+  --shadow-pop: var(--sg-shadow);
 }
 
 * {
@@ -58,6 +83,10 @@ body,
   margin: 0;
 }
 
+html {
+  color-scheme: dark;
+}
+
 body {
   color: var(--text);
   background: var(--bg);
@@ -66,10 +95,9 @@ body {
   line-height: 1.6;
 }
 
-/* Browser surfaces carry the design too. */
 ::selection {
-  background: #bae6fd;
-  color: #0c4a6e;
+  background: rgba(56, 189, 248, 0.32);
+  color: #f0f9ff;
 }
 
 :focus-visible {
@@ -79,7 +107,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -88,14 +116,14 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
+  background: rgba(255, 255, 255, 0.16);
   border: 3px solid transparent;
   border-radius: var(--r-pill);
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgba(255, 255, 255, 0.28);
   background-clip: content-box;
 }
 
@@ -128,44 +156,218 @@ body {
   font-size: var(--fs-md);
 }
 
-/* Element Plus alignment with the token set. */
+/* ---------- 玻璃面板配方（法则 1/2/3 的实现） ---------- */
+
+.glass-pane,
 .el-card {
+  background: var(--sg-card);
+  border: 1px solid var(--sg-hairline);
   border-radius: var(--r-card);
-  border-color: var(--border);
-  box-shadow: none;
+  backdrop-filter: var(--sg-blur);
+  -webkit-backdrop-filter: var(--sg-blur);
+  box-shadow:
+    inset 0 1px 0 var(--sg-rim),
+    var(--sg-shadow);
+}
+
+.glass-panel-thin {
+  background: var(--sg-panel);
+  border: 1px solid var(--sg-hairline);
+  backdrop-filter: var(--sg-blur);
+  -webkit-backdrop-filter: var(--sg-blur);
+  box-shadow: inset 0 1px 0 var(--sg-rim-soft);
+}
+
+/* ---------- Element Plus 玻璃化 ---------- */
+
+html.dark {
+  --el-bg-color: #1d2026; /* 弹层基底（厚度最高） */
+  --el-bg-color-overlay: var(--sg-popover);
+  --el-fill-color-blank: #16181c; /* 输入井：比卡片更深 */
+  --el-fill-color-light: var(--sg-state);
+  --el-fill-color: rgba(255, 255, 255, 0.09);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.05);
+  --el-border-color: rgba(255, 255, 255, 0.1);
+  --el-border-color-light: rgba(255, 255, 255, 0.07);
+  --el-border-color-lighter: var(--sg-hairline);
+  --el-text-color-primary: #eef0f4;
+  --el-text-color-regular: #c9ced8;
+  --el-text-color-secondary: #9aa3af;
+  --el-text-color-placeholder: #6d7683;
+  --el-color-primary: #38bdf8;
+  --el-color-primary-light-3: #5cc8fa;
+  --el-color-primary-light-5: #2a8ab8;
+  --el-color-primary-light-7: #1a5c7c;
+  --el-color-primary-light-8: #124153;
+  --el-color-primary-light-9: rgba(56, 189, 248, 0.14);
+  --el-color-primary-dark-2: #7dd3fc;
+  --el-mask-color: rgba(10, 11, 13, 0.6);
+}
+
+.el-card {
+  --el-card-bg-color: transparent;
+  border-color: var(--sg-hairline);
+  color: var(--text);
 }
 
 .el-card__header {
   padding: var(--s-3) var(--s-4);
   font-weight: 600;
   color: var(--text-strong);
+  border-bottom-color: var(--sg-hairline);
 }
 
 .el-card__body {
   padding: var(--s-4);
 }
 
+/* 主按钮：参考项目的招牌——白色实心 pane + 深色文字 + 顶部一线光 */
 .el-button {
   border-radius: var(--r-control);
 }
 
+.el-button--primary {
+  background: #e8eaef;
+  border-color: #e8eaef;
+  color: #17191d;
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: #f4f5f8;
+  border-color: #f4f5f8;
+  color: #101215;
+}
+
+.el-button--primary.is-disabled,
+.el-button--primary.is-disabled:hover {
+  background: rgba(232, 234, 239, 0.4);
+  border-color: transparent;
+  color: rgba(23, 25, 29, 0.5);
+}
+
+/* 默认按钮：玻璃控件 */
+.el-button--default {
+  background: var(--sg-state);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e6e9ee;
+  box-shadow: inset 0 1px 0 var(--sg-rim-soft);
+}
+
+.el-button--default:hover,
+.el-button--default:focus {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.el-button--danger {
+  background: rgba(248, 113, 113, 0.16);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.el-button--danger:hover {
+  background: rgba(248, 113, 113, 0.26);
+  color: #fecaca;
+}
+
+/* 输入井：比卡片更深的凹陷，顶部不进光（凹面） */
 .el-input__wrapper,
 .el-textarea__inner,
 .el-select__wrapper {
   border-radius: var(--r-control);
 }
 
+.el-input__wrapper,
+.el-textarea__inner {
+  background-color: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px var(--sg-hairline) inset;
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus {
+  box-shadow:
+    0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(56, 189, 248, 0.45) inset;
+}
+
+/* 表格 */
 .el-table {
-  --el-table-border-color: var(--border);
+  --el-table-border-color: var(--sg-hairline);
   --el-table-header-text-color: var(--muted);
+  --el-table-tr-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--sg-state);
+  color: var(--text);
 }
 
 .el-table th.el-table__cell {
-  background: var(--panel-2);
+  background: rgba(255, 255, 255, 0.04);
   font-weight: 600;
 }
 
-/* Keep transient messages clear of the fixed-height top bar. */
+/* 页签：状态唯一的玻璃小块 */
+.el-tabs__item {
+  color: var(--muted);
+}
+
+.el-tabs__item.is-active {
+  color: var(--text-strong);
+}
+
+.el-tabs__nav-wrap::after {
+  background-color: var(--sg-hairline);
+}
+
+.el-tabs__active-bar {
+  background-color: var(--brand);
+}
+
+/* 弹层与对话框：最厚的玻璃 */
+.el-dialog {
+  border-radius: var(--r-card);
+  border: 1px solid var(--sg-hairline);
+  background: var(--sg-popover);
+  box-shadow:
+    inset 0 1px 0 var(--sg-rim),
+    0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.el-popper.is-light {
+  background: var(--sg-popover);
+  border: 1px solid var(--sg-hairline);
+  box-shadow: inset 0 1px 0 var(--sg-rim-soft), var(--sg-shadow);
+}
+
+/* 标签：状态色玻璃化 */
+.el-tag {
+  border-radius: var(--r-control);
+  background: var(--sg-state);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+/* 步骤条 */
+.el-step__title {
+  color: var(--muted);
+}
+
+.el-step__title.is-process {
+  color: var(--text-strong);
+}
+
+.el-step__head.is-finish .el-step__icon {
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* 临时消息避开固定顶栏 */
 .el-message {
   top: 68px !important;
 }

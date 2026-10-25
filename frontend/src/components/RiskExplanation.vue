@@ -128,9 +128,9 @@ const factorRows = computed(() => {
 })
 
 const scoreColor = computed(() => {
-  if (score.value >= 70) return '#dc2626'
-  if (score.value >= 40) return '#d97706'
-  return '#16a34a'
+  if (score.value >= 70) return '#f87171'
+  if (score.value >= 40) return '#fbbf24'
+  return '#34d399'
 })
 
 const levelText = computed(() => {
@@ -227,13 +227,13 @@ const triggeredRules = computed(() =>
 
 .explain-score-label,
 .explain-section-title {
-  color: #334155;
+  color: #ccd4de;
   font-size: 13px;
   font-weight: 600;
 }
 
 .explain-level {
-  color: #475569;
+  color: #b3bcc8;
   font-size: 13px;
 }
 
@@ -249,21 +249,21 @@ const triggeredRules = computed(() =>
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  color: #475569;
+  color: #b3bcc8;
   font-size: 13px;
 }
 
 .rule-version {
-  color: #94a3b8;
+  color: #8a93a2;
   font-size: 12px;
 }
 
 .flag-ok {
-  color: #16a34a;
+  color: #34d399;
 }
 
 .flag-bad {
-  color: #dc2626;
+  color: #f87171;
 }
 
 .factor-table {
@@ -277,7 +277,7 @@ const triggeredRules = computed(() =>
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #475569;
+  color: #b3bcc8;
   font-size: 12px;
 }
 
@@ -292,7 +292,7 @@ const triggeredRules = computed(() =>
 }
 
 .factor-contribution {
-  color: #64748b;
+  color: #9aa3af;
   white-space: nowrap;
 }
 
@@ -302,7 +302,7 @@ const triggeredRules = computed(() =>
   background: #f0f9ff;
   border: 1px solid #bae6fd;
   border-radius: 6px;
-  color: #0c4a6e;
+  color: #7dd3fc;
   font-size: 12px;
 }
 
@@ -315,7 +315,7 @@ const triggeredRules = computed(() =>
 .explain-evidence ul {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #475569;
+  color: #b3bcc8;
   font-size: 12px;
 }
 
@@ -326,17 +326,17 @@ const triggeredRules = computed(() =>
 
 .rule-name {
   margin-right: 8px;
-  color: #334155;
+  color: #ccd4de;
   font-weight: 600;
 }
 
 .rule-raw {
-  color: #64748b;
+  color: #9aa3af;
 }
 
 .explain-empty {
   margin: 8px 0 0;
-  color: #94a3b8;
+  color: #8a93a2;
   font-size: 12px;
 }
 </style>

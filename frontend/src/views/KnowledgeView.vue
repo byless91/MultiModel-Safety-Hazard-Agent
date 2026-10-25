@@ -186,7 +186,7 @@ function formatTime(value: string) {
 }
 
 .rebuild-tip {
-  color: #64748b;
+  color: #9aa3af;
   margin: 10px 0 0;
 }
 

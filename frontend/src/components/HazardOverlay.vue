@@ -210,7 +210,7 @@ const hasAnyPlausibleBox = computed(() =>
 }
 
 .overlay-filename {
-  color: #334155;
+  color: #ccd4de;
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
@@ -223,9 +223,9 @@ const hasAnyPlausibleBox = computed(() =>
   width: 100%;
   max-width: 420px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255,255,255,0.10);
   border-radius: 6px;
-  background: #f8fafc;
+  background: rgba(255,255,255,0.05);
 }
 
 .bbox-img {
@@ -237,7 +237,7 @@ const hasAnyPlausibleBox = computed(() =>
 
 .bbox-overlay {
   position: absolute;
-  border: 2px solid #ef4444;
+  border: 2px solid #f87171;
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
 }
@@ -247,7 +247,7 @@ const hasAnyPlausibleBox = computed(() =>
   top: -20px;
   left: -2px;
   padding: 1px 6px;
-  background: #ef4444;
+  background: #f87171;
   color: #ffffff;
   font-size: 11px;
   border-radius: 3px;
@@ -259,19 +259,19 @@ const hasAnyPlausibleBox = computed(() =>
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed rgba(255,255,255,0.16);
   border-radius: 6px;
-  color: #94a3b8;
+  color: #8a93a2;
   font-size: 12px;
 }
 
 .overlay-note {
   margin: 12px 0 0;
   padding: 8px 10px;
-  background: #fffbeb;
+  background: rgba(251,191,36,0.10);
   border: 1px solid #fde68a;
   border-radius: 6px;
-  color: #b45309;
+  color: #fbbf24;
   font-size: 12px;
 }
 </style>

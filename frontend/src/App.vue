@@ -73,8 +73,16 @@ onMounted(async () => {
   min-height: 100vh;
 }
 
+/* 顶栏：最薄的玻璃面板（法则 3），悬浮于内容之上 */
 .topbar {
-  background: var(--brand-dark);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--sg-panel);
+  border-bottom: 1px solid var(--sg-hairline);
+  backdrop-filter: var(--sg-blur);
+  -webkit-backdrop-filter: var(--sg-blur);
+  box-shadow: inset 0 1px 0 var(--sg-rim-soft);
 }
 
 .topbar-inner {
@@ -97,7 +105,7 @@ onMounted(async () => {
 }
 
 .brand-icon {
-  color: #7dd3fc;
+  color: var(--brand, #7dd3fc);
 }
 
 .nav {
@@ -109,13 +117,13 @@ onMounted(async () => {
 .nav-link {
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-control);
-  color: #cbd5e1;
+  color: rgba(255,255,255,0.16);
   text-decoration: none;
   transition: background-color 0.16s ease, color 0.16s ease;
 }
 
 .nav-link:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--sg-state, rgba(255, 255, 255, 0.08));
   color: #ffffff;
 }
 
@@ -123,6 +131,7 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.14);
   color: #ffffff;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .mode-tag {
@@ -130,7 +139,7 @@ onMounted(async () => {
 }
 
 .logout-btn {
-  color: #cbd5e1;
+  color: rgba(255,255,255,0.16);
   margin-left: calc(var(--s-1) * -1);
 }
 
