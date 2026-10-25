@@ -199,6 +199,7 @@ import { computed, ref } from 'vue'
 
 import { useAssessmentStore } from '../stores/assessment'
 import type { Assessment } from '../types'
+import { themeColor } from '../utils/theme-color'
 import {
   RECT_LABELS,
   RECT_STEPS,
@@ -309,7 +310,9 @@ const canReopen = computed(
 
 const rectColor = computed(() => {
   const score = props.assessment.rectification_score ?? 0
-  return score >= 0.8 ? '#34d399' : score >= 0.5 ? '#fbbf24' : '#8a93a2'
+  if (score >= 0.8) return themeColor('--success')
+  if (score >= 0.5) return themeColor('--warning')
+  return themeColor('--danger')
 })
 
 function byImageTime(

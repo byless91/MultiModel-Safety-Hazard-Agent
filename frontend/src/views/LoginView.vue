@@ -114,7 +114,7 @@ async function onLogin() {
 }
 
 .login-sub {
-  color: var(--text-secondary, #9aa3af);
+  color: var(--text-secondary, var(--muted));
   font-size: var(--fs-sm);
   margin: 0;
 }

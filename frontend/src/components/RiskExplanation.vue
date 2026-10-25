@@ -72,6 +72,7 @@
 import { computed } from 'vue'
 
 import type { Assessment } from '../types'
+import { themeColor } from '../utils/theme-color'
 
 const props = defineProps<{
   assessment: Assessment
@@ -128,9 +129,9 @@ const factorRows = computed(() => {
 })
 
 const scoreColor = computed(() => {
-  if (score.value >= 70) return '#f87171'
-  if (score.value >= 40) return '#fbbf24'
-  return '#34d399'
+  if (score.value >= 70) return themeColor('--danger')
+  if (score.value >= 40) return themeColor('--warning')
+  return themeColor('--success')
 })
 
 const levelText = computed(() => {
@@ -227,13 +228,13 @@ const triggeredRules = computed(() =>
 
 .explain-score-label,
 .explain-section-title {
-  color: #ccd4de;
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
 }
 
 .explain-level {
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -249,21 +250,21 @@ const triggeredRules = computed(() =>
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .rule-version {
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 
 .flag-ok {
-  color: #34d399;
+  color: var(--success);
 }
 
 .flag-bad {
-  color: #f87171;
+  color: var(--danger);
 }
 
 .factor-table {
@@ -277,7 +278,7 @@ const triggeredRules = computed(() =>
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -292,17 +293,17 @@ const triggeredRules = computed(() =>
 }
 
 .factor-contribution {
-  color: #9aa3af;
+  color: var(--muted);
   white-space: nowrap;
 }
 
 .explain-formula {
   margin: 0 0 10px;
   padding: 8px 10px;
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #7dd3fc;
+  color: var(--brand-strong);
   font-size: 12px;
 }
 
@@ -315,7 +316,7 @@ const triggeredRules = computed(() =>
 .explain-evidence ul {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -326,17 +327,17 @@ const triggeredRules = computed(() =>
 
 .rule-name {
   margin-right: 8px;
-  color: #ccd4de;
+  color: var(--text);
   font-weight: 600;
 }
 
 .rule-raw {
-  color: #9aa3af;
+  color: var(--muted);
 }
 
 .explain-empty {
   margin: 8px 0 0;
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 </style>

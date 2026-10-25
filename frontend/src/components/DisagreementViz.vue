@@ -101,6 +101,7 @@
 import { computed } from 'vue'
 
 import type { Assessment } from '../types'
+import { themeColor } from '../utils/theme-color'
 
 const props = defineProps<{
   assessment: Assessment
@@ -115,9 +116,9 @@ const agreementPercent = computed(() =>
 )
 
 const agreementColor = computed(() => {
-  if (agreementPercent.value >= 80) return '#34d399'
-  if (agreementPercent.value >= 60) return '#fbbf24'
-  return '#f87171'
+  if (agreementPercent.value >= 80) return themeColor('--success')
+  if (agreementPercent.value >= 60) return themeColor('--warning')
+  return themeColor('--danger')
 })
 
 const modeLabel = computed(() => {
@@ -181,14 +182,14 @@ function confidenceText(value: number) {
 
 .viz-score-label,
 .viz-section-title {
-  color: #ccd4de;
+  color: var(--text);
   font-size: 13px;
   font-weight: 600;
 }
 
 .viz-score-hint {
   margin: 0;
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 
@@ -204,16 +205,16 @@ function confidenceText(value: number) {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .flag-ok {
-  color: #34d399;
+  color: var(--success);
 }
 
 .flag-bad {
-  color: #f87171;
+  color: var(--danger);
 }
 
 .viz-reasons {
@@ -223,7 +224,7 @@ function confidenceText(value: number) {
 .viz-reasons ul {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #fbbf24;
+  color: var(--warning);
   font-size: 13px;
 }
 
@@ -240,8 +241,8 @@ function confidenceText(value: number) {
 
 .pair-card {
   padding: 10px 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
@@ -254,7 +255,7 @@ function confidenceText(value: number) {
 }
 
 .pair-category {
-  color: #7dd3fc;
+  color: var(--brand-strong);
   font-size: 13px;
   font-weight: 600;
 }
@@ -265,7 +266,7 @@ function confidenceText(value: number) {
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -276,7 +277,7 @@ function confidenceText(value: number) {
 
 .viz-no-pair {
   margin: 0;
-  color: #9aa3af;
+  color: var(--muted);
   font-size: 13px;
 }
 </style>

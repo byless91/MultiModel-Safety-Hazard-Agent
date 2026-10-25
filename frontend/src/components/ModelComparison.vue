@@ -140,8 +140,8 @@ function confidenceText(value: number) {
 
 .model-card {
   padding: 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
@@ -155,7 +155,7 @@ function confidenceText(value: number) {
 .model-name {
   font-size: 15px;
   font-weight: 700;
-  color: #7dd3fc;
+  color: var(--brand-strong);
 }
 
 .model-meta {
@@ -163,32 +163,32 @@ function confidenceText(value: number) {
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 8px;
-  color: #9aa3af;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .model-error,
 .model-failed {
   margin: 0 0 8px;
-  color: #f87171;
+  color: var(--danger);
   font-size: 12px;
 }
 
 .model-fallback {
   margin: 0;
-  color: #fbbf24;
+  color: var(--warning);
   font-size: 12px;
 }
 
 .model-analysis-row {
   margin-bottom: 6px;
-  color: #ccd4de;
+  color: var(--text);
   font-size: 12px;
 }
 
 .model-hints {
   margin: 0 0 8px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -200,8 +200,8 @@ function confidenceText(value: number) {
 
 .model-finding {
   padding: 8px 10px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
@@ -209,27 +209,27 @@ function confidenceText(value: number) {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  color: #ccd4de;
+  color: var(--text);
   font-size: 12px;
   font-weight: 600;
 }
 
 .model-finding p {
   margin: 6px 0 0;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .fact-list {
   margin: 6px 0 0;
   padding-left: 16px;
-  color: #9aa3af;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .model-no-findings {
   margin: 0;
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 

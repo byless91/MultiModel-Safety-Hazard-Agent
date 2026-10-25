@@ -479,7 +479,7 @@ function extractDetail(err: unknown): string {
   margin: 0 var(--s-1) var(--s-1) 0;
   padding: 2px 8px;
   border-radius: var(--r-pill);
-  background: #fee2e2;
+  background: var(--danger-soft);
   color: var(--danger);
   font-size: var(--fs-xs);
 }

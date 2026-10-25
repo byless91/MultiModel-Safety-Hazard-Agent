@@ -21,6 +21,16 @@
         >
           {{ provider === 'mock' ? '演示模式' : '真实模型' }}
         </el-tag>
+        <el-tooltip :content="mode === 'dark' ? '切换到亮色模式' : '切换到暗色模式'" placement="bottom">
+          <button
+            class="theme-toggle"
+            type="button"
+            :aria-label="mode === 'dark' ? '切换到亮色模式' : '切换到暗色模式'"
+            @click="toggle"
+          >
+            <el-icon><Sunny v-if="mode === 'dark'" /><Moon v-else /></el-icon>
+          </button>
+        </el-tooltip>
         <template v-if="auth.isLoggedIn && auth.user">
           <el-tag class="mode-tag" size="small" type="info">
             {{ auth.user.username }}（{{ roleLabel }}）
@@ -40,11 +50,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { api } from './api/client'
+import { useTheme } from './composables/useTheme'
 import { useAuthStore } from './stores/auth'
 
 const provider = ref('')
 const auth = useAuthStore()
 const router = useRouter()
+const { mode, toggle } = useTheme()
 
 const ROLE_LABELS: Record<string, string> = {
   admin: '管理员',
@@ -98,14 +110,14 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  color: #ffffff;
+  color: var(--topbar-fg-active);
   font-size: var(--fs-lg);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .brand-icon {
-  color: var(--brand, #7dd3fc);
+  color: var(--brand, var(--brand-strong));
 }
 
 .nav {
@@ -117,21 +129,42 @@ onMounted(async () => {
 .nav-link {
   padding: var(--s-1) var(--s-3);
   border-radius: var(--r-control);
-  color: rgba(255,255,255,0.16);
+  color: var(--topbar-fg);
   text-decoration: none;
   transition: background-color 0.16s ease, color 0.16s ease;
 }
 
 .nav-link:hover {
-  background: var(--sg-state, rgba(255, 255, 255, 0.08));
-  color: #ffffff;
+  background: var(--surface-2);
+  color: var(--topbar-fg-active);
 }
 
 .nav-link.router-link-active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
+  background: var(--surface-3);
+  color: var(--topbar-fg-active);
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 var(--sg-rim-soft);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--topbar-fg);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 var(--sg-rim-soft);
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--surface-3);
+  color: var(--topbar-fg-active);
 }
 
 .mode-tag {
@@ -139,12 +172,12 @@ onMounted(async () => {
 }
 
 .logout-btn {
-  color: rgba(255,255,255,0.16);
+  color: var(--topbar-fg);
   margin-left: calc(var(--s-1) * -1);
 }
 
 .logout-btn:hover {
-  color: #ffffff;
+  color: var(--topbar-fg-active);
 }
 
 @media (max-width: 720px) {

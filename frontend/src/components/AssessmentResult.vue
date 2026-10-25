@@ -514,7 +514,7 @@ async function onDownload() {
 }
 
 .tab-badge--warn {
-  background: rgba(251,191,36,0.10);
+  background: var(--warning-soft);
   color: var(--warning);
 }
 
@@ -711,7 +711,7 @@ async function onDownload() {
   margin: 0 0 var(--s-3);
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-control);
-  background: rgba(251,191,36,0.10);
+  background: var(--warning-soft);
   color: var(--warning);
   font-size: var(--fs-sm);
 }

@@ -241,12 +241,12 @@ function evidenceVerdictText(finding: Finding) {
 }
 
 .overview-counts {
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .overview-version {
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 
@@ -258,8 +258,8 @@ function evidenceVerdictText(finding: Finding) {
 
 .chain-card {
   padding: 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
@@ -271,18 +271,18 @@ function evidenceVerdictText(finding: Finding) {
 }
 
 .chain-index {
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 
 .chain-category {
   font-weight: 600;
-  color: #7dd3fc;
+  color: var(--brand-strong);
 }
 
 .chain-description {
   margin: 0 0 12px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -296,7 +296,7 @@ function evidenceVerdictText(finding: Finding) {
 
 .chain-step-title {
   margin-bottom: 6px;
-  color: #ccd4de;
+  color: var(--text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -304,7 +304,7 @@ function evidenceVerdictText(finding: Finding) {
 .chain-list {
   margin: 0;
   padding-left: 18px;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -314,7 +314,7 @@ function evidenceVerdictText(finding: Finding) {
 
 .chain-none {
   margin: 0;
-  color: #fbbf24;
+  color: var(--warning);
   font-size: 13px;
 }
 
@@ -327,10 +327,10 @@ function evidenceVerdictText(finding: Finding) {
 
 .location-chip {
   padding: 3px 8px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--brand-soft);
   border-radius: 4px;
-  background: rgba(56,189,248,0.10);
-  color: #1e40af;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
   font-size: 12px;
 }
 
@@ -338,13 +338,13 @@ function evidenceVerdictText(finding: Finding) {
 .chain-risk,
 .chain-verdict {
   margin: 0;
-  color: #ccd4de;
+  color: var(--text);
   font-size: 13px;
 }
 
 .chain-version {
   margin-left: 8px;
-  color: #8a93a2;
+  color: var(--muted-deep);
   font-size: 12px;
 }
 
@@ -356,8 +356,8 @@ function evidenceVerdictText(finding: Finding) {
 
 .chain-evidence-item {
   padding: 8px 10px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
   border-radius: 6px;
 }
 
@@ -370,27 +370,27 @@ function evidenceVerdictText(finding: Finding) {
 
 .chain-evidence-source {
   font-weight: 600;
-  color: #38bdf8;
+  color: var(--brand);
   font-size: 12px;
 }
 
 .chain-evidence-article,
 .chain-evidence-score {
-  color: #9aa3af;
+  color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
 }
 
 .chain-evidence-text {
   margin: 6px 0 0;
-  color: #b3bcc8;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .chain-unsupported {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #fbbf24;
+  color: var(--warning);
   font-size: 12px;
 }
 </style>

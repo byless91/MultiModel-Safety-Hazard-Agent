@@ -7,46 +7,77 @@
  *   3. 厚度即层级——panel（最薄）< card < popover（最厚、近乎实心）；
  *   4. 状态唯一——hover/选中/激活共用同一块小玻璃。
  *
- * 旧令牌名全部保留，各视图 scoped 样式自动换肤。
+ * 双主题：暗色是材质的设计本体（html.dark），亮色是同一批玻璃的日光形态。
+ * 切换开关由 src/composables/useTheme.ts 控制 html 的 dark 类。
  */
 :root {
-  /* 品牌：深底上的青蓝强调色 */
-  --brand: #38bdf8;
-  --brand-strong: #7dd3fc;
-  --brand-dark: #10171d; /* 兼容旧名：深玻璃底 */
-  --brand-soft: rgba(56, 189, 248, 0.12);
+  /* ---- 日光形态（亮色） ---- */
+  color-scheme: light;
 
-  /* 玻璃厚度刻度（核心） */
-  --sg-panel: rgba(255, 255, 255, 0.045); /* 最薄：顶栏、工具条 */
-  --sg-card: rgba(148, 158, 175, 0.13); /* 中厚：内容卡片 */
-  --sg-state: rgba(255, 255, 255, 0.07); /* 唯一状态玻璃 */
-  --sg-popover: #212429; /* 最厚：弹层、对话框（近实心） */
+  /* 玻璃厚度刻度：亮色下是烟熏白玻璃 */
+  --sg-panel: rgba(255, 255, 255, 0.55);
+  --sg-card: rgba(255, 255, 255, 0.68);
+  --sg-state: rgba(15, 23, 42, 0.06);
+  --sg-popover: #ffffff;
 
-  /* 边缘配方：rim + 发丝线 + 投影 */
-  --sg-rim: rgba(255, 255, 255, 0.16); /* 顶部一线光 */
-  --sg-rim-soft: rgba(255, 255, 255, 0.1);
-  --sg-hairline: rgba(255, 255, 255, 0.07);
+  /* 边缘配方 */
+  --sg-rim: rgba(255, 255, 255, 0.95);
+  --sg-rim-soft: rgba(255, 255, 255, 0.6);
+  --sg-hairline: rgba(15, 23, 42, 0.08);
   --sg-blur: blur(26px);
-  --sg-shadow: 0 10px 28px rgba(0, 0, 0, 0.38), 0 2px 6px rgba(0, 0, 0, 0.28);
+  --sg-shadow:
+    0 10px 28px rgba(15, 23, 42, 0.1),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+
+  /* 表面填充（组件内芯片、内嵌面板用） */
+  --surface-1: rgba(15, 23, 42, 0.04);
+  --surface-2: rgba(15, 23, 42, 0.06);
+  --surface-3: rgba(15, 23, 42, 0.1);
 
   /* 页面与表面（旧名兼容） */
-  --bg: #17191d;
+  --bg: #e6e8ee;
   --panel: var(--sg-card);
-  --panel-2: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.18);
+  --panel-2: rgba(15, 23, 42, 0.035);
+  --border: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.22);
 
   /* 文字 */
-  --text: #c9ced8;
-  --text-strong: #eef0f4;
-  --muted: #9aa3af;
-  --muted-deep: #6d7683;
+  --text: #3b4351;
+  --text-strong: #16181d;
+  --muted: #5f6875;
+  --muted-deep: #8b93a0;
 
-  /* 语义状态（暗底适配） */
-  --danger: #f87171;
-  --warning: #fbbf24;
-  --success: #34d399;
+  /* 语义状态（亮底用深色变体） */
+  --danger: #dc2626;
+  --danger-soft: rgba(220, 38, 38, 0.1);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.1);
+  --success: #15803d;
   --info: var(--brand);
+
+  /* 品牌 */
+  --brand: #0369a1;
+  --brand-strong: #0284c7;
+  --brand-dark: #10171d; /* 兼容旧名：深玻璃底 */
+  --brand-soft: rgba(2, 132, 199, 0.1);
+
+  /* 顶栏专属（亮色玻璃上用深色文字） */
+  --topbar-fg: #454e5c;
+  --topbar-fg-active: #101418;
+
+  /* 主按钮：亮色下是深炭实心 pane */
+  --btn-primary-bg: #1d2026;
+  --btn-primary-fg: #f4f5f8;
+  --btn-primary-hover-bg: #2b2f37;
+  --btn-primary-rim: rgba(255, 255, 255, 0.22);
+
+  /* 输入井 */
+  --field-bg: rgba(255, 255, 255, 0.78);
+
+  /* 滚动条 / 选区 */
+  --scrollbar-thumb: rgba(15, 23, 42, 0.22);
+  --selection-bg: rgba(2, 132, 199, 0.22);
+  --selection-fg: #0c4a6e;
 
   /* 圆角：卡片 14px、控件 11px（对齐参考项目 0.875rem / 0.7rem） */
   --r-card: 14px;
@@ -70,6 +101,102 @@
   --fs-2xl: 24px;
 
   --shadow-pop: var(--sg-shadow);
+
+  /* Element Plus（亮色覆盖：品牌色与玻璃边框） */
+  --el-color-primary: #0369a1;
+  --el-color-primary-light-3: #0284c7;
+  --el-color-primary-light-5: #4aa3cd;
+  --el-color-primary-light-7: #9dcbdf;
+  --el-color-primary-light-8: #c8e0ec;
+  --el-color-primary-light-9: rgba(2, 132, 199, 0.1);
+  --el-color-primary-dark-2: #02587f;
+  --el-border-color: rgba(15, 23, 42, 0.14);
+  --el-border-color-light: rgba(15, 23, 42, 0.1);
+  --el-border-color-lighter: var(--sg-hairline);
+  --el-fill-color-blank: #ffffff;
+  --el-text-color-primary: #16181d;
+  --el-text-color-regular: #3b4351;
+  --el-text-color-secondary: #5f6875;
+  --el-text-color-placeholder: #8b93a0;
+  --el-mask-color: rgba(230, 232, 238, 0.55);
+}
+
+/* ---- 暗色：材质的设计本体 ---- */
+html.dark {
+  color-scheme: dark;
+
+  --sg-panel: rgba(255, 255, 255, 0.045);
+  --sg-card: rgba(148, 158, 175, 0.13);
+  --sg-state: rgba(255, 255, 255, 0.07);
+  --sg-popover: #212429;
+
+  --sg-rim: rgba(255, 255, 255, 0.16);
+  --sg-rim-soft: rgba(255, 255, 255, 0.1);
+  --sg-hairline: rgba(255, 255, 255, 0.07);
+  --sg-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    0 2px 6px rgba(0, 0, 0, 0.28);
+
+  --surface-1: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --surface-3: rgba(255, 255, 255, 0.12);
+
+  --bg: #17191d;
+  --panel: var(--sg-card);
+  --panel-2: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  --text: #c9ced8;
+  --text-strong: #eef0f4;
+  --muted: #9aa3af;
+  --muted-deep: #6d7683;
+
+  --danger: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.16);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.1);
+  --success: #34d399;
+
+  --brand: #38bdf8;
+  --brand-strong: #7dd3fc;
+  --brand-soft: rgba(56, 189, 248, 0.12);
+
+  --topbar-fg: #cbd5e1;
+  --topbar-fg-active: #ffffff;
+
+  --btn-primary-bg: #e8eaef;
+  --btn-primary-fg: #17191d;
+  --btn-primary-hover-bg: #f4f5f8;
+  --btn-primary-rim: rgba(255, 255, 255, 1);
+
+  --field-bg: rgba(0, 0, 0, 0.22);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --selection-bg: rgba(56, 189, 248, 0.32);
+  --selection-fg: #f0f9ff;
+
+  --el-bg-color: #1d2026;
+  --el-bg-color-overlay: var(--sg-popover);
+  --el-fill-color-blank: #16181c;
+  --el-fill-color-light: var(--sg-state);
+  --el-fill-color: rgba(255, 255, 255, 0.09);
+  --el-fill-color-lighter: rgba(255, 255, 255, 0.05);
+  --el-border-color: rgba(255, 255, 255, 0.1);
+  --el-border-color-light: rgba(255, 255, 255, 0.07);
+  --el-border-color-lighter: var(--sg-hairline);
+  --el-text-color-primary: #eef0f4;
+  --el-text-color-regular: #c9ced8;
+  --el-text-color-secondary: #9aa3af;
+  --el-text-color-placeholder: #6d7683;
+  --el-color-primary: #38bdf8;
+  --el-color-primary-light-3: #5cc8fa;
+  --el-color-primary-light-5: #2a8ab8;
+  --el-color-primary-light-7: #1a5c7c;
+  --el-color-primary-light-8: #124153;
+  --el-color-primary-light-9: rgba(56, 189, 248, 0.14);
+  --el-color-primary-dark-2: #7dd3fc;
+  --el-mask-color: rgba(10, 11, 13, 0.6);
 }
 
 * {
@@ -83,10 +210,6 @@ body,
   margin: 0;
 }
 
-html {
-  color-scheme: dark;
-}
-
 body {
   color: var(--text);
   background: var(--bg);
@@ -96,8 +219,8 @@ body {
 }
 
 ::selection {
-  background: rgba(56, 189, 248, 0.32);
-  color: #f0f9ff;
+  background: var(--selection-bg);
+  color: var(--selection-fg);
 }
 
 :focus-visible {
@@ -107,7 +230,7 @@ body {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -116,14 +239,14 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--scrollbar-thumb);
   border: 3px solid transparent;
   border-radius: var(--r-pill);
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--border-strong);
   background-clip: content-box;
 }
 
@@ -180,30 +303,6 @@ body {
 
 /* ---------- Element Plus 玻璃化 ---------- */
 
-html.dark {
-  --el-bg-color: #1d2026; /* 弹层基底（厚度最高） */
-  --el-bg-color-overlay: var(--sg-popover);
-  --el-fill-color-blank: #16181c; /* 输入井：比卡片更深 */
-  --el-fill-color-light: var(--sg-state);
-  --el-fill-color: rgba(255, 255, 255, 0.09);
-  --el-fill-color-lighter: rgba(255, 255, 255, 0.05);
-  --el-border-color: rgba(255, 255, 255, 0.1);
-  --el-border-color-light: rgba(255, 255, 255, 0.07);
-  --el-border-color-lighter: var(--sg-hairline);
-  --el-text-color-primary: #eef0f4;
-  --el-text-color-regular: #c9ced8;
-  --el-text-color-secondary: #9aa3af;
-  --el-text-color-placeholder: #6d7683;
-  --el-color-primary: #38bdf8;
-  --el-color-primary-light-3: #5cc8fa;
-  --el-color-primary-light-5: #2a8ab8;
-  --el-color-primary-light-7: #1a5c7c;
-  --el-color-primary-light-8: #124153;
-  --el-color-primary-light-9: rgba(56, 189, 248, 0.14);
-  --el-color-primary-dark-2: #7dd3fc;
-  --el-mask-color: rgba(10, 11, 13, 0.6);
-}
-
 .el-card {
   --el-card-bg-color: transparent;
   border-color: var(--sg-hairline);
@@ -221,61 +320,61 @@ html.dark {
   padding: var(--s-4);
 }
 
-/* 主按钮：参考项目的招牌——白色实心 pane + 深色文字 + 顶部一线光 */
+/* 主按钮：实心 pane + 顶部一线光（亮=深炭/暗=白玻璃，参考项目两态） */
 .el-button {
   border-radius: var(--r-control);
 }
 
 .el-button--primary {
-  background: #e8eaef;
-  border-color: #e8eaef;
-  color: #17191d;
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
   box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 2px 5px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 var(--btn-primary-rim),
+    0 2px 5px rgba(0, 0, 0, 0.18);
 }
 
 .el-button--primary:hover,
 .el-button--primary:focus {
-  background: #f4f5f8;
-  border-color: #f4f5f8;
-  color: #101215;
+  background: var(--btn-primary-hover-bg);
+  border-color: var(--btn-primary-hover-bg);
+  color: var(--btn-primary-fg);
 }
 
 .el-button--primary.is-disabled,
 .el-button--primary.is-disabled:hover {
-  background: rgba(232, 234, 239, 0.4);
+  background: color-mix(in srgb, var(--btn-primary-bg) 40%, transparent);
   border-color: transparent;
-  color: rgba(23, 25, 29, 0.5);
+  color: color-mix(in srgb, var(--btn-primary-fg) 50%, transparent);
 }
 
-/* 默认按钮：玻璃控件 */
+/* 默认按钮：状态唯一的小玻璃 */
 .el-button--default {
-  background: var(--sg-state);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #e6e9ee;
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text-strong);
   box-shadow: inset 0 1px 0 var(--sg-rim-soft);
 }
 
 .el-button--default:hover,
 .el-button--default:focus {
-  background: rgba(255, 255, 255, 0.11);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text-strong);
 }
 
 .el-button--danger {
-  background: rgba(248, 113, 113, 0.16);
-  border-color: rgba(248, 113, 113, 0.4);
-  color: #f87171;
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
 }
 
 .el-button--danger:hover {
-  background: rgba(248, 113, 113, 0.26);
-  color: #fecaca;
+  background: color-mix(in srgb, var(--danger) 24%, transparent);
+  color: var(--danger);
 }
 
-/* 输入井：比卡片更深的凹陷，顶部不进光（凹面） */
+/* 输入井：凹陷感（亮=白井，暗=深井） */
 .el-input__wrapper,
 .el-textarea__inner,
 .el-select__wrapper {
@@ -284,17 +383,17 @@ html.dark {
 
 .el-input__wrapper,
 .el-textarea__inner {
-  background-color: rgba(0, 0, 0, 0.22);
+  background-color: var(--field-bg);
   box-shadow:
-    0 -1px 0 rgba(255, 255, 255, 0.06),
+    0 -1px 0 var(--sg-hairline),
     0 0 0 1px var(--sg-hairline) inset;
 }
 
 .el-input__wrapper.is-focus,
 .el-textarea__inner:focus {
   box-shadow:
-    0 -1px 0 rgba(255, 255, 255, 0.06),
-    0 0 0 1px rgba(56, 189, 248, 0.45) inset;
+    0 -1px 0 var(--sg-hairline),
+    0 0 0 1px color-mix(in srgb, var(--brand) 50%, transparent) inset;
 }
 
 /* 表格 */
@@ -308,7 +407,7 @@ html.dark {
 }
 
 .el-table th.el-table__cell {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-1);
   font-weight: 600;
 }
 
@@ -336,7 +435,7 @@ html.dark {
   background: var(--sg-popover);
   box-shadow:
     inset 0 1px 0 var(--sg-rim),
-    0 24px 64px rgba(0, 0, 0, 0.5);
+    0 24px 64px rgba(0, 0, 0, 0.28);
 }
 
 .el-popper.is-light {
@@ -348,8 +447,8 @@ html.dark {
 /* 标签：状态色玻璃化 */
 .el-tag {
   border-radius: var(--r-control);
-  background: var(--sg-state);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-2);
+  border-color: var(--border);
   color: var(--text);
 }
 
