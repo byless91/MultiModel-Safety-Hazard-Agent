@@ -26,10 +26,12 @@ import httpx
 from app.core.logging import mask_secrets
 from app.prompts import COMPARE_PROMPT, GUARD_STATEMENT, PROMPT_VERSION, VISION_PROMPT
 from app.services.guardrail.input_guard import build_external_text
+from app.services.llm_concurrency import http_gate
 from app.services.llm_ledger import mark_parse_failed, record_call
 from app.services.providers.base import (
     BaseProvider,
     ImageInput,
+    ModelCapacityError,
     ModelTimeoutError,
     ModelUnavailableError,
 )
@@ -121,7 +123,9 @@ class OpenAICompatibleProvider(BaseProvider):
         for attempt in range(self.max_retries + 1):
             self._thread_local.retry_count = attempt
             try:
-                response = self._client.post(path, json=payload)
+                # 仅实际 HTTP 持有名额；解析、台账、重试退避不占名额。
+                with http_gate.slot():
+                    response = self._client.post(path, json=payload)
                 response.raise_for_status()
                 data = response.json()
                 usage = data.get("usage") or {}
@@ -144,6 +148,9 @@ class OpenAICompatibleProvider(BaseProvider):
                     },
                     ledger_id=ledger_id,
                 )
+            except ModelCapacityError:
+                self._record_failure(model=model, started=started, attempt=attempt, error_type="capacity_timeout")
+                raise  # 没有发出 HTTP，不在 Provider 内自动重试排队。
             except httpx.TimeoutException as exc:
                 last_error = exc
             except httpx.HTTPStatusError as exc:

@@ -128,7 +128,7 @@ jwt 模式使用：
 
 - **调用台账**：每次真实模型调用（含失败）逐条落 `llm_calls` 表——provider、模型、用途（analyze/refine/compare/embed）、prompt 版本、tokens 进出、延迟、重试次数、解析失败标记，并携带 request_id 与研判 ID 关联日志；`GET /api/v1/admin/llm-usage`（admin）按天×模型×用途聚合查看；
 - **预算熔断**：`DAILY_TOKEN_BUDGET`（默认 0 不限），当日 tokens 超限后新研判返回 429，进行中任务不受影响；
-- **并发治理**：跨请求共享模型线程池（`MAX_CONCURRENT_LLM_CALLS`），provider 持久连接池复用（不再每次调用重建 TCP/TLS），重试指数退避 + 抖动并遵循 Retry-After；
+- **并发治理**：`MAX_CONCURRENT_LLM_CALLS`（默认 4）统一限制单进程内所有 Provider 的 analyze/refine/compare/embed 实际 HTTP 并发。`LLM_QUEUE_TIMEOUT_SECONDS`（默认 60 秒）限制等待名额的时间，排队超时不发送 HTTP、不在 Provider 内重试；每次 HTTP 重试重新申请名额，退避、解析和台账写入不占名额。双模型线程池仅调度任务。此限制不提供分布式限流或严格日预算预留；
 - **输出可信**：模型输出 JSON 解析失败不再静默——结果带 `parse_failed` 标记、台账记 `parse_failed` 状态、model_guard 强制人工复核（与"未检出隐患"可区分）；
 - **Prompt 版本化**：prompt 集中在 `backend/app/prompts/`（当前 `vision-v2`），改动必须递增版本号，评测与台账据此归因；
 - **RAG 修复**：分块按「第X条」边界（多条文法规溯源不再张冠李戴）、语料原子写、重建/查询读写锁、向量 L2 归一化（分数恢复 cosine 语义）、embedding 降级留日志且重建时自动重试真实 API；

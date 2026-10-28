@@ -18,7 +18,8 @@ from app.services.providers.base import (
 )
 from app.services.providers.mock import MockProvider
 
-# B5/WP3.2：全局共享线程池，池大小即跨请求的模型并发上限（复用，不再按请求创建）
+# 双模型的共享调度池。所有用途的实际 HTTP 并发由 Provider 入口统一限制，
+# 不在分析线程或父请求持有名额，避免父线程等待子线程时嵌套占用。
 _ANALYSIS_POOL = ThreadPoolExecutor(
     max_workers=get_settings().max_concurrent_llm_calls,
     thread_name_prefix="llm-analysis",

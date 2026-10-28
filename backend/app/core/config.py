@@ -62,7 +62,8 @@ class Settings(BaseSettings):
     upload_url_ttl_minutes: int = 60
     rate_limit_enabled: bool = False
     # B5：LLM 并发与预算
-    max_concurrent_llm_calls: int = 4
+    max_concurrent_llm_calls: int = Field(default=4, ge=1, le=128)
+    llm_queue_timeout_seconds: float = Field(default=60.0, gt=0)
     daily_token_budget: int = 0  # 0 = 不限；>0 时当日 tokens 超限后拒绝新研判
     # B5：演示模式置信度加成（默认关；生产与评测路径不得开启）
     mock_demo_boost: bool = False

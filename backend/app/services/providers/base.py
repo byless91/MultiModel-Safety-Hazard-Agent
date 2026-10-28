@@ -19,6 +19,10 @@ class ModelUnavailableError(ProviderError):
     """Model endpoint rejected the call or the transport failed."""
 
 
+class ModelCapacityError(ModelUnavailableError):
+    """No HTTP slot became available; no request was sent to the provider."""
+
+
 @dataclass
 class ImageInput:
     filename: str
