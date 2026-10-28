@@ -2,7 +2,7 @@
 
 面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。当前为 MVP 骨架，无 API Key 时使用 Mock 模式即可跑通完整演示链路。
 
-后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R4 已完成，后续从 R5 部署和认证配置开始；新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)、[R4 验证记录](docs/baselines/r4-2026-10-28.md)。
+后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R5 已完成，后续从 R6 可信评测开始；新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)、[R4 验证记录](docs/baselines/r4-2026-10-28.md)、[R5 验证记录](docs/baselines/r5-2026-10-28.md)。
 
 ## 技术栈
 
@@ -82,7 +82,8 @@ docker compose -f docker-compose.pg.yml up -d --build
 docker compose exec backend python -m app.cli.create_user --username admin --role admin
 ```
 
-- 后端镜像启动时自动执行 `alembic upgrade head`（旧库自动纳入版本管理）；
+- 后端 lifespan 自动初始化并升级 Alembic 版本（旧库自动纳入版本管理），迁移错误拒绝启动；
+- 默认使用 Mock。新空卷从镜像只读种子离线初始化知识，已有卷不被新版种子覆盖；内置法规节选只供开发验证，正式使用前须人工复核版本与适用性。
 - `DATABASE_URL` 切 `postgresql+psycopg://...` 即用 PG（安装 `.[pg]` extra），CI 有 PG 全量测试矩阵；
 - 当前仅支持一个后端实例、一个 Uvicorn worker（`--workers 1`）。任务认领已原子化，但本地 SQLite checkpoint、上传目录和检索索引尚不支持多副本；PG 不改变这一限制。异步 worker 启动时通过 checkpoint 旁的 OS 锁拒绝重复启动；部署时保持同一数据目录，禁止通过分离 checkpoint 路径绕开此限制。
 - `/api/v1/live` 检查基础存活，`/health` 保留元信息；部署应检查 `/api/v1/ready`（数据库、迁移版本、知识/索引、持久存储和 worker），未就绪返回 503。两套 Compose 已使用此健康依赖，迁移失败拒绝启动。
@@ -94,7 +95,7 @@ docker compose exec backend python -m app.cli.create_user --username admin --rol
 通过率上升 >2pp 即失败。CI 的 `eval-gate` job 每次 push 都会执行；本地：
 
 ```powershell
-.ackend\.venv\Scripts\python.exe scripts\check_eval_baseline.py
+.\backend\.venv\Scripts\python.exe scripts\check_eval_baseline.py
 ```
 
 ## 认证与权限（B4）
@@ -104,18 +105,21 @@ docker compose exec backend python -m app.cli.create_user --username admin --rol
 | 模式 | 行为 | 适用 |
 |---|---|---|
 | `none`（默认） | 全部接口开放 | 本地开发/演示 |
-| `token` | 静态 `API_BEARER_TOKEN` Bearer（兼容旧部署） | 简单服务间调用 |
+| `token` | 静态 `API_BEARER_TOKEN`，无用户与角色体系，前端提供凭证验证入口 | 服务间兼容模式 |
 | `jwt` | 用户体系 + 角色 + 签名图片 URL（**生产推荐**） | 正式部署 |
 
 jwt 模式使用：
 
+启用前设置独立随机 `AUTH_JWT_SECRET`（至少 32 字节）。默认开发密钥、文档旧占位值、过短 JWT 密钥，以及 token 模式缺失静态凭证均会拒绝启动。密钥须稳定保存；更换后原 JWT 和图片签名失效。
+
 ```powershell
 # 创建管理员（密码交互输入，至少 8 位）
-.ackend\.venv\Scripts\python.exe scripts\create_user.py --username admin --role admin
+.\backend\.venv\Scripts\python.exe scripts\create_user.py --username admin --role admin
 # 角色可选 admin / reviewer / inspector
 ```
 
-- 登录：`POST /api/v1/auth/token`（OAuth2 密码流）换取 JWT，前端已内置登录页、路由守卫与 401 自动跳转；
+- `/health` 明确返回 `auth_mode`；JWT 使用账号密码登录，静态模式验证 `/auth/check`，none 显示无需登录说明。读取认证配置失败时不会默认为开放模式。
+- 登录：仅 JWT 提供 `POST /api/v1/auth/token`（OAuth2 密码流）；token/none 返回明确说明。前端仅按 JWT 会话处理 401，静态凭证 401 不自动删除凭证或循环跳转；候选凭证验证通过才替换保存值。
 - 角色权限：inspector 提交研判/整改照片，reviewer 确认复核与整改关闭，admin 管理知识库与用户（`GET/POST /api/v1/admin/users`）；
 - 审计可信：复核人/整改操作人一律取认证身份，客户端传入的 `reviewer`/`by` 字段在 jwt 模式下不生效；
 - 复核保护：仅 `needs_more_info` 可追问，活动任务或已定稿记录不能被追问覆盖；复核只接受允许的终态，相同决定可幂等重放；
@@ -123,6 +127,8 @@ jwt 模式使用：
 - 图片保护：`/uploads` 改为短期 HMAC 签名 URL（`UPLOAD_URL_TTL_MINUTES`），浏览器 `<img>` 无需携带凭证，过期/篡改即拒绝；
 - 限流（`RATE_LIMIT_ENABLED=true` 开启）：登录 10 次/分/IP（防爆破），研判提交 5 次/分/用户；
 - `/health` 与 `/metrics` 保持开放（探活与内网监控）。
+
+容器内创建管理员无需先 HTTP 登录：`docker compose exec backend python -m app.cli.create_user --username admin --role admin`。自动化可使用 `--password-stdin`，避免把密码放入命令行参数。
 
 ## LLM 成本台账与工程化（B5）
 

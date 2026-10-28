@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         env_file=str(BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     app_name: str = "多模态基层安全隐患智能研判与处置辅助系统"
@@ -83,6 +84,18 @@ class Settings(BaseSettings):
     job_stop_grace_seconds: float = Field(default=5.0, ge=0, le=30)
     idempotency_ttl_hours: int = 24
     compare_dedup_minutes: int = 5
+
+    @model_validator(mode="after")
+    def validate_auth_configuration(self) -> "Settings":
+        if self.auth_mode == "jwt":
+            unsafe = {"dev-insecure-secret-change-me", "change-me-to-a-long-random-secret"}
+            if self.auth_jwt_secret.strip() in unsafe or len(self.auth_jwt_secret.strip().encode("utf-8")) < 32:
+                raise ValueError("AUTH_MODE=jwt 必须配置至少 32 字节的独立 AUTH_JWT_SECRET，禁止默认开发密钥")
+        if self.auth_mode == "token" and not self.api_bearer_token.strip():
+            raise ValueError("AUTH_MODE=token 必须配置非空 API_BEARER_TOKEN")
+        if self.auth_mode == "token" and self.api_bearer_token != self.api_bearer_token.strip():
+            raise ValueError("API_BEARER_TOKEN 不能包含首尾空白")
+        return self
 
     @property
     def origins(self) -> list[str]:

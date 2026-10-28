@@ -28,7 +28,7 @@ router.beforeEach(async (to) => {
   if (to.name !== 'login' && auth.authRequired && !auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (to.name === 'login' && auth.isLoggedIn) {
+  if (to.name === 'login' && auth.isLoggedIn && auth.authMode === 'jwt') {
     return { name: 'home' }
   }
   return true

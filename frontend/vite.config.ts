@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [vue()],
   resolve: {
     // Root test files resolve the same packages as the application.
-    dedupe: ['vue', 'pinia', 'vitest', '@vue/test-utils', 'axios'],
+    dedupe: ['vue', 'vue-router', 'pinia', 'vitest', '@vue/test-utils', 'axios'],
   },
   server: {
     fs: mode === 'test' ? {

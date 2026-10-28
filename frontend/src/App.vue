@@ -37,6 +37,7 @@
           </el-tag>
           <el-button class="logout-btn" link size="small" @click="onLogout">退出</el-button>
         </template>
+        <router-link v-if="auth.authMode === 'token'" to="/login" class="nav-link">静态凭证模式</router-link>
       </div>
     </header>
     <main>

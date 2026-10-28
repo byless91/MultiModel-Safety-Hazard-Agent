@@ -479,6 +479,7 @@ def health() -> HealthOut:
         reranker_enabled=rag.reranker_enabled,
         version=settings.app_version,
         auth_required=settings.auth_mode != "none",
+        auth_mode=settings.auth_mode,
     )
 
 
@@ -490,6 +491,9 @@ def login(
     db: Session = Depends(get_db),
 ) -> TokenOut:
     """OAuth2 密码流登录：换取 JWT。失败统一 401，不暴露用户是否存在。"""
+    if settings.auth_mode != "jwt":
+        raise HTTPException(status_code=409,
+                            detail="当前认证模式不提供用户名密码登录；静态凭证模式请使用运维提供的 Bearer 凭证")
     user = db.scalars(select(User).where(User.username == form.username)).first()
     if user is None or user.disabled or not verify_password(form.password, user.password_hash):
         raise HTTPException(status_code=401, detail="用户名或密码错误")
@@ -497,6 +501,11 @@ def login(
         access_token=create_access_token(user),
         user=AuthUserOut(id=user.id, username=user.username, role=user.role),
     )
+
+
+@router.get("/auth/check")
+def check_auth() -> dict:
+    return {"auth_mode": settings.auth_mode, "authenticated": settings.auth_mode != "none"}
 
 
 @router.get("/auth/me", response_model=AuthUserOut)

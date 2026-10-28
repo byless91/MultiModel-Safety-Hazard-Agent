@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -129,6 +129,7 @@ class HealthOut(BaseModel):
     reranker_enabled: bool = True
     version: str
     auth_required: bool = False
+    auth_mode: Literal["none", "token", "jwt"] = "none"
 
 
 class AuthUserOut(BaseModel):

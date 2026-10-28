@@ -1,3 +1,5 @@
+export type AuthMode = 'none' | 'token' | 'jwt'
+
 export interface AssessmentImage {
   id: string
   filename: string

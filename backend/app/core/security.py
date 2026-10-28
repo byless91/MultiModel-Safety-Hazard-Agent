@@ -139,7 +139,10 @@ def require_roles(*roles: str):
 
 
 def _secret_bytes() -> bytes:
-    return get_settings().auth_jwt_secret.encode("utf-8")
+    settings = get_settings()
+    # 静态模式不使用默认 JWT 密钥签图片，签名密钥与其服务凭证绑定。
+    secret = settings.api_bearer_token if settings.auth_mode == "token" else settings.auth_jwt_secret
+    return secret.encode("utf-8")
 
 
 def sign_upload_url(path: str) -> str:
