@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
+from copy import deepcopy
 from typing import Any
 
 from app.core.config import get_settings
@@ -28,6 +29,7 @@ from app.services.ensemble import (
 from app.services.ensemble.categories import rag_tags_for_category
 from app.services.evidence import judge_evidence
 from app.services.evidence_refine import refine_with_evidence
+from app.services.finding_identity import ensure_unique_finding_ids
 from app.services.guardrail import EvidenceGuardResult, validate_model_analysis
 from app.services.providers import MockProvider, build_providers, get_providers
 from app.services.rag import (
@@ -324,7 +326,9 @@ def step_judge(state: dict[str, Any]) -> dict[str, Any]:
 
 def step_evidence(state: dict[str, Any]) -> dict[str, Any]:
     evidence = retrieval_as_evidence(state.get("retrieval", []))
-    findings = state.get("ensemble_judge", {}).get("final_findings", [])
+    judge = deepcopy(state.get("ensemble_judge") or {})
+    findings = ensure_unique_finding_ids(judge.get("final_findings", []))
+    judge["final_findings"] = findings
     judge_result = judge_evidence(findings, evidence)
     guard = EvidenceGuardResult(
         supported=judge_result.supported,
@@ -336,7 +340,6 @@ def step_evidence(state: dict[str, Any]) -> dict[str, Any]:
         retrieval_evidence_count=judge_result.retrieval_evidence_count,
         finding_status=[item.model_dump() for item in judge_result.findings],
     )
-    judge = state.get("ensemble_judge")
     if isinstance(judge, dict):
         statuses = {item.finding_id: item for item in judge_result.findings}
         for finding in judge.get("final_findings", []):
@@ -355,6 +358,7 @@ def step_evidence(state: dict[str, Any]) -> dict[str, Any]:
         "evidence_guard": guard.model_dump(),
         "evidence_judge": judge_result.model_dump(),
         "evidence_context": build_evidence_context(evidence),
+        "ensemble_judge": judge,
     }
 
 

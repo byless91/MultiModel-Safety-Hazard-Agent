@@ -9,6 +9,7 @@ from app.services.evidence.schemas import (
     EvidenceJudgeResult,
     FindingEvidenceResult,
 )
+from app.services.finding_identity import ensure_unique_finding_ids, location_signature
 from app.services.rag import is_regulatory_evidence
 
 EVIDENCE_ID_FALLBACK = "evidence"
@@ -66,7 +67,20 @@ def _reliable_facts(facts: list[str]) -> list[str]:
 
 def _has_reliable_visual(finding: dict[str, Any]) -> bool:
     facts = [str(item) for item in (finding.get("observed_facts") or [])]
-    return bool(_reliable_facts(facts) or finding.get("location"))
+    locations = finding.get("locations") or []
+    if not isinstance(locations, list):
+        locations = []
+    locations = [*locations, finding.get("location")]
+    for location in locations:
+        signature = location_signature(location)
+        if not signature:
+            continue
+        image, bbox, text = signature
+        if text and not _is_visual_placeholder(text):
+            return True
+        if image and len(bbox) == 4 and min(bbox) >= 0 and bbox[2] > bbox[0] and bbox[3] > bbox[1]:
+            return True
+    return bool(_reliable_facts(facts))
 
 
 def _evidence_score(item: dict[str, Any]) -> float:
@@ -84,7 +98,7 @@ def _judge_one(
     category = str(finding.get("category") or "")
     raw_facts = [str(item) for item in (finding.get("observed_facts") or [])]
     facts = _reliable_facts(raw_facts)
-    visual_ok = bool(facts) or bool(finding.get("location"))
+    visual_ok = _has_reliable_visual(finding)
     query_tokens = tokens(f"{category} {' '.join(facts)}")
 
     best_overlap = 0
@@ -157,7 +171,7 @@ def judge_evidence(
     findings: list[dict[str, Any]] | None,
     evidence: list[dict[str, Any]] | None,
 ) -> EvidenceJudgeResult:
-    findings = findings or []
+    findings = ensure_unique_finding_ids(findings or [])
     retrieval = [
         item
         for item in (evidence or [])

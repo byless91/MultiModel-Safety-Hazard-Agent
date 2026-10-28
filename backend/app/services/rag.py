@@ -27,7 +27,7 @@ logger = logging.getLogger("safety_hazard.rag")
 
 DEMO_SOURCE_MARKERS = ("演示",)
 DEMO_VERSION_MARKERS = ("demo",)
-HASH_EMBEDDING_SPACE = "hash:sha256-v1:256"
+HASH_EMBEDDING_SPACE = "hash:md5-v1:256"
 INDEX_FORMAT_VERSION = 2
 
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")

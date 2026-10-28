@@ -12,6 +12,7 @@ from app.services.ensemble.standardize import (
     coerce_standardized_results,
 )
 from app.services.evidence import judge_evidence
+from app.services.finding_identity import finding_identifier, location_signature
 
 
 def _merge_unique(target: list[str], source: list[str]) -> None:
@@ -68,20 +69,13 @@ class EnsembleJudgeResult(BaseModel):
 
 
 def _location_signature(location: dict[str, Any] | None) -> tuple:
-    if not isinstance(location, dict):
-        return ()
-    bbox = location.get("bbox") if isinstance(location.get("bbox"), list) else ()
-    return (
-        str(location.get("image_id") or ""),
-        tuple(bbox),
-        str(location.get("location_text") or ""),
-    )
+    return location_signature(location)
 
 
 def _aggregate_findings(
     models: list[StandardizedModelResult],
 ) -> list[FinalFinding]:
-    groups: dict[str, dict[str, Any]] = {}
+    groups: dict[tuple, dict[str, Any]] = {}
     order: list[Any] = []
     for model in models:
         if model.status not in ("success", "mock_fallback"):
@@ -150,7 +144,7 @@ def _aggregate_findings(
             source = "single_model"
         results.append(
             FinalFinding(
-                finding_id=category,
+                finding_id=finding_identifier(category, key[1]),
                 category=category,
                 description="；".join(descriptions)[:300],
                 final_severity=max(group["severities"]) if group["severities"] else None,

@@ -55,6 +55,7 @@ from app.services.document_converter import (
     ConversionError,
     convert_to_markdown,
 )
+from app.services.finding_identity import legacy_evidence_view
 from app.services.guardrail import (
     detect_image_type,
     inspect_ocr_texts,
@@ -132,6 +133,9 @@ def to_out(item: Assessment) -> AssessmentOut:
     risk = parse_json(item.risk_result_json) or {}
     evidence_judge = parse_json(item.evidence_judge_json)
     ensemble_judge = parse_json(item.ensemble_judge_json) or {}
+    findings, evidence_judge, identity_warnings = legacy_evidence_view(
+        ensemble_judge.get("final_findings") or [], evidence_judge,
+    )
     rect_status = normalize_rectification_status(item.rectification_status)
     effective = effective_result(item)
     return AssessmentOut(
@@ -147,7 +151,7 @@ def to_out(item: Assessment) -> AssessmentOut:
         evidence_judge=evidence_judge,
         multi_model=parse_json(item.multi_model_json),
         disagreement=parse_json(item.disagreement_json),
-        findings=ensemble_judge.get("final_findings") or [],
+        findings=findings,
         report=effective["report"],
         followup_questions=parse_json(item.followup_questions_json) or [],
         followup_used=item.followup_used,
@@ -159,7 +163,7 @@ def to_out(item: Assessment) -> AssessmentOut:
         rectification_meta=parse_json(item.rectification_meta_json),
         rectification_next_states=next_rectification_states(rect_status),
         rectified_at=item.rectified_at,
-        review_reasons=parse_json(item.review_reasons_json) or [],
+        review_reasons=list(dict.fromkeys((parse_json(item.review_reasons_json) or []) + identity_warnings)),
         awaiting_human_review=item.status == "awaiting_human_review",
         human_review=effective["human_review"],
         risk_result=risk or None,

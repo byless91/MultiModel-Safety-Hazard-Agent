@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-28T20:01:36.433732+08:00",
+  "git_revision": "6071b9c0f8aae3df837b13102d23eef6ab8e46de",
+  "worktree_dirty": true,
+  "product_source_sha256": "7177c96ef0fe1b10672682f4ac43d9af669b3a3ef166a048e63bf1c9f7b8932b",
+  "scope": "Local offline SQLite and Mock; no real model or container runtime validation",
+  "offline_configuration": {
+    "provider_mode": "mock",
+    "auth_mode": "none",
+    "workflow_mode": "sync",
+    "real_api_keys": "cleared",
+    "database": "isolated SQLite",
+    "real_http": "blocked",
+    "test_artifacts": "test/.artifacts/"
+  },
+  "backend_new": {
+    "tests": 128,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 128
+  },
+  "backend_legacy": {
+    "tests": 335,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "passed": 334
+  },
+  "frontend_combined": {
+    "tests": 11,
+    "passed": 11,
+    "failures": 0,
+    "skipped": 0
+  },
+  "evaluation_dataset": {
+    "sha256": "a0c5193f38011fa95387702c3785b33b4c640eb57fc7fd7e93f949165b795d5d",
+    "cases": 60,
+    "image_cases": 0,
+    "safe_negative_cases": 0,
+    "evidence_labeled_cases": 0,
+    "source_type_counts": {
+      "curated": 60
+    },
+    "category_counts": {
+      "占用疏散通道": 9,
+      "消防器材失效": 16,
+      "电气线路隐患": 14,
+      "危险化学品存储不规范": 3,
+      "公共区域安全隐患": 13,
+      "野外用火风险": 5
+    }
+  },
+  "not_validated": [
+    "PostgreSQL runtime",
+    "Docker runtime",
+    "Real model/image accuracy"
+  ]
+}

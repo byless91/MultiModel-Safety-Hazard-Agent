@@ -38,4 +38,28 @@ describe('root suite: real Vue component and evidence input', () => {
     expect(wrapper.text()).not.toContain('不得展示的无关依据')
     wrapper.unmount()
   })
+
+  it('keeps same-category concrete findings and their evidence separate', () => {
+    const assessment = makeAssessment()
+    assessment.evidence = [{
+      id: 'law-1', source: '第二项采用依据', text: '第二项原文', version: 'test', tags: [], score: 0.9,
+    }]
+    const common = {
+      category: '占用疏散通道', final_confidence: 0.8, observed_facts: [], uncertainties: [],
+      model_support: ['mock'], locations: [], source: 'mock',
+    }
+    assessment.findings = [
+      { ...common, finding_id: 'finding-first', description: '第一项', evidence_status: 'pending',
+        evidence_ids: [], unsupported_claims: ['历史对应关系需核查'] },
+      { ...common, finding_id: 'finding-second', description: '第二项', evidence_status: 'supported',
+        evidence_ids: ['law-1'], unsupported_claims: [] },
+    ]
+    const wrapper = shallowMount(EvidenceChain, { props: { assessment }, global: { stubs } })
+    const cards = wrapper.findAll('.chain-card')
+    expect(cards).toHaveLength(2)
+    expect(cards[0].text()).toContain('历史对应关系需核查')
+    expect(cards[0].text()).not.toContain('第二项原文')
+    expect(cards[1].text()).toContain('第二项原文')
+    wrapper.unmount()
+  })
 })
