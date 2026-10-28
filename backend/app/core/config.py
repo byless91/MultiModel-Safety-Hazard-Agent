@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     rate_limit_login_per_minute: int = 10
     langgraph_checkpoint_path: Path = BACKEND_DIR / "data" / "langgraph.db"
     job_stale_minutes: int = 10
+    job_lease_seconds: float = Field(default=30.0, ge=3)
+    job_monitor_seconds: float = Field(default=5.0, gt=0, le=10)
     idempotency_ttl_hours: int = 24
     compare_dedup_minutes: int = 5
 
