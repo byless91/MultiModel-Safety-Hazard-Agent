@@ -8,13 +8,15 @@ WORKDIR /app
 # 先装依赖（利用层缓存：pyproject/uv.lock 不变则跳过）
 COPY pyproject.toml uv.lock alembic.ini ./
 COPY migrations ./migrations
-RUN uv sync --frozen --no-dev --extra faiss --extra pg
+RUN uv sync --frozen --no-dev --no-install-project --extra faiss --extra pg
 
 COPY app ./app
+COPY resources/knowledge_seed ./resources/knowledge_seed
+RUN chmod -R a-w /app/resources/knowledge_seed
 
-ENV UV_RUNTINE_PYTHON=/app/.venv/bin/python \
-    PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PROVIDER_MODE=mock
 
 EXPOSE 8001
 

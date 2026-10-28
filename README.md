@@ -79,7 +79,7 @@ docker compose up -d --build
 docker compose -f docker-compose.pg.yml up -d --build
 
 # 首次使用 jwt 认证时建管理员（容器内）
-docker compose exec backend python scripts/create_user.py --username admin --role admin
+docker compose exec backend python -m app.cli.create_user --username admin --role admin
 ```
 
 - 后端镜像启动时自动执行 `alembic upgrade head`（旧库自动纳入版本管理）；

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'data' / 'app.db').as_posix()}"
     upload_dir: Path = BACKEND_DIR / "data" / "uploads"
     knowledge_dir: Path = BACKEND_DIR / "data" / "knowledge"
+    knowledge_seed_dir: Path = BACKEND_DIR / "resources" / "knowledge_seed"
     faiss_index_dir: Path = BACKEND_DIR / "data" / "faiss"
 
     provider_mode: str = "auto"
@@ -104,7 +105,9 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def resolve_relative_paths(self) -> "Settings":
-        for field in ("upload_dir", "knowledge_dir", "faiss_index_dir", "langgraph_checkpoint_path"):
+        for field in (
+            "upload_dir", "knowledge_dir", "knowledge_seed_dir", "faiss_index_dir", "langgraph_checkpoint_path",
+        ):
             value = getattr(self, field)
             if isinstance(value, Path) and not value.is_absolute():
                 setattr(self, field, BACKEND_DIR / value)

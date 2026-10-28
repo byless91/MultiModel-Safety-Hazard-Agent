@@ -39,10 +39,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         logger.warning("AUTH_MODE=jwt 但仍在使用默认开发密钥，生产必须设置 AUTH_JWT_SECRET")
     if settings.auth_mode == "none":
         logger.warning("AUTH_MODE=none：当前无任何鉴权，仅限本地开发使用")
+    from app.services.bootstrap import bootstrap_knowledge
     from app.services.providers import get_provider
     from app.services.rag import get_rag
 
     # 预热含同步 IO（建索引/embedding），放线程池避免阻塞事件循环
+    await run_in_threadpool(bootstrap_knowledge, settings)
     await run_in_threadpool(get_provider)
     await run_in_threadpool(get_rag)
     if settings.workflow_mode == "async":
