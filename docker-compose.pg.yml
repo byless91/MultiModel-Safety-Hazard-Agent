@@ -10,40 +10,54 @@ services:
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U safety"]
+      test: ["CMD-SHELL", "pg_isready -U safety -d safety_hazard"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
+    image: ${BACKEND_IMAGE:-safety-hazard-backend:local}
     build:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://safety:safety@db:5432/safety_hazard
       AUTH_MODE: ${AUTH_MODE:-none}
       WORKFLOW_MODE: ${WORKFLOW_MODE:-sync}
-      PROVIDER_MODE: auto
+      PROVIDER_MODE: ${PROVIDER_MODE:-mock}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-dev-insecure-secret-change-me}
+      API_BEARER_TOKEN: ${API_BEARER_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - backend-data:/app/data
     ports:
-      - "8001:8001"
+      - "${BACKEND_BIND_HOST:-0.0.0.0}:${BACKEND_PORT:-8001}:8001"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8001/api/v1/ready', timeout=4)"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   frontend:
+    image: ${FRONTEND_IMAGE:-safety-hazard-frontend:local}
     build:
       context: ./frontend
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "${FRONTEND_BIND_HOST:-0.0.0.0}:${FRONTEND_PORT:-8080}:80"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
 volumes:
   pg-data:

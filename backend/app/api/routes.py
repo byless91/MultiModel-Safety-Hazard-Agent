@@ -73,6 +73,7 @@ from app.services.knowledge import rebuild_knowledge
 from app.services.model_inputs import require_model_text
 from app.services.providers import ImageInput, get_provider, get_providers
 from app.services.rag import get_rag
+from app.services.readiness import readiness_report
 from app.services.rectification import (
     RectificationTransitionError,
     next_rectification_states,
@@ -454,6 +455,18 @@ def _run_rectification_compare(item: Assessment, db: Session) -> None:
     item.rectification_score = score
     item.rectification_analysis_json = json.dumps(result, ensure_ascii=False)
     _record_compare_meta(item)
+
+
+@public_router.get("/live")
+def liveness() -> dict:
+    return {"status": "alive"}
+
+
+@public_router.get("/ready")
+def readiness() -> JSONResponse:
+    report = readiness_report()
+    return JSONResponse(report, status_code=200 if report["status"] == "ready" else 503,
+                        headers={"Cache-Control": "no-store"})
 
 
 @public_router.get("/health", response_model=HealthOut)

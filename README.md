@@ -85,7 +85,7 @@ docker compose exec backend python -m app.cli.create_user --username admin --rol
 - 后端镜像启动时自动执行 `alembic upgrade head`（旧库自动纳入版本管理）；
 - `DATABASE_URL` 切 `postgresql+psycopg://...` 即用 PG（安装 `.[pg]` extra），CI 有 PG 全量测试矩阵；
 - 当前仅支持一个后端实例、一个 Uvicorn worker（`--workers 1`）。任务认领已原子化，但本地 SQLite checkpoint、上传目录和检索索引尚不支持多副本；PG 不改变这一限制。异步 worker 启动时通过 checkpoint 旁的 OS 锁拒绝重复启动；部署时保持同一数据目录，禁止通过分离 checkpoint 路径绕开此限制。
-- `/metrics` 供内网监控抓取；健康检查 `/api/v1/health`。
+- `/api/v1/live` 检查基础存活，`/health` 保留元信息；部署应检查 `/api/v1/ready`（数据库、迁移版本、知识/索引、持久存储和 worker），未就绪返回 503。两套 Compose 已使用此健康依赖，迁移失败拒绝启动。
 
 ## 质量保障（B6：评测回归门禁）
 

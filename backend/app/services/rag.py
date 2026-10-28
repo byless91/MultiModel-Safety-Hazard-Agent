@@ -143,6 +143,22 @@ class RAGService:
     def cache_dir(self) -> Path:
         return Path(self.settings.faiss_index_dir)
 
+    def readiness_snapshot(self) -> dict:
+        """Inspect the active index without rebuilding vectors or waiting on a model call."""
+        if not self._lock.acquire(blocking=False):
+            return {"chunks": 0, "index_ready": False}
+        try:
+            count = len(self.texts)
+            chunks = sum(bool(value.strip()) and not is_demo_chunk(meta)
+                         for value, meta in zip(self.texts, self.metas, strict=True))
+            if self._index is not None:
+                index_ready = self._index.ntotal == count and self._index.d == self.embedding_dim > 0
+            else:
+                index_ready = self.vectors.shape == (count, self.embedding_dim) and self.embedding_dim > 0
+            return {"chunks": chunks, "index_ready": index_ready and count == len(self.metas)}
+        finally:
+            self._lock.release()
+
     def _model_key(self) -> str:
         provider = getattr(self.provider, "name", "") or "unknown"
         model = getattr(self.provider, "embedding_model", "") or "default"

@@ -87,7 +87,8 @@ def init_db() -> None:
         stamp_if_unversioned(engine)
         upgrade_to_head(engine)
     except Exception:
-        logger.warning("数据库调和失败（不影响启动，下次将重试）", exc_info=True)
+        logger.error("数据库迁移失败，拒绝继续启动", exc_info=True)
+        raise
 
 
 def get_db():

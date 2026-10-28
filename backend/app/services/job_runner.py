@@ -286,6 +286,11 @@ class JobRunner:
     def running(self) -> bool:
         return self._task is not None and not self._task.done()
 
+    @property
+    def healthy(self) -> bool:
+        return (self.running and not self._stopped and self._lock is not None
+                and self._monitor is not None and not self._monitor.done())
+
     async def start(self) -> None:
         if self.running:
             return
