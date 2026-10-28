@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class JobOut(BaseModel):
@@ -76,6 +76,15 @@ class ConfirmIn(BaseModel):
     edits: dict[str, Any] = Field(default_factory=dict)
     reviewer: str | None = None
     note: str | None = None
+
+    @field_validator("edits")
+    @classmethod
+    def validate_risk_level(cls, edits: dict[str, Any]) -> dict[str, Any]:
+        if "risk_level" in edits:
+            level = edits["risk_level"]
+            if type(level) is not int or not 1 <= level <= 3:
+                raise ValueError("risk_level 必须为 1-3 的整数")
+        return edits
 
 
 class RectificationConfirmIn(BaseModel):

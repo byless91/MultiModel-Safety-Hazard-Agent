@@ -78,6 +78,7 @@ from app.services.rectification import (
     transition_rectification,
 )
 from app.services.rectification_assessment import assess_rectification_completion
+from app.services.review import confirmation_is_replay, ensure_followup_allowed
 from app.services.workflow import run_workflow
 
 settings = get_settings()
@@ -869,6 +870,7 @@ def followup_assessment(
     item = db.get(Assessment, assessment_id)
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
+    ensure_followup_allowed(item, db)
     _reject_text(payload.answer)
     if item.followup_used >= settings.max_followups:
         raise HTTPException(status_code=400, detail="已达追问上限")
@@ -927,6 +929,8 @@ def confirm_assessment(
     # 审计身份以认证身份为准；无用户体系（none/token）时回退请求体字段（兼容旧客户端）
     user = get_request_user(request)
     reviewer_name = user.username if user else (payload.reviewer or "")
+    if confirmation_is_replay(item, db, payload, reviewer_name):
+        return to_out(item)
     item.confirmed = payload.confirmed
     item.confirmed_by_id = user.id if user else None
     item.confirmed_by_name = reviewer_name or None

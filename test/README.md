@@ -22,6 +22,8 @@
 
 `run_backend.py --suite new|legacy|all` 使用同一早期隔离插件。不要在同一 pytest 进程混跑新旧目录；应用配置、数据库 engine 和 Provider 存在导入时单例。
 
+R1/T03 起，历史 `test_async_second_followup_falls_back_to_full_rerun` 要求完成后仍可追问，与新状态合同冲突，在根目录插件中标记为严格预期失败（xfail，意外通过会使运行失败）。历史文件未改动；正确的 409 行为由 `test/backend/test_review_state_guards.py` 显式回归。该项必须在结果中单独报告，不能计入通过数。
+
 测试在应用导入前固定 Mock，清空真实模型 Key，并将数据库、上传、知识库副本、向量缓存、checkpoint 和临时目录设置到 `test/.artifacts/`。真实 httpx HTTP 传输被阻止；`httpx.MockTransport` 与 FastAPI TestClient 可以使用。
 
 普通 `DATABASE_URL` 不作为新入口的数据库来源。只有显式提供 `TEST_DATABASE_URL` 才可覆盖默认测试库：

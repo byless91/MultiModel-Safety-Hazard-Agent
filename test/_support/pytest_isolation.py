@@ -34,6 +34,17 @@ def pytest_configure(config: pytest.Config) -> None:
         write_records(collect_directory_records(knowledge / "source_raw"), knowledge / "chunks")
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        if item.nodeid == "tests/test_workflow_jobs.py::test_async_second_followup_falls_back_to_full_rerun":
+            item.add_marker(pytest.mark.xfail(
+                strict=True,
+                raises=AssertionError,
+                reason="R1/T03 intentionally rejects followup after completion (409); replacement: "
+                       "test/backend/test_review_state_guards.py",
+            ))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def record_offline_environment(record_testsuite_property) -> None:
     record_testsuite_property("database_backend", make_url(ENVIRONMENT.overrides["DATABASE_URL"]).get_backend_name())
