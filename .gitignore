@@ -30,3 +30,6 @@ Thumbs.db
 # SQLite WAL sidecar files
 backend/data/*.db-wal
 backend/data/*.db-shm
+
+# Root regression-suite generated artifacts
+test/.artifacts/

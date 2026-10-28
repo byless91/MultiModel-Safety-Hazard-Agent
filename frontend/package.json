@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "type-check": "vue-tsc --noEmit",
-    "lint": "eslint .",
+    "type-check": "vue-tsc --noEmit && vue-tsc --noEmit -p ../test/frontend/tsconfig.json",
+    "lint": "node ../test/frontend/lint.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

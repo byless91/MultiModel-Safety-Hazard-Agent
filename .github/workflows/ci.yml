@@ -24,20 +24,15 @@ jobs:
       - name: 安装依赖（按 uv.lock 锁定版本）
         run: uv sync --frozen --extra dev --extra faiss
       - name: Ruff 静态检查
-        run: uv run ruff check .
+        run: uv run ruff check . ../test
       - name: Mypy 类型检查（核心模块）
         run: uv run mypy
       - name: 验证数据库迁移可执行（全新库 upgrade head）
         run: |
           DATABASE_URL="sqlite:///./data/ci-migrate.db" uv run alembic upgrade head
           rm -f data/ci-migrate.db
-      - name: Pytest 单元测试
-        run: |
-          set +e
-          uv run pytest -q -p no:cacheprovider 2>&1 | tee /tmp/pytest.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then grep -E "^FAILED|^ERROR|failed|error" /tmp/pytest.log | head -12 | while read -r line; do echo "::error::$line"; done; fi
-          exit "$code"
+      - name: Pytest 新旧测试（独立进程、隔离数据）
+        run: uv run python ../test/run_backend.py --suite all -q
 
   frontend:
     name: 前端（eslint / vue-tsc / build）
@@ -92,6 +87,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql+psycopg://safety:safety@localhost:5432/safety_test
+      TEST_DATABASE_URL: postgresql+psycopg://safety:safety@localhost:5432/safety_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -103,13 +99,8 @@ jobs:
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --frozen --extra dev --extra faiss --extra pg
       - run: uv run alembic upgrade head
-      - name: Pytest 单元测试（PG）
-        run: |
-          set +e
-          uv run pytest -q -p no:cacheprovider 2>&1 | tee /tmp/pytest.log
-          code=${PIPESTATUS[0]}
-          if [ "$code" -ne 0 ]; then grep -E "^FAILED|^ERROR|failed|error" /tmp/pytest.log | head -12 | while read -r line; do echo "::error::$line"; done; fi
-          exit "$code"
+      - name: Pytest 新旧测试（PG，独立进程）
+        run: uv run python ../test/run_backend.py --suite all -q
 
   eval-gate:
     name: 评测回归门禁（mock）

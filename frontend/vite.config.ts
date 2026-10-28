@@ -1,9 +1,21 @@
+import { fileURLToPath } from 'node:url'
+
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [vue()],
+  resolve: {
+    // Root test files resolve the same packages as the application.
+    dedupe: ['vue', 'pinia', 'vitest', '@vue/test-utils', 'axios'],
+  },
   server: {
+    fs: mode === 'test' ? {
+      allow: [
+        fileURLToPath(new URL('.', import.meta.url)),
+        fileURLToPath(new URL('../test', import.meta.url)),
+      ],
+    } : undefined,
     port: 5173,
     proxy: {
       '/api': {
@@ -18,6 +30,6 @@ export default defineConfig({
   },
   test: {
     environment: 'happy-dom',
-    include: ['src/**/*.spec.ts'],
+    include: ['src/**/*.spec.ts', '../test/frontend/**/*.spec.ts'],
   },
-})
+}))

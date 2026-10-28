@@ -2,6 +2,8 @@
 
 面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。当前为 MVP 骨架，无 API Key 时使用 Mock 模式即可跑通完整演示链路。
 
+后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0 测试入口与基线已完成，后续从 R1 复核审计开始；新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)。
+
 ## 技术栈
 
 - 后端：Python 3.11+、FastAPI、SQLAlchemy、SQLite
@@ -165,10 +167,17 @@ jwt 模式使用：
 
 ## 测试
 
-```bash
-cd backend
-python -m pytest
+从仓库根目录运行新旧后端测试（分进程隔离）及前端检查：
+
+```powershell
+.\backend\.venv\Scripts\python.exe test/run_backend.py --suite all -q
+pnpm --dir frontend test
+pnpm --dir frontend lint
+pnpm --dir frontend type-check
+pnpm --dir frontend build
 ```
+
+聚焦测试、PG 测试参数和可重复基线记录见 [test/README.md](test/README.md)。
 
 ## 数据库迁移（Alembic）
 

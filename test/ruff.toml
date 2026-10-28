@@ -1,0 +1,4 @@
+extend = "../backend/pyproject.toml"
+
+[lint.per-file-ignores]
+"backend/*" = ["E402"]
