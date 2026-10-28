@@ -18,7 +18,8 @@ def main() -> int:
     parser.add_argument("--reports-dir", type=Path, default=ROOT / "test/.artifacts/reports")
     parser.add_argument("--output", type=Path, default=ROOT / "docs/baselines/r0-2026-10-28.json")
     args = parser.parse_args()
-    reports = args.reports_dir
+    reports = args.reports_dir.resolve()
+    output = args.output.resolve()
     test_environment = junit_environment(reports / "backend-new.xml")
     if test_environment != junit_environment(reports / "backend-legacy.xml"):
         raise ValueError("Backend reports were produced under different test environments")
@@ -46,9 +47,10 @@ def main() -> int:
         "evaluation_dataset": dataset_summary(ROOT / "backend/data/eval_cases/cases.jsonl"),
         "not_validated": ["PostgreSQL runtime", "Docker runtime", "Real model/image accuracy"],
     }
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(baseline, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Baseline written: {args.output.relative_to(ROOT)}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(baseline, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    label = output.relative_to(ROOT) if output.is_relative_to(ROOT) else output
+    print(f"Baseline written: {label}")
     return 0
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class JobOut(BaseModel):
@@ -74,17 +74,37 @@ class AssessmentOut(BaseModel):
 class ConfirmIn(BaseModel):
     confirmed: bool = True
     edits: dict[str, Any] = Field(default_factory=dict)
-    reviewer: str | None = None
-    note: str | None = None
+    reviewer: str | None = Field(default=None, max_length=64)
+    note: str | None = Field(default=None, max_length=2000)
 
     @field_validator("edits")
     @classmethod
     def validate_risk_level(cls, edits: dict[str, Any]) -> dict[str, Any]:
+        if edits.keys() - {"hazard_category", "risk_level", "conclusion"}:
+            raise ValueError("edits 仅允许 hazard_category、risk_level、conclusion")
+        edits = dict(edits)
+        for name, limit in (("hazard_category", 128), ("conclusion", 2000)):
+            if name in edits:
+                value = edits[name]
+                if not isinstance(value, str) or not value.strip() or len(value.strip()) > limit:
+                    raise ValueError(f"{name} 必须为 1-{limit} 字符的非空文本")
+                edits[name] = value.strip()
         if "risk_level" in edits:
             level = edits["risk_level"]
             if type(level) is not int or not 1 <= level <= 3:
                 raise ValueError("risk_level 必须为 1-3 的整数")
         return edits
+
+    @field_validator("note", "reviewer")
+    @classmethod
+    def strip_review_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @model_validator(mode="after")
+    def rejection_requires_note(self) -> "ConfirmIn":
+        if not self.confirmed and not self.note:
+            raise ValueError("拒绝定稿时必须填写复核意见")
+        return self
 
 
 class RectificationConfirmIn(BaseModel):

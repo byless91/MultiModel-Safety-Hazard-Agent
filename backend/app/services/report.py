@@ -1,3 +1,4 @@
+from copy import deepcopy
 from typing import Any
 
 
@@ -65,3 +66,28 @@ def build_report(state: dict[str, Any]) -> dict[str, Any]:
         "work_order": work_order,
         "disclaimer": "本报告由 AI 辅助生成，仅供研判参考，需人工确认后使用。",
     }
+
+
+def human_summary(category: str | None, level: int | None) -> str:
+    return f"人工复核：现场存在“{category or '待确认隐患'}”类隐患，按 {level or 3} 级处置。"
+
+
+def build_reviewed_report(
+    original: dict[str, Any], *, category: str | None, level: int | None,
+    conclusion: str | None, confidence: float | None, evidence: list, confirmed: bool,
+) -> dict[str, Any]:
+    """Render the effective human result without pretending to rerun AI rules."""
+    generated = build_report({"hazard_category": category, "risk_level": level,
+                              "confidence": confidence, "evidence": evidence})
+    # Old category-specific actions cannot silently follow a changed category.
+    report = deepcopy(original) if original.get("category") == category else generated
+    if not report:
+        report = generated
+    report.update(category=category, level=level, summary=conclusion, briefing=conclusion,
+                  result_source="human_review", review_confirmed=confirmed)
+    work_order = report.setdefault("work_order", {})
+    for key in ("title", "category", "level", "deadline"):
+        work_order[key] = generated["work_order"][key]
+    work_order["source_note"] = "人工复核已确认" if confirmed else "人工修订，待确认后使用"
+    report["disclaimer"] = "类别与等级以人工复核结论为准；原始 AI 风险计算与法规证据仅供核对，不代表重新验证。"
+    return report

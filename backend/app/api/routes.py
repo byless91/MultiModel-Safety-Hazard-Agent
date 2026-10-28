@@ -78,7 +78,7 @@ from app.services.rectification import (
     transition_rectification,
 )
 from app.services.rectification_assessment import assess_rectification_completion
-from app.services.review import confirmation_is_replay, ensure_followup_allowed
+from app.services.review import apply_human_review, effective_result, ensure_followup_allowed
 from app.services.workflow import run_workflow
 
 settings = get_settings()
@@ -133,6 +133,7 @@ def to_out(item: Assessment) -> AssessmentOut:
     evidence_judge = parse_json(item.evidence_judge_json)
     ensemble_judge = parse_json(item.ensemble_judge_json) or {}
     rect_status = normalize_rectification_status(item.rectification_status)
+    effective = effective_result(item)
     return AssessmentOut(
         id=item.id,
         description=item.description,
@@ -141,13 +142,13 @@ def to_out(item: Assessment) -> AssessmentOut:
         hazard_category=item.hazard_category,
         risk_level=item.risk_level,
         confidence=item.confidence,
-        conclusion=item.conclusion,
+        conclusion=effective["conclusion"],
         evidence=parse_json(item.evidence_json) or [],
         evidence_judge=evidence_judge,
         multi_model=parse_json(item.multi_model_json),
         disagreement=parse_json(item.disagreement_json),
         findings=ensemble_judge.get("final_findings") or [],
-        report=parse_json(item.report_json),
+        report=effective["report"],
         followup_questions=parse_json(item.followup_questions_json) or [],
         followup_used=item.followup_used,
         confirmed=item.confirmed,
@@ -160,7 +161,7 @@ def to_out(item: Assessment) -> AssessmentOut:
         rectified_at=item.rectified_at,
         review_reasons=parse_json(item.review_reasons_json) or [],
         awaiting_human_review=item.status == "awaiting_human_review",
-        human_review=parse_json(item.human_review_json),
+        human_review=effective["human_review"],
         risk_result=risk or None,
         risk_score=risk.get("risk_score"),
         risk_label=risk.get("risk_level"),
@@ -929,36 +930,9 @@ def confirm_assessment(
     # 审计身份以认证身份为准；无用户体系（none/token）时回退请求体字段（兼容旧客户端）
     user = get_request_user(request)
     reviewer_name = user.username if user else (payload.reviewer or "")
-    if confirmation_is_replay(item, db, payload, reviewer_name):
+    if not apply_human_review(item, db, payload, reviewer_name, user.id if user else None):
         return to_out(item)
-    item.confirmed = payload.confirmed
-    item.confirmed_by_id = user.id if user else None
-    item.confirmed_by_name = reviewer_name or None
-    edits = payload.edits or {}
-    if edits.get("hazard_category"):
-        item.hazard_category = str(edits["hazard_category"])
-    if edits.get("risk_level") is not None:
-        try:
-            level = int(edits["risk_level"])
-        except (TypeError, ValueError):
-            raise HTTPException(status_code=422, detail="risk_level 必须为 1-4 的整数") from None
-        if not 1 <= level <= 4:
-            raise HTTPException(status_code=422, detail="risk_level 必须为 1-4 的整数")
-        item.risk_level = level
-    if edits.get("conclusion"):
-        item.conclusion = str(edits["conclusion"])
-    item.status = "confirmed" if payload.confirmed else "needs_review"
     human_review = parse_json(item.human_review_json) or {}
-    human_review["resolution"] = {
-        "confirmed": payload.confirmed,
-        "reviewer": reviewer_name,
-        "note": payload.note or "",
-        "edits": payload.edits or {},
-        "resolved_at": utcnow().isoformat(),
-    }
-    item.human_review_json = json.dumps(human_review, ensure_ascii=False)
-    db.commit()
-    db.refresh(item)
     if settings.workflow_mode == "async":
         # 人工复核结论回写图线程状态（checkpointer），保持图状态与业务记录一致
         from app.services.langgraph_flow import append_thread_state
@@ -971,6 +945,10 @@ def confirm_assessment(
                     "confirmed": bool(item.confirmed),
                     "status": item.status,
                     "human_review": human_review,
+                    "hazard_category": item.hazard_category,
+                    "risk_level": item.risk_level,
+                    "conclusion": item.conclusion,
+                    "report": parse_json(item.report_json),
                 },
             )
     return to_out(item)
@@ -1130,7 +1108,8 @@ def transition_rectification_status(
 
 
 def _export_content(item: Assessment) -> str:
-    report = parse_json(item.report_json) or {}
+    effective = effective_result(item)
+    report = effective["report"] or {}
     work_order = report.get("work_order", {}) or {}
     evidence = parse_json(item.evidence_json) or []
     lines = [
@@ -1142,7 +1121,7 @@ def _export_content(item: Assessment) -> str:
         f"- 置信度：{item.confidence or '-'}",
         "",
         "## 研判结论",
-        item.conclusion or "",
+        effective["conclusion"] or "",
         "",
         "## 参考依据",
     ]
