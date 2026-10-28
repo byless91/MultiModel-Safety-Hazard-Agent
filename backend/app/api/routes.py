@@ -56,18 +56,20 @@ from app.services.document_converter import (
     convert_to_markdown,
 )
 from app.services.finding_identity import legacy_evidence_view
+from app.services.followup import finish_followup, release_followup, reserve_followup
 from app.services.guardrail import (
     detect_image_type,
     inspect_ocr_texts,
-    inspect_text,
     validate_uploaded_input,
 )
+from app.services.guardrail.input_guard import MAX_DESCRIPTION_LENGTH
 from app.services.job_runner import (
     enqueue_job,
     find_create_thread_id,
     get_job_runner,
 )
 from app.services.knowledge import rebuild_knowledge
+from app.services.model_inputs import require_model_text
 from app.services.providers import ImageInput, get_provider, get_providers
 from app.services.rag import get_rag
 from app.services.rectification import (
@@ -79,7 +81,7 @@ from app.services.rectification import (
     transition_rectification,
 )
 from app.services.rectification_assessment import assess_rectification_completion
-from app.services.review import apply_human_review, effective_result, ensure_followup_allowed
+from app.services.review import apply_human_review, effective_result
 from app.services.workflow import run_workflow
 
 settings = get_settings()
@@ -293,15 +295,11 @@ def _reject_ocr_texts(ocr_texts: list[str]) -> None:
         raise HTTPException(status_code=400, detail=detail)
 
 
-def _reject_text(text: str, *, max_length: int | None = None) -> None:
-    errors = [
-        item
-        for item in inspect_text(text or "", max_length=max_length)
-        if item.severity == "error"
-    ]
-    if errors:
-        detail = "；".join(f"{item.code}: {item.message}" for item in errors)
-        raise HTTPException(status_code=400, detail=detail)
+def _reject_text(text: str, *, max_length: int | None = MAX_DESCRIPTION_LENGTH) -> None:
+    try:
+        require_model_text(text or "", max_length=max_length)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _image_row_url(row: AssessmentImage) -> str | None:
@@ -382,6 +380,7 @@ def _compare_recently_run(item: Assessment) -> bool:
 
 
 def _run_rectification_compare(item: Assessment, db: Session) -> None:
+    _reject_text(item.rectification_note or "")
     provider = get_provider()
     original_rows = _rectification_image_rows(db, item.id, "original")
     rectification_rows = _rectification_image_rows(db, item.id, "rectification")
@@ -738,6 +737,7 @@ async def create_assessment(
     ocr_list = _parse_ocr_texts(ocr_texts)
     _reject_ocr_texts(ocr_list)
     _reject_uploaded_input(description, [data for _, data in staged])
+    _reject_text(followup_answer)
     _check_token_budget()
 
     assessment = Assessment(id=str(uuid4()), description=description)
@@ -767,7 +767,7 @@ async def create_assessment(
             ))
             images.append(ImageInput(filename=original_name, path=target, mime_type=sniffed_mime))
         if settings.workflow_mode == "async":
-            job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list)
+            job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list, answer=followup_answer or None)
         # assessment、图片元数据、幂等键和初始 job 只能一起提交。
         db.commit()
     except Exception as exc:
@@ -881,14 +881,12 @@ def followup_assessment(
     response: Response = None,
     db: Session = Depends(get_db),
 ) -> AssessmentOut | JobOut:
-    item = db.get(Assessment, assessment_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="研判记录不存在")
-    ensure_followup_allowed(item, db)
     _reject_text(payload.answer)
-    if item.followup_used >= settings.max_followups:
-        raise HTTPException(status_code=400, detail="已达追问上限")
+    if not payload.answer.strip():
+        raise HTTPException(status_code=400, detail="追问回答不能为空")
     _check_token_budget()
+    item, reservation = reserve_followup(db, assessment_id, settings.max_followups)
+    _reject_text(item.description or "")
     if settings.workflow_mode == "async":
         # 异步模式：从 info 中断点恢复（不重跑视觉模型），完成后回写结果
         thread_id = find_create_thread_id(db, assessment_id)
@@ -898,29 +896,35 @@ def followup_assessment(
             "followup",
             answer=payload.answer,
             thread_id=thread_id,
+            reservation_token=reservation,
         )
         db.commit()
         get_job_runner().wake()
         response.status_code = 202
         return job_to_out(job)
+    images = images_from_db(db, assessment_id, kind="original")
+    db.commit()  # 在模型调用前提交预留，其他请求立即看到 pending。
     try:
         ctx_token = llm_ledger.current_assessment_id.set(item.id)
         try:
             state = run_workflow(
                 description=item.description,
-                images=images_from_db(db, assessment_id, kind="original"),
+                images=images,
                 followup_answer=payload.answer,
                 followup_used=item.followup_used,
             )
         finally:
             llm_ledger.current_assessment_id.reset(ctx_token)
+        if not finish_followup(db, assessment_id, reservation, state):
+            raise HTTPException(status_code=409, detail="追问预留已失效，结果未覆盖")
+        db.commit()
+    except HTTPException:
+        raise
     except Exception as exc:
-        item.status = "failed"
+        db.rollback()
+        release_followup(db, assessment_id, reservation)
         db.commit()
         raise HTTPException(status_code=502, detail=f"研判服务异常：{exc}") from exc
-    item.followup_used += 1
-    apply_state(item, state, db)
-    db.commit()
     db.refresh(item)
     return to_out(item)
 
@@ -998,6 +1002,7 @@ async def submit_rectification(
     if not staged:
         raise HTTPException(status_code=400, detail="至少需要上传一张整改后照片")
     _reject_uploaded_input("", [data for _, data in staged])
+    _reject_text(note)
 
     upload_root = settings.upload_dir / assessment_id
     upload_root.mkdir(parents=True, exist_ok=True)
@@ -1073,6 +1078,7 @@ def confirm_rectification(
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
     target = "verified" if payload.resolved else "rectifying"
+    _reject_text(payload.note or "")
     note = payload.note or (
         "人工确认整改完成" if payload.resolved else "人工退回整改"
     )

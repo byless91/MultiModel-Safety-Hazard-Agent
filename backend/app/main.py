@@ -30,6 +30,11 @@ _REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     init_db()
+    from app.services.followup import recover_abandoned_sync_followups
+
+    recovered = await run_in_threadpool(recover_abandoned_sync_followups)
+    if recovered:
+        logger.warning("回收进程遗留的同步追问预留 %d 条；未自动重放模型调用", recovered)
     if settings.auth_mode == "jwt" and settings.auth_jwt_secret == "dev-insecure-secret-change-me":
         logger.warning("AUTH_MODE=jwt 但仍在使用默认开发密钥，生产必须设置 AUTH_JWT_SECRET")
     if settings.auth_mode == "none":

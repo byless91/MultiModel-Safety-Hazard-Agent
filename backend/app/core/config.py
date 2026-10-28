@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     job_stale_minutes: int = 10
     job_lease_seconds: float = Field(default=30.0, ge=3)
     job_monitor_seconds: float = Field(default=5.0, gt=0, le=10)
+    job_stop_grace_seconds: float = Field(default=5.0, ge=0, le=30)
     idempotency_ttl_hours: int = 24
     compare_dedup_minutes: int = 5
 

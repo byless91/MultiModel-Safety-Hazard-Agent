@@ -30,6 +30,7 @@ class Assessment(Base):
     report_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     followup_questions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     followup_used: Mapped[int] = mapped_column(Integer, default=0)
+    followup_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
     confirmed: Mapped[bool] = mapped_column(default=False)
     rectification_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     rectification_note: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -24,6 +25,8 @@ from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.models import Assessment, AssessmentJob
 from app.services.assessment_io import apply_state, images_from_db, parse_payload_json
+from app.services.followup import finish_followup, release_followup
+from app.services.model_inputs import require_model_text
 from app.services.worker_lock import WorkerLock
 
 logger = logging.getLogger("safety_hazard.jobs")
@@ -37,6 +40,7 @@ def enqueue_job(
     answer: str | None = None,
     ocr_texts: list[str] | None = None,
     thread_id: str | None = None,
+    reservation_token: str | None = None,
 ) -> AssessmentJob:
     job = AssessmentJob(
         assessment_id=assessment_id,
@@ -44,7 +48,7 @@ def enqueue_job(
         answer=answer,
         payload_json=json.dumps({"ocr_texts": ocr_texts or []}, ensure_ascii=False)
         if kind == "create"
-        else None,
+        else json.dumps({"followup_reservation": reservation_token}) if reservation_token else None,
         thread_id=thread_id,
         status="queued",
         progress_step="queued",
@@ -107,17 +111,26 @@ def recover_stale_jobs(*, now: datetime | None = None, startup: bool = False) ->
         query = update(AssessmentJob).where(AssessmentJob.status == "running")
         if not startup:
             query = query.where(expired)
-        ids = db.scalars(query.values(
+        rows = db.execute(query.values(
             status="failed", error="任务执行归属丢失或租约超时，已被清扫；未自动重放模型调用",
-        ).returning(AssessmentJob.assessment_id)).all()
-        if ids:
-            db.execute(update(Assessment).where(
-                Assessment.id.in_(ids), Assessment.confirmed.is_(False),
-                Assessment.status.in_(["pending", "needs_more_info"]),
-            ).values(status="failed"))
+        ).returning(AssessmentJob.assessment_id, AssessmentJob.kind, AssessmentJob.payload_json)).all()
+        if rows:
+            failed_ids = []
+            for assessment_id, kind, payload in rows:
+                reservation = parse_payload_json(payload).get("followup_reservation")
+                if kind == "followup" and reservation:
+                    release_followup(db, assessment_id, reservation)
+                else:
+                    failed_ids.append(assessment_id)
+            if failed_ids:
+                db.execute(update(Assessment).where(
+                    Assessment.id.in_(failed_ids), Assessment.confirmed.is_(False),
+                    Assessment.status.in_(["pending", "needs_more_info"]),
+                    Assessment.followup_token.is_(None),
+                ).values(status="failed"))
             db.commit()
-            logger.warning("清扫僵尸任务 %d 条", len(ids))
-        return len(ids)
+            logger.warning("清扫僵尸任务 %d 条", len(rows))
+        return len(rows)
     finally:
         db.close()
 
@@ -147,6 +160,16 @@ def _finish_job(job_id: str, attempt_token: str, *, state=None, error: str | Non
         ).values(status="failed" if error else "succeeded", error=error).returning(AssessmentJob)).first()
         if job is None:
             return False
+        reservation = parse_payload_json(job.payload_json).get("followup_reservation")
+        if job.kind == "followup" and reservation:
+            if error:
+                release_followup(db, job.assessment_id, reservation)
+            elif finish_followup(db, job.assessment_id, reservation, state):
+                job.progress_step = str(state.get("status") or "done")
+            else:
+                job.status, job.error = "failed", "追问预留已失效，拒绝覆盖既有结果"
+            db.commit()
+            return True
         assessment = db.get(Assessment, job.assessment_id)
         if assessment is None or assessment.confirmed or assessment.status not in {"pending", "needs_more_info"}:
             job.status = "failed"
@@ -156,6 +179,7 @@ def _finish_job(job_id: str, attempt_token: str, *, state=None, error: str | Non
         else:
             apply_state(assessment, state, db)
             if job.kind == "followup":
+                # 兼容升级前已排队、尚无预留标识的追问。
                 assessment.followup_used += 1
             job.progress_step = str(state.get("status") or "done")
         db.commit()
@@ -194,16 +218,23 @@ def execute_job(job_id: str, attempt_token: str) -> None:
 
         ctx_token = llm_ledger.current_assessment_id.set(assessment.id)
         try:
+            require_model_text(assessment.description or "")
+            require_model_text(job.answer or "")
             if job.kind == "create":
                 from app.services.workflow import run_workflow
 
                 payload = parse_payload_json(job.payload_json)
+                ocr_texts = payload.get("ocr_texts") or []
+                if not isinstance(ocr_texts, list):
+                    raise ValueError("OCR 输入必须是文本列表")
+                for text in ocr_texts:
+                    require_model_text(text)
                 state = run_workflow(
                     description=assessment.description or "（未填写描述）",
                     images=images,
-                    followup_answer=None,
+                    followup_answer=job.answer or None,
                     followup_used=assessment.followup_used,
-                    ocr_texts=payload.get("ocr_texts") or [],
+                    ocr_texts=ocr_texts,
                     progress=progress,
                     thread_id=job.thread_id,
                     use_checkpointer=True,
@@ -248,6 +279,7 @@ class JobRunner:
         self._execution: asyncio.Task | None = None
         self._active: AssessmentJob | None = None
         self._lock: WorkerLock | None = None
+        self._lock_guard = threading.Lock()
         self._worker_id = ""
 
     @property
@@ -263,6 +295,8 @@ class JobRunner:
         self._lock = WorkerLock(settings.langgraph_checkpoint_path.with_suffix(".worker.lock"))
         self._worker_id = str(uuid.uuid4())
         self._wake = asyncio.Event()  # lifespan 重启时绑定新的事件循环
+        self._active = None
+        self._execution = None
         self._stopped = False
         try:
             recovered = await asyncio.to_thread(recover_stale_jobs, startup=True)
@@ -280,7 +314,7 @@ class JobRunner:
         self._wake.set()
         if self._task is not None:
             try:
-                await asyncio.wait_for(asyncio.shield(self._task), timeout=5.0)
+                await asyncio.wait_for(asyncio.shield(self._task), timeout=get_settings().job_stop_grace_seconds)
             except (TimeoutError, asyncio.CancelledError):
                 self._task.cancel()
             self._task = None
@@ -292,16 +326,22 @@ class JobRunner:
             await asyncio.to_thread(
                 _finish_job, self._active.id, self._active.attempt_token, error="worker 停止，未重放调用",
             )
-        if self._execution is not None and not self._execution.done():
-            # 底层线程不可取消；退出前继续持有 checkpoint 锁，阻止新 worker 并发写。
-            self._execution.add_done_callback(lambda _: self._release_lock())
-        else:
+        if self._active is None:
             self._release_lock()
 
     def _release_lock(self) -> None:
-        if self._lock is not None:
-            self._lock.release()
-            self._lock = None
+        with self._lock_guard:
+            if self._lock is not None:
+                self._lock.release()
+                self._lock = None
+
+    def _execute_owned(self, job: AssessmentJob) -> None:
+        try:
+            execute_job(job.id, job.attempt_token)
+        finally:
+            # 由真实线程释放。asyncio Task 被取消不代表模型线程或 checkpoint 已停止。
+            if self._stopped:
+                self._release_lock()
 
     async def _monitor_loop(self) -> None:
         while True:
@@ -338,9 +378,12 @@ class JobRunner:
                     job.assessment_id,
                 )
                 self._active = job
-                self._execution = asyncio.create_task(asyncio.to_thread(execute_job, job.id, job.attempt_token))
-                await asyncio.shield(self._execution)
-                self._active = None
+                self._execution = asyncio.create_task(asyncio.to_thread(self._execute_owned, job))
+                try:
+                    await asyncio.shield(self._execution)
+                finally:
+                    if self._execution.done() and not self._execution.cancelled():
+                        self._active = None
             except asyncio.CancelledError:
                 raise
             except Exception:

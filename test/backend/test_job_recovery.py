@@ -192,6 +192,50 @@ def test_monitor_keeps_blocked_execution_alive(job_db, monkeypatch):
     asyncio.run(exercise())
 
 
+def test_cancelling_async_task_cannot_release_live_model_thread_lock(job_db, monkeypatch):
+    from app.services import workflow
+
+    monkeypatch.setattr(jobs.get_settings(), "job_stop_grace_seconds", 0.02)
+    started, release, exited = threading.Event(), threading.Event(), threading.Event()
+
+    def run(**kwargs):
+        started.set()
+        try:
+            assert release.wait(3)
+            return {"status": "needs_more_info"}
+        finally:
+            exited.set()
+
+    monkeypatch.setattr(workflow, "run_workflow", run)
+    _, job_id = add_job(job_db, status="queued")
+
+    async def exercise():
+        runner = jobs.JobRunner()
+        await runner.start()
+        try:
+            assert await asyncio.to_thread(started.wait, 2)
+            await runner.stop()
+            runner._execution.cancel()  # emulate event-loop shutdown cancellation
+            await asyncio.gather(runner._execution, return_exceptions=True)
+            with pytest.raises(RuntimeError, match="单实例"):
+                WorkerLock(jobs.get_settings().langgraph_checkpoint_path.with_suffix(".worker.lock"))
+            with job_db() as db:
+                assert db.get(AssessmentJob, job_id).status == "failed"
+        finally:
+            release.set()
+            assert await asyncio.to_thread(exited.wait, 2)
+            for _ in range(100):
+                if runner._lock is None:
+                    break
+                await asyncio.sleep(0.01)
+            assert runner._lock is None
+        await runner.start()
+        await runner.stop()
+        assert runner._lock is None
+
+    asyncio.run(exercise())
+
+
 def test_lease_migration_upgrades_existing_rows_and_is_reentrant(tmp_path, monkeypatch):
     path = (Path(__file__).resolve().parents[2] / "backend/migrations/versions"
             / "20261028_c21a7db8e401_job_execution_leases.py")
