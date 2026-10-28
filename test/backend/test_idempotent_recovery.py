@@ -2,6 +2,7 @@
 
 import asyncio
 import importlib.util
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,8 @@ from app.api import routes
 from app.core.db import SessionLocal
 from app.main import app
 from app.models import Assessment, AssessmentJob, IdempotencyKey
+
+from _support.environment import validate_database_url
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 48
 
@@ -237,13 +240,26 @@ def test_lookup_missing_or_invalid_key_does_not_create_work(submissions):
     assert not calls
 
 
-def test_fingerprint_migration_preserves_old_mapping_and_can_reenter(tmp_path, monkeypatch):
+@pytest.mark.parametrize("dialect", ["sqlite", "postgres"])
+def test_fingerprint_migration_preserves_old_mapping_and_can_reenter(tmp_path, monkeypatch, dialect):
     path = (Path(__file__).resolve().parents[2] / "backend/migrations/versions"
             / "20261028_f04b62a9c310_submission_fingerprints.py")
     spec = importlib.util.spec_from_file_location("fingerprint_migration", path)
     migration = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(migration)
-    engine = sa.create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
+    admin = None
+    if dialect == "postgres":
+        url = os.environ.get("R4_TEST_POSTGRES_URL")
+        if not url:
+            pytest.skip("set R4_TEST_POSTGRES_URL to a local PostgreSQL test database")
+        validate_database_url(url)
+        schema = f"r4_migration_{uuid4().hex}"
+        admin = sa.create_engine(url)
+        with admin.begin() as connection:
+            connection.execute(sa.schema.CreateSchema(schema))
+        engine = sa.create_engine(url, connect_args={"options": f"-csearch_path={schema}"})
+    else:
+        engine = sa.create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
     with engine.begin() as connection:
         connection.exec_driver_sql("CREATE TABLE idempotency_keys (key VARCHAR(128) PRIMARY KEY)")
         connection.exec_driver_sql("INSERT INTO idempotency_keys VALUES ('legacy-key')")
@@ -253,3 +269,7 @@ def test_fingerprint_migration_preserves_old_mapping_and_can_reenter(tmp_path, m
         row = connection.exec_driver_sql("SELECT key, request_hash FROM idempotency_keys").one()
         assert row == ("legacy-key", None)
     engine.dispose()
+    if admin is not None:
+        with admin.begin() as connection:
+            connection.execute(sa.schema.DropSchema(schema, cascade=True))
+        admin.dispose()

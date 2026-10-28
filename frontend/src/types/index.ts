@@ -201,6 +201,7 @@ export interface AssessmentReport {
 
 export type AssessmentStatus =
   | 'pending'
+  | 'failed'
   | 'processing'
   | 'needs_more_info'
   | 'completed'

@@ -21,6 +21,7 @@
               :auto-upload="false"
               :limit="3"
               :on-exceed="onExceed"
+              :disabled="store.hasPendingSubmission"
             >
               <el-icon><Plus /></el-icon>
             </el-upload>
@@ -36,6 +37,7 @@
               v-model="description"
               type="textarea"
               :rows="4"
+              :disabled="store.hasPendingSubmission"
               placeholder="例如：3 栋 2 单元楼道堆满纸箱，挡住疏散通道"
             />
           </div>
@@ -46,16 +48,33 @@
             type="primary"
             native-type="submit"
             :loading="store.loading"
-            :disabled="!description.trim()"
+            :disabled="!description.trim() || store.hasPendingSubmission"
           >
             <el-icon><UploadFilled /></el-icon>
             开始研判
           </el-button>
-          <el-button :disabled="store.loading" @click="resetForm">重置</el-button>
+          <el-button :disabled="store.loading || store.submissionBusy" @click="resetForm">
+            {{ store.hasPendingSubmission ? '新建研判' : '重置' }}
+          </el-button>
           <span v-if="!description.trim()" class="action-hint">填写情况描述后才能开始</span>
         </div>
       </form>
     </el-card>
+
+    <section v-if="store.hasPendingSubmission" class="submission-recovery" role="status" aria-live="polite">
+      <p>{{ store.submission?.phase === 'failed' ? '本次研判未完成，原记录已保留。' : '结果尚未确认，请先查询本次提交。' }}</p>
+      <div class="intake-actions">
+        <el-button :disabled="store.submissionBusy" @click="resumeSubmission(false)">查询本次提交</el-button>
+        <el-button v-if="store.canRetrySubmission" :disabled="store.submissionBusy" @click="resumeSubmission(true)">
+          重试原内容
+        </el-button>
+        <RouterLink v-if="store.submission?.assessmentId" :to="`/assessments/${store.submission.assessmentId}`">
+          查看研判记录
+        </RouterLink>
+        <RouterLink to="/history">历史记录</RouterLink>
+      </div>
+      <p class="field-hint">刷新后仍可查询。新建研判不会取消已受理的请求。</p>
+    </section>
 
     <el-alert
       v-if="store.activeJob && store.loading"
@@ -123,11 +142,23 @@ async function submit() {
     .map((item) => (item.raw ? item.raw : (item as unknown as File)))
     .filter((item) => item instanceof File)
   try {
-    assessment.value = await store.create(description.value.trim(), files)
-    ElMessage.success('研判完成')
-  } catch (err) {
-    // store.error 已在页面展示，这里只吞掉未处理的 Promise rejection
-    console.warn('研判失败', err)
+    showSubmission(await store.create(description.value.trim(), files))
+  } catch {
+    // store.error 和恢复入口已在页面展示。
+  }
+}
+
+function showSubmission(result: Assessment) {
+  assessment.value = result.status === 'pending' ? null : result
+  if (result.status === 'pending') ElMessage.info('请求已受理，可从记录入口查看进度')
+  else ElMessage.success('研判记录已就绪')
+}
+
+async function resumeSubmission(retry: boolean) {
+  try {
+    showSubmission(await (retry ? store.retryCreate() : store.recoverCreate()))
+  } catch {
+    // 保留原提交及其查询入口，不自动创建新的研判。
   }
 }
 
@@ -147,6 +178,7 @@ function onUpdated(updated: Assessment) {
 }
 
 function resetForm() {
+  store.startNewSubmission()
   description.value = ''
   fileList.value = []
   assessment.value = null
@@ -160,6 +192,14 @@ function onExceed() {
 
 <style scoped>
 .intake-card {
+  background: var(--panel);
+}
+
+.submission-recovery {
+  margin-top: var(--s-4);
+  padding: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   background: var(--panel);
 }
 

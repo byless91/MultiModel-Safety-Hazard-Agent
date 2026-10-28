@@ -2,7 +2,7 @@
 
 面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。当前为 MVP 骨架，无 API Key 时使用 Mock 模式即可跑通完整演示链路。
 
-后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R3 已完成，后续从 R4 模型并发与重复费用开始；新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)。
+后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R4 已完成，后续从 R5 部署和认证配置开始；新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)、[R4 验证记录](docs/baselines/r4-2026-10-28.md)。
 
 ## 技术栈
 
@@ -148,7 +148,9 @@ jwt 模式使用：
 
 ### 幂等与去重
 
-- `POST /assessments` 支持 `Idempotency-Key` 请求头（8-128 位字母数字或 `-_`）：同 key 24 小时内重复请求返回首次结果（响应头 `Idempotency-Replayed: true`），网络重试不再重复付费；
+- `POST /assessments` 支持 `Idempotency-Key`（8-128 位字母数字或 `-_`）：同 key 在重放窗口内校验初始描述、补充回答、OCR 和图片指纹；内容不同返回 409，内容相同复用原研判/初始任务。默认窗口 24 小时，pending/failed 不会因过期自动重跑；已完成终态过期后直接 POST 可新建，调用方应为新提交生成新 key。
+- `GET /assessment-submissions/{key}` 只读查询原提交，无模型调用、不删除过期映射；原 create job 排队/执行中为 202，其他情况为 Assessment 200，始终提供 Assessment-Id / Location。旧 key 无指纹时 POST 明确冲突，仍可 GET 恢复。
+- 前端每次新建生成独立 key；结果不确定时先查询，明确未找到才按内存中的原内容和原 key 重发。页面提供查询、原内容重试及记录入口；sessionStorage 仅保留恢复元数据，刷新后不自动重传照片。同步失败保留原记录，需要再次执行时明确新建研判。
 - `POST /assessments/{id}/rectification/compare` 在同整改状态的 `COMPARE_DEDUP_MINUTES` 窗口内复用上次比对结果，不重复调用模型。
 
 ## 已实现能力
