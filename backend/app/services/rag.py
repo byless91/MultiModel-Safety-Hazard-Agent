@@ -2,7 +2,9 @@ import json
 import logging
 import re
 import threading
+import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -25,6 +27,8 @@ logger = logging.getLogger("safety_hazard.rag")
 
 DEMO_SOURCE_MARKERS = ("演示",)
 DEMO_VERSION_MARKERS = ("demo",)
+HASH_EMBEDDING_SPACE = "hash:sha256-v1:256"
+INDEX_FORMAT_VERSION = 2
 
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 _WORD_RE = re.compile(r"[a-zA-Z0-9_]{2,}")
@@ -129,6 +133,8 @@ class RAGService:
         self.embedding_fallback = False
         self.reranker_enabled = settings.reranker_enabled
         self.model_key = self._model_key()
+        self.embedding_space = self.model_key
+        self._next_recovery_at = 0.0
         # 读写锁：重建期间查询读不到半新半旧的状态（B1 审查项竞态）
         self._lock = threading.RLock()
         self.load()
@@ -144,7 +150,16 @@ class RAGService:
 
     def load(self) -> None:
         with self._lock:
-            self._load_locked()
+            fields = ("texts", "metas", "hashes", "model_key", "vectors", "_index", "embedding_dim",
+                      "embedding_fallback", "embedding_space", "_next_recovery_at")
+            previous = {name: getattr(self, name) for name in fields}
+            try:
+                self._load_locked()
+            except Exception:
+                # Failed corpus/index construction must not publish a partial state.
+                for name, value in previous.items():
+                    setattr(self, name, value)
+                raise
 
     def _load_locked(self) -> None:
         chunks = []
@@ -158,7 +173,9 @@ class RAGService:
                 if not line:
                     continue
                 try:
-                    chunks.append(json.loads(line))
+                    item = json.loads(line)
+                    if isinstance(item, dict) and item.get("text"):
+                        chunks.append(item)
                 except json.JSONDecodeError:
                     continue
         self.texts = [str(item.get("text", "")) for item in chunks if item.get("text")]
@@ -191,33 +208,44 @@ class RAGService:
             self.vectors = np.zeros((0, 0), dtype=np.float32)
             self._index = None
             self.embedding_dim = 0
+            self.embedding_fallback = False
+            self.embedding_space = self.model_key
             return
         signature = corpus_signature(self.hashes, self.model_key)
         if self._restore_persisted_index(signature):
             return
-        self.rebuild()
-        self._persist_index(signature)
+        self._rebuild_locked()
+        self._persist_index()
 
     def _restore_persisted_index(self, signature: str) -> bool:
         if not HAS_FAISS:
             return False
         meta = load_index_meta(index_meta_file(self.cache_dir))
-        if not meta or meta.get("signature") != signature:
+        if (not meta or meta.get("signature") != signature
+                or meta.get("index_version") != INDEX_FORMAT_VERSION
+                or meta.get("embedding_space") != self.model_key
+                or meta.get("embedding_fallback")):
             return False
         path = index_file(self.cache_dir)
         if not path.exists():
             return False
         try:
-            self._index = faiss.read_index(str(path))
+            candidate = faiss.read_index(str(path))
+            if (candidate.d <= 0 or candidate.d != meta.get("dim")
+                    or candidate.ntotal != len(self.texts) or meta.get("count") != len(self.texts)):
+                raise ValueError("Persisted index shape does not match corpus metadata")
         except Exception:
-            self._index = None
+            logger.warning("持久化索引无效，使用 embedding 缓存重建", exc_info=True)
             return False
-        self.embedding_dim = int(meta.get("dim") or 0) or int(self._index.d)
-        self.embedding_fallback = bool(meta.get("embedding_fallback", False))
+        self._index = candidate
+        self.embedding_dim = int(candidate.d)
+        self.embedding_fallback = False
+        self.embedding_space = self.model_key
+        self._next_recovery_at = 0.0
         self.vectors = np.zeros((0, 0), dtype=np.float32)
         return True
 
-    def _persist_index(self, signature: str) -> None:
+    def _persist_index(self) -> None:
         if not HAS_FAISS or self._index is None:
             return
         try:
@@ -227,7 +255,9 @@ class RAGService:
                 index_meta_file(self.cache_dir),
                 {
                     "version": CACHE_VERSION,
-                    "signature": signature,
+                    "index_version": INDEX_FORMAT_VERSION,
+                    "signature": corpus_signature(self.hashes, self.embedding_space),
+                    "embedding_space": self.embedding_space,
                     "model_key": self.model_key,
                     "count": len(self.texts),
                     "dim": int(self.embedding_dim),
@@ -241,6 +271,7 @@ class RAGService:
     def rebuild(self) -> None:
         with self._lock:
             self._rebuild_locked()
+            self._persist_index()
 
     def _rebuild_locked(self) -> None:
         if len(self.hashes) != len(self.texts):
@@ -249,61 +280,109 @@ class RAGService:
             self.vectors = np.zeros((0, 0), dtype=np.float32)
             self._index = None
             self.embedding_dim = 0
+            self.embedding_fallback = False
+            self.embedding_space = self.model_key
             return
-        # 恢复探测：重建时先重试真实 embedding API，降级不再是一程票
-        self.embedding_fallback = False
-        vectors = self._embed_texts()
-        self.vectors = np.asarray(vectors, dtype=np.float32)
-        # L2 归一化：IndexFlatIP 是内积检索，未归一化向量的分数无上界、
-        # 与 cosine 语义不可比（B1 审查项）
-        if self.vectors.ndim == 2 and self.vectors.shape[0] > 0:
-            norms = np.linalg.norm(self.vectors, axis=1, keepdims=True)
-            self.vectors = self.vectors / np.clip(norms, 1e-12, None)
-        self.embedding_dim = (
-            int(self.vectors.shape[1]) if self.vectors.ndim == 2 else 0
-        )
-        self._index = None
-        if HAS_FAISS and self.vectors.shape[0] > 0:
-            index = faiss.IndexFlatIP(self.vectors.shape[1])
-            index.add(self.vectors)
-            self._index = index
-
-    def _embed_texts(self) -> list:
-        if self.embedding_fallback:
-            return hash_embed(self.texts)
         try:
-            return self._embed_with_cache()
+            vectors = self._embed_with_cache()
         except Exception:
-            # 降级必须留痕：静默降级会让置信度语义失真且无法恢复（B1 审查项 C5）
-            logger.warning(
-                "真实 embedding 调用失败，降级 hash 嵌入（分数语义将失真，重建时自动重试真实 API）",
-                exc_info=True,
-            )
-            self.embedding_fallback = True
-            return hash_embed(self.texts)
+            logger.warning("语料 embedding 不可用，成对降级至 hash 检索空间", exc_info=True)
+            self._activate_hash_space()
+            return
+        recovered = self.embedding_fallback
+        self._publish_index(self._prepare_index(vectors), fallback=False)
+        if recovered:
+            logger.info("语料索引恢复至 provider embedding 空间")
 
-    def _embed_with_cache(self) -> list:
+    @staticmethod
+    def _normalized_vectors(vectors: Any, rows: int, dimension: int | None = None) -> np.ndarray:
+        matrix = np.asarray(vectors, dtype=np.float32)
+        if (matrix.ndim != 2 or matrix.shape[0] != rows or matrix.shape[1] <= 0
+                or not np.isfinite(matrix).all() or (dimension is not None and matrix.shape[1] != dimension)):
+            raise ValueError("Embedding batch count, dimension or finite values are invalid")
+        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+        if not np.isfinite(norms).all():
+            raise ValueError("Embedding vector norm is invalid")
+        return matrix / np.clip(norms, 1e-12, None)
+
+    def _prepare_index(self, vectors: Any) -> tuple[np.ndarray, Any, int]:
+        matrix = self._normalized_vectors(vectors, len(self.texts))
+        index = None
+        if HAS_FAISS:
+            index = faiss.IndexFlatIP(matrix.shape[1])
+            index.add(matrix)
+        return matrix, index, int(matrix.shape[1])
+
+    def _publish_index(self, candidate: tuple[np.ndarray, Any, int], *, fallback: bool) -> None:
+        # Callers hold the RLock; queries cannot observe a half-built candidate.
+        self.vectors, self._index, self.embedding_dim = candidate
+        self.embedding_fallback = fallback
+        self.embedding_space = HASH_EMBEDDING_SPACE if fallback else self.model_key
+        interval = max(0.0, self.settings.embedding_recovery_seconds)
+        self._next_recovery_at = time.monotonic() + interval if fallback else 0.0
+
+    def _activate_hash_space(self) -> None:
+        vectors = self._embed_with_cache(fallback=True)
+        self._publish_index(self._prepare_index(vectors), fallback=True)
+
+    def _provider_embed(self, texts: list[str]) -> list:
+        from app.services import llm_ledger
+
+        token = llm_ledger.current_purpose.set("embed")
+        try:
+            return self.provider.embed(texts)
+        finally:
+            llm_ledger.current_purpose.reset(token)
+
+    def _embed_with_cache(self, *, fallback: bool = False, expected_dim: int | None = None) -> list:
         """Embed only chunks whose text hash is absent from the cache."""
-        cache_path = embedding_cache_file(self.cache_dir, self.model_key)
-        cache = load_embedding_cache(cache_path, self.model_key)
+        space = HASH_EMBEDDING_SPACE if fallback else self.model_key
+        cache_path = embedding_cache_file(self.cache_dir, space)
+        cache = load_embedding_cache(cache_path, space)
+        if cache:
+            try:
+                self._normalized_vectors(list(cache.values()), len(cache), expected_dim)
+            except ValueError:
+                logger.warning("embedding 缓存形状无效，重新获取当前空间的完整语料")
+                cache = {}
         missing = [
             (index, text)
             for index, (item_hash, text) in enumerate(zip(self.hashes, self.texts, strict=False))
             if item_hash not in cache
         ]
         if missing:
-            from app.services import llm_ledger
-
-            purpose_token = llm_ledger.current_purpose.set("embed")
-            try:
-                fresh = self.provider.embed([text for _, text in missing])
-            finally:
-                llm_ledger.current_purpose.reset(purpose_token)
-            for (index, _), vector in zip(missing, fresh, strict=False):
+            texts = [text for _, text in missing]
+            fresh = hash_embed(texts) if fallback else self._provider_embed(texts)
+            self._normalized_vectors(fresh, len(missing), expected_dim)
+            for (index, _), vector in zip(missing, fresh, strict=True):
                 cache[self.hashes[index]] = np.asarray(vector, dtype=np.float32)
-            save_embedding_cache(cache_path, self.model_key, cache)
-        self.embedding_fallback = False
-        return [cache[item_hash] for item_hash in self.hashes]
+        vectors = [cache[item_hash] for item_hash in self.hashes]
+        self._normalized_vectors(vectors, len(self.texts), expected_dim)
+        if missing:
+            save_embedding_cache(cache_path, space, cache)
+        return vectors
+
+    def _query_vector(self, query: str) -> np.ndarray:
+        if not self.embedding_fallback:
+            try:
+                return self._normalized_vectors(self._provider_embed([query]), 1, self.embedding_dim)
+            except Exception:
+                logger.warning("查询 embedding 不可用，语料与查询同时切换 hash 空间", exc_info=True)
+                self._activate_hash_space()
+                self._persist_index()
+        elif time.monotonic() >= self._next_recovery_at:
+            try:
+                query_vector = self._normalized_vectors(self._provider_embed([query]), 1)
+                vectors = self._embed_with_cache(expected_dim=int(query_vector.shape[1]))
+                candidate = self._prepare_index(vectors)
+                self._publish_index(candidate, fallback=False)
+                self._persist_index()
+                logger.info("查询与语料校验通过，恢复 provider embedding 空间")
+                return query_vector
+            except Exception:
+                self._next_recovery_at = time.monotonic() + max(0.0, self.settings.embedding_recovery_seconds)
+                logger.warning("embedding 恢复探测失败，保留完整 hash 索引", exc_info=True)
+        return self._normalized_vectors(hash_embed([query]), 1, self.embedding_dim)
 
     def search(
         self,
@@ -314,9 +393,9 @@ class RAGService:
         include_demo: bool = False,
         reranker_enabled: bool | None = None,
     ) -> list[dict]:
-        if not self.texts:
-            return []
         with self._lock:
+            if not self.texts or top_k <= 0:
+                return []
             return self._search_locked(
                 query,
                 top_k=top_k,
@@ -346,25 +425,7 @@ class RAGService:
             max(top_k * 4, 200 if tags else 0),
             len(self.texts),
         )
-        try:
-            if self.embedding_fallback:
-                raise RuntimeError("fallback embedding mode")
-            from app.services import llm_ledger
-
-            _purpose_token = llm_ledger.current_purpose.set("embed")
-            try:
-                query_vector = np.asarray(self.provider.embed([query]), dtype=np.float32)
-            finally:
-                llm_ledger.current_purpose.reset(_purpose_token)
-            # 查询向量同样归一化，与语料向量保持 cosine 语义
-            norm = float(np.linalg.norm(query_vector))
-            if norm > 0:
-                query_vector = query_vector / norm
-        except Exception:
-            if self.embedding_dim != 256:
-                self.embedding_fallback = True
-                self.rebuild()
-            query_vector = np.asarray(hash_embed([query]), dtype=np.float32)
+        query_vector = self._query_vector(query)
 
         if self._index is not None:
             scores, indexes = self._index.search(query_vector, candidate_window)
@@ -392,6 +453,8 @@ class RAGService:
                     "id": item_id,
                     "text": self.texts[index],
                     "score": round(float(score), 4),
+                    "embedding_space": self.embedding_space,
+                    "embedding_fallback": self.embedding_fallback,
                 }
             )
             if len(results) >= candidate_limit:
@@ -444,6 +507,8 @@ def retrieval_as_evidence(retrieval: list[dict]) -> list[dict]:
             "risk_type": item.get("risk_type", ""),
             "scene": item.get("scene", ""),
             "is_demo": bool(item.get("is_demo") or is_demo_chunk(item)),
+            "embedding_space": item.get("embedding_space", ""),
+            "embedding_fallback": bool(item.get("embedding_fallback")),
         }
         for item in retrieval
     ]

@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     mock_demo_boost: bool = False
     # B5：检索参数收敛
     retrieval_top_k: int = 5
+    embedding_recovery_seconds: float = 60.0
     rerank_vector_weight: float = 0.4
     rerank_lexical_weight: float = 0.4
     rerank_metadata_weight: float = 0.2
