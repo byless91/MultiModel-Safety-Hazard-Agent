@@ -678,7 +678,7 @@ def _idempotent_replay(
     db: Session,
     key: str,
     response: Response,
-) -> AssessmentOut | None:
+) -> AssessmentOut | JobOut | None:
     """同 key 重复请求返回首次创建的 assessment（200）；过期键放行新请求。"""
     existing = db.get(IdempotencyKey, key)
     if existing is None:
@@ -693,6 +693,13 @@ def _idempotent_replay(
         return None
     response.status_code = 200
     response.headers["Idempotency-Replayed"] = "true"
+    if settings.workflow_mode == "async" and item.status == "pending":
+        job = db.scalars(select(AssessmentJob).where(
+            AssessmentJob.assessment_id == item.id,
+        ).order_by(AssessmentJob.created_at.desc(), AssessmentJob.id.desc()).limit(1)).first()
+        if job is not None:
+            response.status_code = 202
+            return job_to_out(job)
     return to_out(item)
 
 
@@ -713,17 +720,6 @@ async def create_assessment(
     if idempotency_key:
         replayed = _idempotent_replay(db, idempotency_key, response)
         if replayed is not None:
-            if settings.workflow_mode == "async" and replayed.status == "pending":
-                # 首次任务仍在排队/执行中：重放返回任务状态供前端继续轮询
-                job = db.scalars(
-                    select(AssessmentJob)
-                    .where(AssessmentJob.assessment_id == replayed.id)
-                    .order_by(AssessmentJob.created_at.desc(), AssessmentJob.id.desc())
-                    .limit(1)
-                ).first()
-                if job is not None:
-                    response.status_code = 202
-                    return job_to_out(job)
             return replayed
 
     file_list = files or []
@@ -744,51 +740,46 @@ async def create_assessment(
     _reject_uploaded_input(description, [data for _, data in staged])
     _check_token_budget()
 
-    assessment = Assessment(description=description)
-    db.add(assessment)
-    db.flush()
-
-    if idempotency_key:
-        db.add(IdempotencyKey(key=idempotency_key, assessment_id=assessment.id))
-
+    assessment = Assessment(id=str(uuid4()), description=description)
     upload_root = settings.upload_dir / assessment.id
-    upload_root.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
     images: list[ImageInput] = []
-    for upload, data in staged:
-        original_name, _suffix = _safe_filename(
-            upload.filename or "image.jpg",
-            allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
-            default="image.jpg",
-        )
-        stored_name = f"{uuid4().hex}_{original_name}"
-        target = upload_root / stored_name
-        target.write_bytes(data)
-        sniffed_mime = _sniffed_image_mime(data)
-        image = AssessmentImage(
-            assessment_id=assessment.id,
-            filename=original_name,
-            stored_path=str(target),
-            mime_type=sniffed_mime,
-            size_bytes=len(data),
-        )
-        db.add(image)
-        images.append(ImageInput(filename=original_name, path=target, mime_type=sniffed_mime))
-
+    job = None
     try:
-        db.commit()
-    except IntegrityError:
-        # 并发同 key：另一请求已创建，回退返回已有结果
-        db.rollback()
+        db.add(assessment)
+        db.flush()
         if idempotency_key:
+            db.add(IdempotencyKey(key=idempotency_key, assessment_id=assessment.id))
+        upload_root.mkdir(parents=True, exist_ok=False)
+        for upload, data in staged:
+            original_name, _suffix = _safe_filename(
+                upload.filename or "image.jpg",
+                allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
+                default="image.jpg",
+            )
+            target = upload_root / f"{uuid4().hex}_{original_name}"
+            written.append(target)
+            target.write_bytes(data)
+            sniffed_mime = _sniffed_image_mime(data)
+            db.add(AssessmentImage(
+                assessment_id=assessment.id, filename=original_name, stored_path=str(target),
+                mime_type=sniffed_mime, size_bytes=len(data),
+            ))
+            images.append(ImageInput(filename=original_name, path=target, mime_type=sniffed_mime))
+        if settings.workflow_mode == "async":
+            job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list)
+        # assessment、图片元数据、幂等键和初始 job 只能一起提交。
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        _cleanup_uncommitted_uploads(upload_root, written)
+        if isinstance(exc, IntegrityError) and idempotency_key:
             replayed = _idempotent_replay(db, idempotency_key, response)
             if replayed is not None:
                 return replayed
         raise
 
-    if settings.workflow_mode == "async":
-        # 异步模式：入队后立即返回 202，worker 串行执行并逐步更新进度
-        job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list)
-        db.commit()
+    if job is not None:
         get_job_runner().wake()
         response.status_code = 202
         return job_to_out(job)
@@ -816,6 +807,24 @@ async def create_assessment(
     db.commit()
     db.refresh(assessment)
     return to_out(assessment)
+
+
+def _cleanup_uncommitted_uploads(root: Path, written: list[Path]) -> None:
+    """仅删除本次请求记录的文件和空目录；不递归删除任何上传目录。"""
+    base = settings.upload_dir.resolve()
+    if root.resolve() == base or not root.resolve().is_relative_to(base):
+        raise RuntimeError("上传清理目录超出配置范围")
+    for path in written:
+        if path.resolve().parent != root.resolve():
+            raise RuntimeError("上传清理文件超出本次请求目录")
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("清理未提交上传失败：%s", path.name)
+    try:
+        root.rmdir()  # 只删除空目录
+    except OSError:
+        pass
 
 
 @router.get("/assessments/{assessment_id}/job", response_model=JobOut)

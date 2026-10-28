@@ -19,4 +19,5 @@ ENV UV_RUNTINE_PYTHON=/app/.venv/bin/python \
 EXPOSE 8001
 
 # 启动即迁移（旧库自动 stamp/增量；全新库完整建表）
-CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port 8001"]
+# 当前仅支持单实例、单 worker；PG 也不解除 checkpoint/文件/索引约束。
+CMD ["sh", "-c", "python -m alembic upgrade head && python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 1"]

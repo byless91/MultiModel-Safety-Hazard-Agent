@@ -71,23 +71,23 @@ def find_create_thread_id(db, assessment_id: str) -> str | None:
 
 
 def claim_next_job(worker_id: str = "local", *, now: datetime | None = None) -> AssessmentJob | None:
-    """认领下一个排队任务（单 worker 串行，无竞态）。"""
+    """单条条件 UPDATE 原子认领；竞争失败者下次轮询继续。"""
     db = SessionLocal()
     try:
-        job = db.scalars(
-            select(AssessmentJob)
+        candidate = (
+            select(AssessmentJob.id)
             .where(AssessmentJob.status == "queued")
             .order_by(AssessmentJob.created_at, AssessmentJob.id)
             .limit(1)
-        ).first()
-        if job is None:
-            return None
-        job.status = "running"
-        job.worker_id = worker_id
-        job.attempt_token = str(uuid.uuid4())
-        job.lease_expires_at = (now or datetime.now(UTC)) + timedelta(seconds=get_settings().job_lease_seconds)
+            .scalar_subquery()
+        )
+        job = db.scalars(update(AssessmentJob).where(
+            AssessmentJob.id == candidate, AssessmentJob.status == "queued",
+        ).values(
+            status="running", worker_id=worker_id, attempt_token=str(uuid.uuid4()),
+            lease_expires_at=(now or datetime.now(UTC)) + timedelta(seconds=get_settings().job_lease_seconds),
+        ).returning(AssessmentJob)).first()
         db.commit()
-        db.refresh(job)
         return job
     finally:
         db.close()
