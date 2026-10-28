@@ -63,6 +63,7 @@ from app.services.guardrail import (
     validate_uploaded_input,
 )
 from app.services.guardrail.input_guard import MAX_DESCRIPTION_LENGTH
+from app.services.idempotency import find_submission, submission_fingerprint, submission_headers
 from app.services.job_runner import (
     enqueue_job,
     find_create_thread_id,
@@ -677,29 +678,35 @@ def _idempotent_replay(
     db: Session,
     key: str,
     response: Response,
+    *,
+    fingerprint: str | None = None,
 ) -> AssessmentOut | JobOut | None:
-    """同 key 重复请求返回首次创建的 assessment（200）；过期键放行新请求。"""
-    existing = db.get(IdempotencyKey, key)
-    if existing is None:
-        return None
-    ttl = timedelta(hours=settings.idempotency_ttl_hours)
-    if datetime.now(UTC) - existing.created_at.replace(tzinfo=UTC) > ttl:
-        db.delete(existing)
-        db.commit()
-        return None
-    item = db.get(Assessment, existing.assessment_id)
+    """重放初始提交；初始任务未结束返回 202，否则返回当前研判 200。"""
+    item = find_submission(db, key, fingerprint=fingerprint)
     if item is None:
         return None
     response.status_code = 200
     response.headers["Idempotency-Replayed"] = "true"
-    if settings.workflow_mode == "async" and item.status == "pending":
-        job = db.scalars(select(AssessmentJob).where(
-            AssessmentJob.assessment_id == item.id,
-        ).order_by(AssessmentJob.created_at.desc(), AssessmentJob.id.desc()).limit(1)).first()
-        if job is not None:
-            response.status_code = 202
-            return job_to_out(job)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers.update(submission_headers(item.id))
+    job = db.scalars(select(AssessmentJob).where(
+        AssessmentJob.assessment_id == item.id, AssessmentJob.kind == "create",
+    ).order_by(AssessmentJob.created_at, AssessmentJob.id).limit(1)).first()
+    if job is not None and job.status in {"queued", "running"}:
+        response.status_code = 202
+        return job_to_out(job)
     return to_out(item)
+
+
+@router.get("/assessment-submissions/{key}", response_model=AssessmentOut | JobOut)
+def get_submission(key: str, response: Response, db: Session = Depends(get_db)) -> AssessmentOut | JobOut:
+    if not IDEMPOTENCY_KEY_RE.fullmatch(key):
+        raise HTTPException(status_code=400, detail="无效的提交标识")
+    replayed = _idempotent_replay(db, key, response)
+    if replayed is None:
+        raise HTTPException(status_code=404, detail="暂未找到本次提交，请稍后查询；新建可能产生另一条记录",
+                            headers={"Cache-Control": "no-store"})
+    return replayed
 
 
 @router.post("/assessments", response_model=AssessmentOut | JobOut, status_code=201)
@@ -714,13 +721,8 @@ async def create_assessment(
     response: Response = None,
     db: Session = Depends(get_db),
 ) -> AssessmentOut | JobOut:
-    if idempotency_key and not IDEMPOTENCY_KEY_RE.match(idempotency_key):
+    if idempotency_key and not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
         raise HTTPException(status_code=400, detail="Idempotency-Key 需为 8-128 位字母数字或 -_")
-    if idempotency_key:
-        replayed = _idempotent_replay(db, idempotency_key, response)
-        if replayed is not None:
-            return replayed
-
     file_list = files or []
     if len(file_list) > settings.max_images:
         raise HTTPException(status_code=400, detail=f"最多上传 {settings.max_images} 张图片")
@@ -735,6 +737,14 @@ async def create_assessment(
         )
         staged.append((upload, data))
     ocr_list = _parse_ocr_texts(ocr_texts)
+    fingerprint = submission_fingerprint(description, followup_answer, ocr_list, [
+        (_safe_filename(upload.filename or "image.jpg", allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
+                        default="image.jpg")[0], data) for upload, data in staged
+    ])
+    if idempotency_key:
+        replayed = _idempotent_replay(db, idempotency_key, response, fingerprint=fingerprint)
+        if replayed is not None:
+            return replayed
     _reject_ocr_texts(ocr_list)
     _reject_uploaded_input(description, [data for _, data in staged])
     _reject_text(followup_answer)
@@ -749,7 +759,7 @@ async def create_assessment(
         db.add(assessment)
         db.flush()
         if idempotency_key:
-            db.add(IdempotencyKey(key=idempotency_key, assessment_id=assessment.id))
+            db.add(IdempotencyKey(key=idempotency_key, assessment_id=assessment.id, request_hash=fingerprint))
         upload_root.mkdir(parents=True, exist_ok=False)
         for upload, data in staged:
             original_name, _suffix = _safe_filename(
@@ -774,11 +784,12 @@ async def create_assessment(
         db.rollback()
         _cleanup_uncommitted_uploads(upload_root, written)
         if isinstance(exc, IntegrityError) and idempotency_key:
-            replayed = _idempotent_replay(db, idempotency_key, response)
+            replayed = _idempotent_replay(db, idempotency_key, response, fingerprint=fingerprint)
             if replayed is not None:
                 return replayed
         raise
 
+    response.headers.update(submission_headers(assessment.id))
     if job is not None:
         get_job_runner().wake()
         response.status_code = 202
@@ -802,7 +813,8 @@ async def create_assessment(
     except Exception as exc:
         assessment.status = "failed"
         db.commit()
-        raise HTTPException(status_code=502, detail=f"研判服务异常：{exc}") from exc
+        raise HTTPException(status_code=502, detail=f"研判服务异常：{exc}",
+                            headers=submission_headers(assessment.id)) from exc
     apply_state(assessment, state, db)
     db.commit()
     db.refresh(assessment)

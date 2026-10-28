@@ -79,7 +79,9 @@ def test_acceptance_commits_everything_before_worker_wakeup(queued_client, monke
                                 files={"files": ("scene.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 48, "image/png")})
     assert result.status_code == 202, result.text
     assert observed == [result.json()["id"]]
-    replay = queued_client.post("/api/v1/assessments", headers={"Idempotency-Key": key})
+    replay = queued_client.post("/api/v1/assessments", data={"description": "楼道堆放纸箱"},
+                                headers={"Idempotency-Key": key},
+                                files={"files": ("scene.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 48, "image/png")})
     assert replay.status_code == 202
     assert replay.headers["Idempotency-Replayed"] == "true"
     assert replay.json()["id"] == observed[0]

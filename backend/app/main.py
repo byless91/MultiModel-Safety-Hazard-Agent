@@ -71,6 +71,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Assessment-Id", "Location", "Idempotency-Replayed"],
     )
     app.include_router(public_router)
     app.include_router(router)
