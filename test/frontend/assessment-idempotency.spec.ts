@@ -222,7 +222,7 @@ describe('R4 submission identity and recovery', () => {
   })
 })
 
-describe('HomeView recovery entry', () => {
+describe('HomeView submission and recovery', () => {
   function mountHome() {
     return shallowMount(HomeView, { global: {
       directives: { loading: () => undefined },
@@ -236,6 +236,34 @@ describe('HomeView recovery entry', () => {
       },
     } })
   }
+
+  it('submits the selected photo and does not retain it after the visible reset action', async () => {
+    apiMock.post.mockResolvedValueOnce({ data: completed('with-photo') })
+      .mockResolvedValueOnce({ data: completed('after-reset') })
+    const wrapper = mountHome()
+    const photo = new File(['original-image-bytes'], 'scene.png', { type: 'image/png' })
+    wrapper.findComponent({ name: 'ElUpload' }).vm.$emit('update:fileList', [
+      { name: photo.name, uid: 1, status: 'ready', raw: photo },
+    ])
+    wrapper.findComponent({ name: 'ElInput' }).vm.$emit('update:modelValue', '楼道堆放纸箱，需要核查')
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    const first = apiMock.post.mock.calls[0][1] as FormData
+    const uploaded = first.getAll('files') as File[]
+    expect(uploaded).toHaveLength(1)
+    expect(uploaded[0].name).toBe('scene.png')
+    expect(await uploaded[0].text()).toBe('original-image-bytes')
+
+    await wrapper.findAll('button').find((item) => item.text() === '重置')!.trigger('click')
+    wrapper.findComponent({ name: 'ElInput' }).vm.$emit('update:modelValue', '重新检查另一处现场')
+    await flushPromises()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    const second = apiMock.post.mock.calls[1][1] as FormData
+    expect(second.getAll('files')).toHaveLength(0)
+    wrapper.unmount()
+  })
 
   it('shows a recoverable record link and prevents accidental fresh submission after a sync failure', async () => {
     apiMock.post.mockRejectedValueOnce({ response: {

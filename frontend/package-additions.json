@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "echarts": "^5.5.0",
-    "@amap/amap-jsapi-loader": "^1.0.1"
-  },
-  "devDependencies": {}
-}
