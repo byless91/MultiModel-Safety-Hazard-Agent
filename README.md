@@ -2,7 +2,7 @@
 
 面向社区网格员、厂区安全员、林区巡查员，在原 Vue/FastAPI 项目上改造的分类与知识助手。M1 首页提供“照片/描述 → 类别与标签建议 → 参考条款 → 人工录入 → 角色审核”，风险等级由人工选填；也可仅人工录入。原 R0–R8 研判及整改记录继续可读。无 API Key 时为明确标识的 Mock 演示，真实现场识别与法规质量仍待验收。
 
-后续统一按[最终改造计划 v2.0](docs/最终改造计划.md)在本项目上增量实施，整合“知识库与分类助手＋行业数据分析”：分类与人工录入 → 多行业知识版本 → 位置/来源与导入 → 管理统计及同类整改对标 → 更新/趋势提醒 → 部署验证。M0、M1、M2、M3 已完成工程验收，下一阶段为 M4；当前交接与备份入口见 [HANDOVER.md](HANDOVER.md)。
+后续统一按[最终改造计划 v2.0](docs/最终改造计划.md)在本项目上增量实施，整合“知识库与分类助手＋行业数据分析”：分类与人工录入 → 多行业知识版本 → 位置/来源与导入 → 管理统计及同类整改对标 → 更新/趋势提醒 → 部署验证。M0、M1、M2、M3、M4 已完成工程验收，下一阶段为 M5；当前交接与备份入口见 [HANDOVER.md](HANDOVER.md)。
 
 按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)完成 R0–R8 工程工作。最终结果、遗留条件和证据见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)，另有[当前架构](CURRENT_ARCHITECTURE.md)、[部署与回退](docs/DEPLOYMENT.md)、[评测索引](docs/evaluation/README.md)。新增或修改的测试统一放在根目录 `test/`；各阶段原始基线保留于 `docs/baselines/`。
 
@@ -12,6 +12,7 @@
 - 工作流：分类模式复用主 Provider、RAG 与现有任务队列，失败明确展示并允许人工录入；历史研判保留 LangGraph 条件流程及带标识的 Mock 降级
 - 模型：Qwen / GLM（模型名可配置，OpenAI 兼容 API），Mock 模式无需 Key
 - 检索：FAISS 或 NumPy 兜底向量检索，可选规则重排 Reranker（`RERANKER_ENABLED`，执行 Vector Top-K → 重排 → Top-N）
+- 地图：Leaflet + OpenStreetMap 底图（无需 Key；底图需联网，点位与列表不依赖底图）
 - 前端：Vue 3、TypeScript、Vite、Element Plus、Pinia
 
 ## 目录结构
@@ -199,6 +200,14 @@ jwt 模式使用：
 - `POST /api/v1/assessments/import`（admin）接受 `{"rows": [...]}`，每行须有 `source_ref`、`description`、`data_source`，可选位置字段。按（`data_source`, `source_ref`）去重；返回 `batch_id`、`imported`、重复行号 `duplicates` 和逐行 `failures`（行号、外部编号、原因）。导入记录的 `record_mode` 与 `status` 均为 `imported`，保留批次号和外部编号，不进入 AI 研判、不视为人工确认。
 - 历史页管理员可上传 JSON 文件执行导入并查看失败清单；巡查员/复核员无导入入口。
 
+## M4 管理分析与对标合同
+
+- `GET /api/v1/analytics/options`（reviewer/admin）返回已确认记录中可用的区划、类别、设施和场景。
+- `GET /api/v1/analytics/overview` 仅统计 `confirmed=true` 记录，支持 `district`、`category`、`facility`、`scene` 和 `start`/`end`（YYYY-MM）筛选；返回地区/类别分布、风险等级（未分级单列）、补齐零月份的月度趋势、地图点位，以及按来源统计的“收集到的案例数”（导入记录，不并入已确认统计）。
+- 时间口径为事件时间，未填写时使用录入时间。地图点位按 WGS84 输出，GCJ-02/BD-09 坐标先转换再展示；无坐标记录仍进入统计和列表。底图使用 OpenStreetMap，需要联网；点位和列表不依赖底图。
+- `GET /api/v1/analytics/benchmarks` 按设施和/或场景查询其他地点的已确认整改记录，返回样本量、筛选条件、来源计数、匹配方式和可比性说明，并链接原记录；接口与页面均提示不能据此直接作出处置决定。
+- 已确认统计中的模拟数据显式提示；数量展示不代表风险排名。管理分析入口对 reviewer/admin 显示，巡查员直接访问返回 403。
+
 ## 历史研判与共用能力（R0–R8）
 
 - 多图上传 + 文字描述的多模态研判
@@ -347,7 +356,7 @@ Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样�
 
 ## 下一步
 
-下一阶段只推进[最终改造计划中的 M4](docs/最终改造计划.md)：一张管理页展示已确认记录的地区/类别/时间分布、历史趋势和一套地图，并按类似设施/场景检索其他地点的整改方案及结果。自动地理编码、统计口径和地图展示在这一阶段实施。
+下一阶段只推进[最终改造计划中的 M5](docs/最终改造计划.md)：指定权威来源的法规版本变化提醒，以及基于已验证规则的历史趋势提示。新条款须人工审核发布，趋势提示须说明触发依据，并保留回测、误报记录和样本量。
 
 ## 浏览器 E2E
 
