@@ -1,12 +1,13 @@
 """Prompt 注册表（B5/WP3.2）：集中版本化管理。
 
-改动任何 prompt 文本必须递增 PROMPT_VERSION——台账（llm_calls.prompt_version）
-与评测结果据此归因到具体版本。
+改动 prompt 文本必须递增对应任务的版本；台账（llm_calls.prompt_version）
+与评测结果据此归因，分类提示词独立于历史研判提示词。
 """
 
 from __future__ import annotations
 
-PROMPT_VERSION = "vision-v3"
+PROMPT_VERSION = "vision-v2"
+CLASSIFICATION_PROMPT_VERSION = "classification-m1-v1"
 
 CLASSIFICATION_PROMPT = (
     "你是现场记录分类助手。只根据照片可见事实和提供的描述建议类别、通用标签。"

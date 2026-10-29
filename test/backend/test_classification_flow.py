@@ -9,9 +9,11 @@ import pytest
 from app.api import routes
 from app.core.db import SessionLocal
 from app.core.security import create_access_token
-from app.models import Assessment, AssessmentJob, User
+from app.models import Assessment, AssessmentJob, LLMCall, User
+from app.prompts import CLASSIFICATION_PROMPT_VERSION, PROMPT_VERSION
 from app.services import classification, job_runner
 from app.services.providers import ImageInput, QwenProvider, ZhipuProvider
+from sqlalchemy import select
 
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jfZkAAAAASUVORK5CYII=")
 
@@ -212,3 +214,23 @@ def test_real_provider_request_contains_actual_image_bytes(review_client, tmp_pa
     assert base64.b64decode(content[1]["image_url"]["url"].split(",")[1]) == PNG
     prompt = sent[0]["messages"][0]["content"]
     assert "禁止输出风险等级" in prompt and "severity" not in prompt
+
+
+@pytest.mark.parametrize("http_status", [200, 503])
+def test_classification_prompt_version_and_purpose_are_audited_without_changing_legacy(review_client, http_status):
+    model = f"m1-audit-{uuid4().hex}"
+    provider = QwenProvider(api_key="test-not-real", max_retries=0, vision_model=model)
+    provider._client.close()
+    provider._client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(
+        http_status, json={"choices": [{"message": {"content": '{"category":null,"tags":[]}'}}]},
+    )), base_url="https://example.test")
+    try:
+        result = classification.run_classification("现场情况", [], provider=provider, rag=Retrieval())
+    finally:
+        provider.close()
+    assert result["classification"]["suggestion_status"] == ("unknown" if http_status == 200 else "failed")
+    with SessionLocal() as db:
+        call = db.scalar(select(LLMCall).where(LLMCall.model == model))
+        assert call.prompt_version == CLASSIFICATION_PROMPT_VERSION == "classification-m1-v1"
+        assert call.purpose == "classification" and call.status == ("success" if http_status == 200 else "failed")
+    assert PROMPT_VERSION == "vision-v2"  # Existing vision prompt and baseline were not changed.

@@ -24,7 +24,14 @@ from typing import Any
 import httpx
 
 from app.core.logging import mask_secrets
-from app.prompts import CLASSIFICATION_PROMPT, COMPARE_PROMPT, GUARD_STATEMENT, PROMPT_VERSION, VISION_PROMPT
+from app.prompts import (
+    CLASSIFICATION_PROMPT,
+    CLASSIFICATION_PROMPT_VERSION,
+    COMPARE_PROMPT,
+    GUARD_STATEMENT,
+    PROMPT_VERSION,
+    VISION_PROMPT,
+)
 from app.schemas.classification import CATEGORIES, TAGS
 from app.services.guardrail.input_guard import build_external_text
 from app.services.llm_concurrency import http_gate
@@ -117,7 +124,9 @@ class OpenAICompatibleProvider(BaseProvider):
         except ValueError:
             return None  # HTTP-date 形式此处不做解析，退回指数退避
 
-    def _post(self, path: str, payload: dict[str, Any]) -> _CallResult:
+    def _post(
+        self, path: str, payload: dict[str, Any], *, prompt_version: str | None = None,
+    ) -> _CallResult:
         model = str(payload.get("model") or self.vision_model)
         started = time.perf_counter()
         last_error: Exception | None = None
@@ -149,7 +158,7 @@ class OpenAICompatibleProvider(BaseProvider):
                     model=model,
                     status="success",
                     latency_ms=(time.perf_counter() - started) * 1000,
-                    prompt_version=self.prompt_version,
+                    prompt_version=prompt_version or self.prompt_version,
                     tokens_in=int(usage.get("prompt_tokens") or 0),
                     tokens_out=int(usage.get("completion_tokens") or 0),
                     retry_count=attempt,
@@ -164,7 +173,8 @@ class OpenAICompatibleProvider(BaseProvider):
                     ledger_id=ledger_id,
                 )
             except ModelCapacityError:
-                self._record_failure(model=model, started=started, attempt=attempt, error_type="capacity_timeout")
+                self._record_failure(model=model, started=started, attempt=attempt,
+                                     error_type="capacity_timeout", prompt_version=prompt_version)
                 raise  # 没有发出 HTTP，不在 Provider 内自动重试排队。
             except httpx.TimeoutException as exc:
                 last_error = exc
@@ -178,6 +188,7 @@ class OpenAICompatibleProvider(BaseProvider):
                         started=started,
                         attempt=attempt,
                         error_type=f"http_{status}",
+                        prompt_version=prompt_version,
                     )
                     raise ModelUnavailableError(
                         f"{self.name} HTTP {status}: {detail}"
@@ -192,7 +203,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 self._sleep_before_retry(attempt, retry_after)
         error_type = "timeout" if isinstance(last_error, httpx.TimeoutException) else "unavailable"
         self._record_failure(
-            model=model, started=started, attempt=attempt, error_type=error_type
+            model=model, started=started, attempt=attempt, error_type=error_type, prompt_version=prompt_version,
         )
         if isinstance(last_error, httpx.TimeoutException):
             raise ModelTimeoutError(f"{self.name} request timed out") from last_error
@@ -201,14 +212,14 @@ class OpenAICompatibleProvider(BaseProvider):
         ) from last_error
 
     def _record_failure(
-        self, *, model: str, started: float, attempt: int, error_type: str
+        self, *, model: str, started: float, attempt: int, error_type: str, prompt_version: str | None = None,
     ) -> None:
         record_call(
             provider=self.name,
             model=model,
             status="failed",
             latency_ms=(time.perf_counter() - started) * 1000,
-            prompt_version=self.prompt_version,
+            prompt_version=prompt_version or self.prompt_version,
             retry_count=attempt,
             error_type=error_type,
         )
@@ -294,7 +305,7 @@ class OpenAICompatibleProvider(BaseProvider):
             ],
             "temperature": 0.2,
         }
-        result_meta = self._post("/chat/completions", payload)
+        result_meta = self._post("/chat/completions", payload, prompt_version=CLASSIFICATION_PROMPT_VERSION)
         result = self._parse_json(result_meta.data["choices"][0]["message"]["content"])
         if result.get("parse_failed"):
             mark_parse_failed(result_meta.ledger_id)
