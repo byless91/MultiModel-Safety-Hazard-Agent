@@ -385,6 +385,7 @@ def _case_to_dict(case: EvalCase) -> dict[str, Any]:
         "expected_hazard": case.expected_hazard,
         "expected_evidence_supported": case.expected_evidence_supported,
         "expected_review_required": case.expected_review_required,
+        "expected_abstention": case.expected_abstention,
         "source_type": case.source_type.value,
         "dataset_version": case.dataset_version,
         "image_paths": list(case.image_paths),
@@ -445,6 +446,7 @@ def _evidence_stats(state: dict[str, Any]) -> dict[str, Any]:
                     }
                 )
     return {
+        "evaluated": isinstance(judge.get("supported"), bool) and bool(findings),
         "supported": bool((judge or {}).get("supported")),
         "support_score": (judge or {}).get("support_score"),
         "needs_human_review": bool((judge or {}).get("needs_human_review")),
@@ -479,15 +481,19 @@ def run_evaluation_case(
             providers = build_providers(settings)
         if rag is None:
             rag = RAGService(settings, providers[0])
-        state = run_workflow(
-            description=case.description, images=images, followup_answer=None,
-            followup_used=0, settings=settings, rag=rag, providers=providers,
-        )
-        if state.get("status") == "needs_more_info" and case.user_text:
+        try:
             state = run_workflow(
-                description=case.description, images=images, followup_answer=case.user_text,
-                followup_used=1, settings=settings, rag=rag, providers=providers,
+                description=case.description, images=images, followup_answer=None,
+                followup_used=0, settings=settings, rag=rag, providers=providers,
             )
+            if state.get("status") == "needs_more_info" and case.user_text:
+                state = run_workflow(
+                    description=case.description, images=images, followup_answer=case.user_text,
+                    followup_used=1, settings=settings, rag=rag, providers=providers,
+                )
+        except Exception as exc:
+            # Keep the batch auditable; exception text may contain credentials.
+            state = {"status": "failed", "evaluation_error": type(exc).__name__}
     elapsed = time.perf_counter() - started
 
     model_results = state.get("model_results") or []
@@ -505,7 +511,18 @@ def run_evaluation_case(
     auto_passed = status == "completed" and not review_required
     evidence_stats = _evidence_stats(state)
     system_found_hazard = bool(findings)
-    predicted_hazard_present = system_found_hazard or review_required
+    successful = [r for r in model_results if r.get("status") == "success"
+                  and isinstance(r.get("analysis"), dict)
+                  and r["analysis"].get("schema_valid", True)
+                  and not r["analysis"].get("parse_failed")]
+    detection_available = (
+        status in ("completed", "awaiting_human_review", "needs_review")
+        and bool(successful) and not state.get("analysis_fallback")
+        and isinstance(judge.get("final_findings"), list)
+    )
+    predicted_hazard_present = system_found_hazard if detection_available else None
+    if not detection_available:
+        predicted_category = predicted_level = None
     evidence_status = (
         "supported"
         if evidence_stats["supported"]
@@ -514,32 +531,18 @@ def run_evaluation_case(
         else "not_applicable"
     )
 
-    category_match = predicted_category == case.category
-    level_match = predicted_level == expected_level
-    tolerance = predicted_level is not None and abs(predicted_level - expected_level) <= 1
+    category_match = detection_available and predicted_category == case.category
+    level_match = detection_available and predicted_level == expected_level
+    tolerance = detection_available and predicted_level is not None and abs(predicted_level - expected_level) <= 1
     severity_mae = abs(predicted_level - expected_level) if predicted_level is not None else None
     evidence_texts = [str(item.get("text", "")) for item in (state.get("evidence") or [])]
     joined_evidence = " ".join(evidence_texts)
     clause_hit = any(term in joined_evidence for term in case.expected_clause_terms)
-    expected_support = case.expected_evidence_supported
-    evidence_support = (
-        evidence_stats["supported"] if expected_support is not False else None
+    evidence_support = evidence_stats["supported"] if evidence_stats["evaluated"] and detection_available else None
+    independent_evidence_correct = (
+        evidence_support == case.expected_evidence_supported
+        if evidence_support is not None and case.expected_evidence_supported is not None else None
     )
-    finding_statuses = evidence_stats.get("finding_status") or []
-    findings_ok = (
-        bool(finding_statuses)
-        and all(bool(item.get("supported")) for item in finding_statuses)
-    )
-    if expected_support is False:
-        evidence_support = False
-    elif expected_support is True:
-        evidence_support = bool(finding_statuses) and findings_ok
-    else:
-        evidence_support = (
-            None
-            if not finding_statuses
-            else findings_ok
-        )
     unsupported_claims = bool(evidence_stats["unsupported_claims"]) and bool(system_found_hazard)
     evidence_failure = bool(system_found_hazard) and not evidence_stats["supported"]
     model_conflict = (
@@ -557,16 +560,12 @@ def run_evaluation_case(
             "review_required": review_required,
         }
     )
-    false_negative = bool(hazard_present_gt) and not predicted_hazard_present
-    false_positive = (
-        bool(not hazard_present_gt)
-        and predicted_hazard_present
-        and not review_required
-    )
+    false_negative = bool(hazard_present_gt) and predicted_hazard_present is False
+    false_positive = not hazard_present_gt and predicted_hazard_present is True
     severity_error = category_match and not level_match
 
-    verdict = "completed" if auto_passed else "awaiting_human_review"
     return {
+        "metrics_schema_version": "2.0",
         "case": _case_to_dict(case),
         "variant": variant["id"],
         "label": variant["label"],
@@ -577,10 +576,11 @@ def run_evaluation_case(
         "requested_provider_mode": settings.provider_mode,
         "configuration": configuration_summary(settings),
         "image_input": image_input,
+        "evaluation_error": state.get("evaluation_error"),
         "system_version": "eval-runner-3",
         "ensemble_mode": state.get("multi_model", {}).get("ensemble_mode", ""),
-        "model_a_result": model_a if model_a is not None else _model_slot_dict(None, slot="model_a"),
-        "model_b_result": model_b if model_b is not None else _model_slot_dict(None, slot="model_b"),
+        "model_a_result": _model_slot_dict(model_a, slot="model_a"),
+        "model_b_result": _model_slot_dict(model_b, slot="model_b"),
         "model_results": [_model_slot_dict(item, slot=f"model_{index+1}") for index, item in enumerate(model_results)],
         "disagreement": {
             "mode": disagreement.get("mode", ""),
@@ -600,11 +600,13 @@ def run_evaluation_case(
         "predicted_category": predicted_category,
         "predicted_level": predicted_level,
         "predicted_hazard_present": predicted_hazard_present,
+        "detection_available": detection_available,
+        "findings": findings or [],
         "status": status,
         "review_required": review_required,
         "auto_passed": auto_passed,
         "confidence": state.get("confidence"),
-        "final_decision": verdict,
+        "final_decision": status,
         "unsafe_reason": unsafe_reason,
         "metric_flags": {
             "category_match": category_match,
@@ -613,6 +615,8 @@ def run_evaluation_case(
             "severity_mae": severity_mae,
             "clause_hit": clause_hit,
             "evidence_support": evidence_support,
+            "independent_evidence_correct": independent_evidence_correct,
+            "abstained": status == "needs_more_info",
             "evidence_failure": evidence_failure,
             "unsupported_claims": unsupported_claims,
             "model_conflict": model_conflict,
@@ -834,21 +838,40 @@ def build_evaluation_report(
         "| --- | --- |",
     ]
     metric_labels = [
+        ("detection_precision", "检测 Precision"),
+        ("detection_recall", "检测 Recall（可用检测）"),
+        ("end_to_end_hazard_recall", "检测 Recall（全部隐患）"),
+        ("false_positive_count", "检测 FP"),
+        ("false_negative_count", "检测 FN"),
+        ("detection_missing_count", "检测缺失数"),
+        ("detection_coverage", "检测覆盖率"),
         ("category_accuracy", "类别准确率"),
         ("level_accuracy", "等级准确率"),
         ("severity_mae", "等级 MAE"),
         ("level_accuracy_tolerance1", "等级容差（±1）"),
         ("clause_hit_rate", "法规证据命中率"),
-        ("evidence_support_rate", "证据支持率"),
+        ("evidence_support_rate", "证据支持率（系统自评）"),
+        ("independent_evidence_accuracy", "独立证据标签正确率"),
         ("unsupported_claim_rate", "无依据结论率"),
         ("model_conflict_rate", "模型分歧率"),
         ("human_review_rate", "人工复核率"),
+        ("high_risk_review_rate", "高风险实际复核率"),
+        ("hazard_interception_rate", "隐患流程拦截率"),
+        ("information_insufficient_rate", "信息不足率"),
+        ("correct_abstention_count", "正确拒判数（有标签）"),
+        ("abstention_accuracy", "拒判标签正确率"),
+        ("execution_failure_rate", "执行失败率"),
         ("unsafe_auto_pass_rate", "Unsafe Auto-Pass 率"),
         ("unsafe_auto_pass_count", "Unsafe Auto-Pass 数"),
         ("avg_latency_s", "平均耗时（秒）"),
     ]
     for key, label in metric_labels:
-        lines.append(f"| {label} | {summary.get(key, '-')} |")
+        value = summary.get(key)
+        lines.append(f"| {label} | {value if value is not None else 'N/A'} |")
+    if metrics.get("metric_basis"):
+        lines.extend(["", "### 指标分母与缺失", "", "| 指标 | 分子 | 分母 | 缺失 |", "| --- | --- | --- | --- |"])
+        for name, basis in metrics["metric_basis"].items():
+            lines.append(f"| {name} | {basis['numerator']} | {basis['denominator']} | {basis['missing']} |")
     lines.extend(
         [
             "",
@@ -876,6 +899,8 @@ def build_evaluation_report(
         "model_conflict": "模型冲突",
         "evidence_failure": "证据不足/证据不支持结论",
         "severity_error": "等级偏差",
+        "information_insufficient": "信息不足（单独统计）",
+        "execution_failure": "输入/执行失败（检测缺失）",
     }
     lines.extend(["", "## 错误分析汇总", ""])
     lines.append("| 错误类型 | 数量 |")
@@ -950,6 +975,6 @@ def build_evaluation_report(
         for note in overview["limitation_notes"]:
             lines.append(f"- {note}")
     lines.append("- 模型输出未经过真实场景图片评测，文本场景仅覆盖当前知识库范围")
-    lines.append("- 法规证据支持率以系统 Evidence Judge 为准，存在知识库覆盖不足时结果偏保守")
+    lines.append("- Evidence Judge 支持率是系统自评；独立证据正确率只使用有独立标签且有有效自评的案例，缺失为 N/A")
     lines.append("- 本报告不保证无错误；正式部署前需人工复核高风险与证据不足案例")
     return summary, "\n".join(lines)

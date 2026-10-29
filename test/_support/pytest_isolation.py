@@ -36,6 +36,13 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
+        if item.nodeid == "tests/test_eval_robustness.py::test_safe_ground_truth_is_not_silently_auto_passed":
+            item.add_marker(pytest.mark.xfail(
+                strict=True,
+                raises=AssertionError,
+                reason="R6/T16 counts false findings as FP even after review; replacement: "
+                       "test/backend/test_eval_detection_metrics.py::test_original_safe_mock_case_exposes_false_alarm",
+            ))
         if item.nodeid == "tests/test_workflow_jobs.py::test_async_second_followup_falls_back_to_full_rerun":
             item.add_marker(pytest.mark.xfail(
                 strict=True,

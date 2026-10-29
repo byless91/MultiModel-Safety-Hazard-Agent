@@ -67,6 +67,7 @@ class EvalCase(BaseModel):
     expected_source: str = ""
     expected_evidence_supported: bool | None = None
     expected_review_required: bool | None = None
+    expected_abstention: bool | None = None
     notes: str = ""
     _dataset_dir: Path | None = PrivateAttr(default=None)
 
