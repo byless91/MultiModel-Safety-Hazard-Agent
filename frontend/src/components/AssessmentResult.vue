@@ -37,6 +37,7 @@
             <el-tag :type="levelTag" effect="dark" size="small">{{ levelLabel }}</el-tag>
           </h3>
           <p class="conclusion-text">{{ report.summary }}</p>
+          <p class="review-source">{{ assessment.confirmed ? '人工最终结论' : report.result_source === 'human_review' ? '人工复核意见，尚未定稿' : 'AI 原始建议，需结合现场核实' }}</p>
         </div>
         <div class="conclusion-metric">
           <span class="conclusion-metric-value">{{ confidencePercent }}%</span>
@@ -101,38 +102,7 @@
             </el-descriptions>
           </section>
 
-          <section v-if="humanReviewVisible" class="block">
-            <h4 class="block-title">
-              人工复核
-              <el-tag
-                :type="assessment.confirmed ? 'success' : assessment.status === 'needs_review' ? 'warning' : 'primary'"
-                effect="light"
-                size="small"
-              >
-                {{ humanReviewTagLabel }}
-              </el-tag>
-            </h4>
-            <ul v-if="assessment.review_reasons?.length" class="review-reasons">
-              <li v-for="reason in assessment.review_reasons" :key="reason">{{ reason }}</li>
-            </ul>
-            <div v-if="humanResolution" class="resolution">
-              <p>复核结论：{{ humanResolution.confirmed ? '确认通过' : '需重新研判' }}</p>
-              <p v-if="humanResolution.reviewer">复核人：{{ humanResolution.reviewer }}</p>
-              <p v-if="humanResolution.note">复核意见：{{ humanResolution.note }}</p>
-              <p v-if="humanResolution.resolved_at">
-                复核时间：{{ formatTime(humanResolution.resolved_at) }}
-              </p>
-            </div>
-            <el-button
-              v-if="!assessment.confirmed"
-              type="primary"
-              :loading="store.loading"
-              @click="emit('confirm')"
-            >
-              <el-icon><CircleCheck /></el-icon>
-              确认结果并定稿
-            </el-button>
-          </section>
+          <HumanReviewPanel :assessment="assessment" :loading="loading" @updated="emit('updated', $event)" />
         </el-tab-pane>
         <el-tab-pane name="evidence">
           <template #label>
@@ -218,7 +188,7 @@
             "
             class="block"
           >
-            <h4 class="block-title">风险引擎判定与解释</h4>
+            <h4 class="block-title">AI / 规则原始风险计算</h4>
             <RiskExplanation :assessment="assessment" />
           </section>
 
@@ -266,7 +236,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAssessmentStore } from '../stores/assessment'
 import type { Assessment, FindingLocation } from '../types'
 import { rectStatusLabel } from '../constants/rectification'
-import { formatTime } from '../utils/format'
+import HumanReviewPanel from './HumanReviewPanel.vue'
 import { extractError } from '../utils/errors'
 import EvidenceChain from './EvidenceChain.vue'
 import RectificationPanel from './RectificationPanel.vue'
@@ -283,7 +253,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   followup: [answer: string]
-  confirm: []
   updated: [assessment: Assessment]
 }>()
 
@@ -370,26 +339,6 @@ const nextStepText = computed(() => {
   return '建议再次现场核实后使用'
 })
 
-const humanReviewVisible = computed(
-  () =>
-    Boolean(
-      props.assessment.awaiting_human_review ||
-        props.assessment.status === 'needs_review' ||
-        props.assessment.review_reasons?.length ||
-        props.assessment.human_review?.resolution,
-    ),
-)
-
-const humanResolution = computed(
-  () => props.assessment.human_review?.resolution ?? null,
-)
-
-const humanReviewTagLabel = computed(() => {
-  if (props.assessment.confirmed) return '已人工确认'
-  if (props.assessment.status === 'needs_review') return '需重新研判'
-  return '待人工复核'
-})
-
 async function onDownload() {
   try {
     const { filename, content } = await store.downloadReport(props.assessment.id)
@@ -440,6 +389,12 @@ async function onDownload() {
   margin: 0;
   max-width: 68ch;
   color: var(--text);
+}
+
+.review-source {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  margin: var(--s-2) 0 0;
 }
 
 .conclusion-metric {

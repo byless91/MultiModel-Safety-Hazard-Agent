@@ -22,7 +22,6 @@
         :assessment="assessment"
         :loading="store.loading"
         @followup="onFollowup"
-        @confirm="onConfirm"
         @updated="onUpdated"
       />
     </section>
@@ -60,16 +59,6 @@ async function onFollowup(answer: string) {
   if (!assessment.value) return
   try {
     assessment.value = await store.followup(assessment.value.id, answer)
-  } catch (err) {
-    ElMessage.error(extractError(err))
-  }
-}
-
-async function onConfirm() {
-  if (!assessment.value) return
-  try {
-    assessment.value = await store.confirm(assessment.value.id, true, {})
-    ElMessage.success('结果已确认')
   } catch (err) {
     ElMessage.error(extractError(err))
   }

@@ -22,6 +22,9 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.token) && state.credentialValid && state.authMode !== 'none',
+    canReview: (state): boolean => state.authMode === 'none'
+      || state.credentialValid && (state.authMode === 'token'
+        || state.authMode === 'jwt' && ['reviewer', 'admin'].includes(state.user?.role || '')),
   },
   actions: {
     /** 启动时执行一次：探测后端是否要求登录，并校验本地 token 有效性 */

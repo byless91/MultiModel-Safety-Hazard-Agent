@@ -198,6 +198,7 @@ import { ElMessage, type UploadFile } from 'element-plus'
 import { computed, ref } from 'vue'
 
 import { useAssessmentStore } from '../stores/assessment'
+import { useAuthStore } from '../stores/auth'
 import type { Assessment } from '../types'
 import { themeColor } from '../utils/theme-color'
 import {
@@ -217,6 +218,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useAssessmentStore()
+const auth = useAuthStore()
 const rectFiles = ref<UploadFile[]>([])
 const rectNote = ref('')
 
@@ -288,7 +290,7 @@ function statusLabel(status: string) {
 
 const canStart = computed(() => {
   const status = props.assessment.rectification_status
-  return status === 'open' || status === 'assigned'
+  return auth.canReview && (status === 'open' || status === 'assigned')
 })
 
 const canSubmitPhotos = computed(() => {
@@ -297,15 +299,15 @@ const canSubmitPhotos = computed(() => {
 })
 
 const canVerify = computed(
-  () => props.assessment.rectification_status === 'pending_verification',
+  () => auth.canReview && props.assessment.rectification_status === 'pending_verification',
 )
 
 const canClose = computed(
-  () => props.assessment.rectification_status === 'verified',
+  () => auth.canReview && props.assessment.rectification_status === 'verified',
 )
 
 const canReopen = computed(
-  () => props.assessment.rectification_status === 'closed',
+  () => auth.canReview && props.assessment.rectification_status === 'closed',
 )
 
 const rectColor = computed(() => {

@@ -103,7 +103,6 @@
         :assessment="assessment"
         :loading="store.loading"
         @followup="onFollowup"
-        @confirm="onConfirm"
         @updated="onUpdated"
       />
     </section>
@@ -165,12 +164,6 @@ async function resumeSubmission(retry: boolean) {
 async function onFollowup(answer: string) {
   if (!assessment.value) return
   assessment.value = await store.followup(assessment.value.id, answer)
-}
-
-async function onConfirm() {
-  if (!assessment.value) return
-  assessment.value = await store.confirm(assessment.value.id, true, {})
-  ElMessage.success('结果已确认')
 }
 
 function onUpdated(updated: Assessment) {

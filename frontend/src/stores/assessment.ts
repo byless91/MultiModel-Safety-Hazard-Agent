@@ -11,6 +11,7 @@ import type {
   JobOut,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
+  ReviewRequest,
 } from '../types'
 
 export const useAssessmentStore = defineStore('assessment', {
@@ -22,6 +23,7 @@ export const useAssessmentStore = defineStore('assessment', {
     submission: loadSubmission() as SubmissionAttempt | null,
     submissionPayload: null as SubmissionPayload | null,
     submissionBusy: false,
+    reviewPending: {} as Record<string, boolean>,
   }),
   getters: {
     hasPendingSubmission: (state): boolean => Boolean(state.submission && state.submission.phase !== 'resolved'),
@@ -177,15 +179,19 @@ export const useAssessmentStore = defineStore('assessment', {
         this.loading = false
       }
     },
-    async confirm(id: string, confirmed: boolean, edits: Record<string, unknown> = {}): Promise<Assessment> {
+    async confirm(id: string, payload: ReviewRequest): Promise<Assessment> {
+      if (this.reviewPending[id]) throw new Error('这条研判正在保存复核结果，请等待完成')
+      this.reviewPending[id] = true
       this.loading = true
+      this.error = ''
       try {
-        const { data } = await api.post<Assessment>(`/assessments/${id}/confirm`, { confirmed, edits })
+        const { data } = await api.post<Assessment>(`/assessments/${id}/confirm`, payload)
         return data
       } catch (err) {
         this.error = extractError(err)
         throw err
       } finally {
+        delete this.reviewPending[id]
         this.loading = false
       }
     },

@@ -187,6 +187,34 @@ export interface HumanReviewResolution {
   resolved_at?: string
 }
 
+export interface ReviewEdits {
+  hazard_category?: string
+  risk_level?: number
+  conclusion?: string
+}
+
+export interface ReviewRequest {
+  confirmed: boolean
+  edits: ReviewEdits
+  note?: string
+}
+
+export interface ReviewSnapshot {
+  hazard_category?: string | null
+  risk_level?: number | null
+  conclusion?: string | null
+  status?: string
+  confirmed?: boolean
+}
+
+export interface ReviewEvent extends HumanReviewResolution {
+  event_id?: string
+  before?: ReviewSnapshot
+  after?: ReviewSnapshot
+  legacy?: boolean
+  snapshots_available?: boolean
+}
+
 export interface AssessmentReport {
   summary: string
   briefing: string
@@ -199,6 +227,8 @@ export interface AssessmentReport {
   long_term_actions: string[]
   work_order: WorkOrder
   disclaimer: string
+  result_source?: string
+  review_confirmed?: boolean
 }
 
 export type AssessmentStatus =
@@ -260,6 +290,8 @@ export interface Assessment {
     review_reasons: string[]
     triggers: Record<string, boolean>
     resolution?: HumanReviewResolution | null
+    history?: ReviewEvent[]
+    ai_original?: ReviewSnapshot & { available: boolean; reason?: string }
   } | null
   risk_result?: {
     risk_score: number
