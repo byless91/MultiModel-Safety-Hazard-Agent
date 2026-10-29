@@ -12,9 +12,11 @@ import time
 from collections import Counter
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from app.core.config import Settings, get_settings
 from app.eval.dataset import EvalCase, EvalDataset
+from app.eval.inputs import load_case_images
 from app.eval.metrics import (
     build_error_analysis,
     compute_metrics,
@@ -74,14 +76,15 @@ def build_variant_settings(
         "enable_risk_engine": bool(variant["risk"]),
         "enable_evidence_rag": bool(variant["rag"]),
         "refine_with_evidence": bool(variant["rag"]),
-        "reranker_enabled": True,
-        "_env_file": None,
+        "mock_demo_boost": False,
     }
-    if provider_mode == "auto":
+    if provider_mode == "mock":
+        kwargs.update(dashscope_api_key="", zhipu_api_key="", api_bearer_token="")
+    else:
         keep_both = variant["models"] == "both"
         kwargs["dashscope_api_key"] = base.dashscope_api_key if keep_both or variant["models"] == "qwen" else ""
         kwargs["zhipu_api_key"] = base.zhipu_api_key if keep_both or variant["models"] == "glm" else ""
-    return Settings(**kwargs)
+    return base.model_copy(update=kwargs, deep=True)
 
 
 def build_variant_runtime(
@@ -166,7 +169,7 @@ def run_ablation(
         "dataset_version": dataset.version,
         "case_count": len(cases),
         "provider_mode": provider_mode,
-        "evaluation_mode": evaluation_mode(get_settings()),
+        "evaluation_mode": next(iter(set(real_modes.values()))) if len(set(real_modes.values())) == 1 else "mixed",
         "source_type_counts": dict(dataset.manifest.source_type_counts),
         "partitions": {
             partition: sum(
@@ -267,12 +270,33 @@ def check_unsafe_auto_pass(trace: dict[str, Any]) -> tuple[bool, str]:
 def evaluation_mode(settings: Settings) -> str:
     if settings.provider_mode == "mock":
         return "mock"
-    if (
-        settings.provider_mode == "auto"
-        and (settings.dashscope_api_key or settings.zhipu_api_key)
-    ):
+    if settings.dashscope_api_key or settings.zhipu_api_key:
         return "real"
     return "mock"
+
+
+def configuration_summary(settings: Settings) -> dict[str, Any]:
+    """Allowlist experiment inputs; never serialize Settings wholesale."""
+    names = (
+        "provider_mode", "vision_model", "text_model", "embedding_model", "zhipu_vision_model",
+        "zhipu_text_model", "zhipu_embedding_model", "knowledge_dir", "faiss_index_dir",
+        "model_timeout", "model_max_retries", "model_retry_backoff", "risk_rule_version",
+        "refine_with_evidence", "reranker_enabled", "reranker_top_k", "retrieval_top_k",
+        "enable_risk_engine", "enable_evidence_rag", "conf_weights", "mock_demo_boost",
+        "rerank_vector_weight", "rerank_lexical_weight", "rerank_metadata_weight",
+        "embedding_recovery_seconds", "max_images", "max_file_bytes", "max_followups",
+        "max_concurrent_llm_calls", "llm_queue_timeout_seconds",
+    )
+    data = settings.model_dump(mode="json", include=set(names))
+    for name in ("dashscope_base_url", "zhipu_base_url"):
+        parts = urlsplit(getattr(settings, name))
+        host = parts.hostname or ""
+        if ":" in host:
+            host = f"[{host}]"
+        if parts.port:
+            host += f":{parts.port}"
+        data[name] = urlunsplit((parts.scheme, host, parts.path, "", ""))
+    return data
 
 
 def _useful_analysis(run: dict[str, Any]) -> dict[str, Any]:
@@ -446,32 +470,24 @@ def run_evaluation_case(
     from app.services.workflow import run_workflow
 
     if settings is None:
-        base = get_settings()
-        settings, providers, rag = build_variant_runtime(base, variant, provider_mode=provider_mode)
-    if providers is None:
-        providers = build_providers(settings)
-    if rag is None:
-        rag = RAGService(settings, providers[0])
+        settings = build_variant_settings(get_settings(), variant, provider_mode=provider_mode)
     started = time.perf_counter()
-    state = run_workflow(
-        description=case.description,
-        images=[],
-        followup_answer=None,
-        followup_used=0,
-        settings=settings,
-        rag=rag,
-        providers=providers,
-    )
-    if state.get("status") == "needs_more_info" and case.user_text:
+    images, image_input = load_case_images(case, settings)
+    state: dict[str, Any] = {"status": "input_failed"}
+    if not image_input["errors"]:
+        if providers is None:
+            providers = build_providers(settings)
+        if rag is None:
+            rag = RAGService(settings, providers[0])
         state = run_workflow(
-            description=case.description,
-            images=[],
-            followup_answer=case.user_text,
-            followup_used=1,
-            settings=settings,
-            rag=rag,
-            providers=providers,
+            description=case.description, images=images, followup_answer=None,
+            followup_used=0, settings=settings, rag=rag, providers=providers,
         )
+        if state.get("status") == "needs_more_info" and case.user_text:
+            state = run_workflow(
+                description=case.description, images=images, followup_answer=case.user_text,
+                followup_used=1, settings=settings, rag=rag, providers=providers,
+            )
     elapsed = time.perf_counter() - started
 
     model_results = state.get("model_results") or []
@@ -558,6 +574,9 @@ def run_evaluation_case(
         "evaluation_timestamp": datetime.now(UTC).isoformat(),
         "latency_s": round(elapsed, 2),
         "provider_mode": evaluation_mode(settings),
+        "requested_provider_mode": settings.provider_mode,
+        "configuration": configuration_summary(settings),
+        "image_input": image_input,
         "system_version": "eval-runner-3",
         "ensemble_mode": state.get("multi_model", {}).get("ensemble_mode", ""),
         "model_a_result": model_a if model_a is not None else _model_slot_dict(None, slot="model_a"),
@@ -733,6 +752,12 @@ def build_evaluation_report(
     error_by_category = error_by_dimension(results, dimension="expected_category")
     error_by_scenario = error_by_dimension(results, dimension="scenario")
     overview = _dataset_overview(dataset)
+    overview["executed_image_case_count"] = sum(bool(r.get("image_input", {}).get("declared")) for r in results)
+    overview["declared_image_count"] = sum(r.get("image_input", {}).get("declared", 0) for r in results)
+    overview["loaded_image_count"] = sum(r.get("image_input", {}).get("loaded", 0) for r in results)
+    overview["input_failed_count"] = sum(r.get("status") == "input_failed" for r in results)
+    modes = {r.get("provider_mode", provider_mode) for r in results}
+    actual_mode = next(iter(modes)) if len(modes) == 1 else "mixed" if modes else provider_mode
     model_family_performance = _model_family_performance(results)
     review_and_risk = _review_and_risk_stats(results)
     evidence_overview = _evidence_stats_summary(results)
@@ -766,7 +791,8 @@ def build_evaluation_report(
         "category_counts": dict(categories),
         "severity_counts": dict(severities),
         "scenario_breakdown": scenario_rows,
-        "evaluation_mode": provider_mode,
+        "evaluation_mode": actual_mode,
+        "requested_provider_mode": provider_mode,
         "evaluation_timestamp": datetime.now(UTC).isoformat(),
         "system_version": "eval-runner-3",
         **metrics,
@@ -787,7 +813,7 @@ def build_evaluation_report(
         "",
         f"- 数据集版本：{dataset.version}（{dataset.manifest.title}）",
         f"- 案例数：{dataset.manifest.case_count}；本次运行：{metrics['total']}",
-        f"- 评测模式：{provider_mode}",
+        f"- 评测模式：{actual_mode}（请求：{provider_mode}）",
         f"- 生成时间：{summary['evaluation_timestamp']}",
         "",
         "## Dataset Overview",
@@ -799,6 +825,8 @@ def build_evaluation_report(
         f"- 有隐患样本：{overview['hazard_case_count']}；无隐患负样本：{overview['safe_negative_case_count']}",
         f"- 含图片案例：{overview['image_case_count']}；"
         f"标注 expected_evidence_supported：{overview['evidence_labeled_count']}",
+        f"- 本次声明图片：{overview['declared_image_count']}；成功加载：{overview['loaded_image_count']}；"
+        f"输入失败案例：{overview['input_failed_count']}",
         "",
         "## 总体指标",
         "",

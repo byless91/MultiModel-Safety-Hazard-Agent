@@ -313,7 +313,6 @@ def main() -> None:
     args = parser.parse_args()
 
     os.environ["PROVIDER_MODE"] = args.provider
-    from app.services.providers import get_provider
 
     dataset = load_dataset(
         args.cases,
@@ -357,10 +356,7 @@ def main() -> None:
         provider_mode=args.provider,
         ablation_summary=ablation_summary,
     )
-    try:
-        summary["provider"] = get_provider().name
-    except Exception:
-        summary["provider"] = settings.provider_mode
+    summary["provider"] = ",".join(provider.name for provider in providers)
     summary["variant"] = variant["id"]
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "report.json").write_text(

@@ -14,7 +14,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 KNOWN_SCENARIOS = ("消防", "生产安全", "社区", "林区", "交通", "其他")
 
@@ -68,6 +68,7 @@ class EvalCase(BaseModel):
     expected_evidence_supported: bool | None = None
     expected_review_required: bool | None = None
     notes: str = ""
+    _dataset_dir: Path | None = PrivateAttr(default=None)
 
     @field_validator("case_id")
     @classmethod
@@ -272,6 +273,7 @@ def load_dataset(
         if not include_synthetic and case.source_type == EvalSourceType.synthetic:
             continue
         seen.add(case.case_id)
+        case._dataset_dir = path.resolve().parent
         cases.append(case)
     if expected_count is not None and len(cases) != expected_count:
         found_issues.append(
