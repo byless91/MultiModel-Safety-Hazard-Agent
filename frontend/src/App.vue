@@ -9,6 +9,7 @@
         <nav class="nav">
           <router-link to="/" class="nav-link">现场研判</router-link>
           <router-link to="/history" class="nav-link">历史记录</router-link>
+          <router-link v-if="auth.canReview" to="/analytics" class="nav-link">管理分析</router-link>
           <router-link to="/knowledge" class="nav-link">知识库</router-link>
           <router-link to="/evaluation" class="nav-link">评测总览</router-link>
         </nav>

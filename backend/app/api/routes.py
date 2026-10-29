@@ -32,6 +32,7 @@ from app.core.security import (
 )
 from app.models import Assessment, AssessmentImage, AssessmentJob, IdempotencyKey, KnowledgeDocument, User
 from app.models.entities import utcnow
+from app.schemas.analytics import AnalyticsOptionsOut, AnalyticsOverviewOut, BenchmarksOut
 from app.schemas.assessment import (
     AssessmentOut,
     AuthUserOut,
@@ -51,6 +52,7 @@ from app.schemas.classification import CATEGORIES, TAGS, TAXONOMY_VERSION, Class
 from app.schemas.knowledge import INDUSTRIES, Industry, KnowledgeMetadataIn, KnowledgeReviewIn
 from app.schemas.location import ImportResultOut, ImportRowsIn, LocationData, utc_event_time
 from app.services import llm_ledger
+from app.services.analytics import analytics_benchmarks, analytics_options, analytics_overview
 from app.services.assessment_io import apply_state, images_from_db
 from app.services.classification import save_classification
 from app.services.document_converter import (
@@ -1266,6 +1268,58 @@ def update_classification(
     user = get_request_user(request)
     save_classification(item, db, payload, user.username if user else "", user.id if user else None)
     return to_out(item)
+
+
+@router.get(
+    "/analytics/options",
+    response_model=AnalyticsOptionsOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
+def get_analytics_options(db: Session = Depends(get_db)) -> AnalyticsOptionsOut:
+    return AnalyticsOptionsOut(**analytics_options(db))
+
+
+@router.get(
+    "/analytics/overview",
+    response_model=AnalyticsOverviewOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
+def get_analytics_overview(
+    district: str | None = None,
+    category: str | None = None,
+    facility: str | None = None,
+    scene: str | None = None,
+    start: str | None = Query(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    end: str | None = Query(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    db: Session = Depends(get_db),
+) -> AnalyticsOverviewOut:
+    try:
+        return AnalyticsOverviewOut(**analytics_overview(
+            db, district=district or None, category=category or None, facility=facility or None,
+            scene=scene or None, start=start, end=end,
+        ))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/analytics/benchmarks",
+    response_model=BenchmarksOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
+def get_analytics_benchmarks(
+    facility: str | None = None,
+    scene: str | None = None,
+    category: str | None = None,
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> BenchmarksOut:
+    try:
+        return BenchmarksOut(**analytics_benchmarks(
+            db, facility=facility or None, scene=scene or None, category=category or None, limit=limit,
+        ))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _export_content(item: Assessment) -> str:

@@ -601,3 +601,78 @@ export interface EvaluationReportsPayload {
   has_trace_results?: boolean
   source_dir?: string
 }
+
+export interface AnalyticsBucket {
+  value: string
+  label?: string | null
+  count: number
+}
+
+export interface AnalyticsMonth {
+  month: string
+  count: number
+}
+
+export interface AnalyticsMapPoint {
+  id: string
+  description: string
+  district?: string | null
+  facility?: string | null
+  scene?: string | null
+  risk_level?: number | null
+  latitude: number
+  longitude: number
+  coordinate_system?: string | null
+  map_latitude: number
+  map_longitude: number
+  event_time?: string | null
+  created_at: string
+}
+
+export interface AnalyticsOverview {
+  time_basis: string
+  total: number
+  by_district: AnalyticsBucket[]
+  by_category: AnalyticsBucket[]
+  by_risk: AnalyticsBucket[]
+  by_source: AnalyticsBucket[]
+  months: AnalyticsMonth[]
+  map_points: AnalyticsMapPoint[]
+  map_truncated: boolean
+  collected: AnalyticsBucket[]
+  notice: string
+}
+
+export interface AnalyticsOptions {
+  districts: string[]
+  categories: string[]
+  facilities: string[]
+  scenes: string[]
+}
+
+export interface BenchmarkItem {
+  id: string
+  description: string
+  district?: string | null
+  facility?: string | null
+  scene?: string | null
+  hazard_category?: string | null
+  risk_level?: number | null
+  rectification_status?: string | null
+  rectification_note?: string | null
+  rectified_at?: string | null
+  event_time?: string | null
+  data_source?: string | null
+  match: 'both' | 'facility' | 'scene'
+  comparable: string
+}
+
+export interface Benchmarks {
+  filters: { facility?: string | null; scene?: string | null; category?: string | null }
+  sample_size: number
+  returned: number
+  truncated: boolean
+  sources: AnalyticsBucket[]
+  items: BenchmarkItem[]
+  notice: string
+}

@@ -2,8 +2,8 @@
   "extends": "../../frontend/tsconfig.json",
   "compilerOptions": {
     "baseUrl": "../../frontend",
-    "paths": { "*": ["node_modules/*"] },
-    "types": ["node"],
+    "paths": { "*": ["node_modules/*"], "leaflet": ["node_modules/@types/leaflet"] },
+    "types": ["node", "leaflet"],
     "typeRoots": ["../../frontend/node_modules/@types"]
   },
   "include": ["./**/*.ts", "../../frontend/env.d.ts"],
