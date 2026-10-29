@@ -5,7 +5,7 @@
       上传现场照片并描述情况，系统给出隐患类型、风险等级和处置建议。
     </p>
 
-    <el-card v-loading="store.loading" class="intake-card">
+    <el-card v-loading="busy" class="intake-card">
       <form class="intake" @submit.prevent="submit">
         <div class="intake-row">
           <div class="field">
@@ -47,7 +47,7 @@
           <el-button
             type="primary"
             native-type="submit"
-            :loading="store.loading"
+            :loading="busy || working"
             :disabled="!description.trim() || store.hasPendingSubmission"
           >
             <el-icon><UploadFilled /></el-icon>
@@ -76,24 +76,9 @@
       <p class="field-hint">刷新后仍可查询。新建研判不会取消已受理的请求。</p>
     </section>
 
-    <el-alert
-      v-if="store.activeJob && store.loading"
-      class="job-progress-alert"
-      :title="`研判进行中：${PROGRESS_LABELS[store.activeJob.progress_step] || store.activeJob.progress_step}`"
-      type="info"
-      :closable="false"
-      show-icon
-    />
-
-    <el-alert
-      v-if="store.error"
-      class="error-alert"
-      :title="store.error"
-      type="error"
-      :closable="false"
-      show-icon
-    />
-
+    <JobProgress :assessment="assessment" :job="job" :busy="busy" :waiting="waiting" :notice="notice"
+      :working="working" @resume="session.resume" />
+    <el-alert v-if="error" class="error-alert" :title="error" type="error" :closable="false" show-icon />
     <section v-if="assessment" class="result-panel">
       <div class="result-panel-head">
         <span class="result-panel-title">研判结果</span>
@@ -101,7 +86,7 @@
       </div>
       <AssessmentResult
         :assessment="assessment"
-        :loading="store.loading"
+        :loading="busy || working"
         @followup="onFollowup"
         @updated="onUpdated"
       />
@@ -115,62 +100,40 @@ import { ref } from 'vue'
 
 import AssessmentResult from '../components/AssessmentResult.vue'
 import { useAssessmentStore } from '../stores/assessment'
+import JobProgress from '../components/JobProgress.vue'
+import { useAssessmentSession } from '../composables/useAssessmentSession'
 import type { Assessment } from '../types'
 
 const store = useAssessmentStore()
 const description = ref('')
 const fileList = ref<UploadFile[]>([])
-const assessment = ref<Assessment | null>(null)
-
-const PROGRESS_LABELS: Record<string, string> = {
-  queued: '排队中',
-  analyze: '多模型分析中',
-  retrieve: '法规检索中',
-  refine: '证据二次研判中',
-  judge: '融合研判中',
-  evidence: '证据校验中',
-  generate: '生成报告中',
-  needs_more_info: '等待补充信息',
-  completed: '已完成',
-  done: '已完成',
-}
+const session = useAssessmentSession()
+const { assessment, job, busy, working, waiting, notice, error } = session
 
 async function submit() {
   if (!description.value.trim()) return
   const files = fileList.value
     .map((item) => (item.raw ? item.raw : (item as unknown as File)))
     .filter((item) => item instanceof File)
-  try {
-    showSubmission(await store.create(description.value.trim(), files))
-  } catch {
-    // store.error 和恢复入口已在页面展示。
-  }
-}
-
-function showSubmission(result: Assessment) {
-  assessment.value = result.status === 'pending' ? null : result
-  if (result.status === 'pending') ElMessage.info('请求已受理，可从记录入口查看进度')
-  else ElMessage.success('研判记录已就绪')
+  await session.run((signal) => store.create(description.value.trim(), files, { wait: false, signal }))
 }
 
 async function resumeSubmission(retry: boolean) {
-  try {
-    showSubmission(await (retry ? store.retryCreate() : store.recoverCreate()))
-  } catch {
-    // 保留原提交及其查询入口，不自动创建新的研判。
-  }
+  await session.run((signal) => retry
+    ? store.retryCreate({ wait: false, signal }) : store.recoverCreate({ wait: false, signal }))
 }
 
 async function onFollowup(answer: string) {
   if (!assessment.value) return
-  assessment.value = await store.followup(assessment.value.id, answer)
+  const id = assessment.value.id
+  await session.run((signal) => store.followup(id, answer, { wait: false, signal }))
 }
 
 function onUpdated(updated: Assessment) {
-  assessment.value = updated
+  session.update(updated)
 }
-
 function resetForm() {
+  session.clear()
   store.startNewSubmission()
   description.value = ''
   fileList.value = []

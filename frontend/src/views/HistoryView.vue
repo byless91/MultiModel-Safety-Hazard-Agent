@@ -7,6 +7,8 @@
       <div class="toolbar">
         <el-select v-model="statusFilter" placeholder="按状态筛选" clearable style="width: 200px">
           <el-option label="自动完成" value="completed" />
+          <el-option label="研判进行中" value="pending" />
+          <el-option label="任务失败" value="failed" />
           <el-option label="需要重新研判" value="needs_review" />
           <el-option label="需要补充信息" value="needs_more_info" />
           <el-option label="需要人工复核" value="awaiting_human_review" />
@@ -120,10 +122,12 @@ function statusLabel(status: string) {
   const labels: Record<string, string> = {
     completed: '自动完成',
     confirmed: '已确认',
-    needs_review: '需要重新研判',
+    needs_review: '待重新复核',
     awaiting_human_review: '需要人工复核',
     needs_more_info: '需要补充信息',
     processing: '处理中',
+    pending: '研判进行中',
+    failed: '任务失败',
   }
   return labels[status] || status
 }
