@@ -155,6 +155,17 @@ def test_reject_then_reenter_and_approve_preserves_classification_audit(client):
     assert replay["human_review"] == final["human_review"]
 
 
+def test_rejection_before_human_entry_keeps_the_original_classification_snapshot(client):
+    http, _ = client
+    item = create(http)
+    rejected = http.post(f"/api/v1/assessments/{item['id']}/confirm",
+                         json={"confirmed": False, "note": "先退回核实"}).json()
+    original = rejected["human_review"]["ai_original"]
+    assert original["classification"] == item["classification"]
+    saved = save(http, rejected).json()
+    assert saved["human_review"]["ai_original"] == original
+
+
 def test_inspector_can_enter_but_cannot_approve(client, monkeypatch):
     http, _ = client
     item = create(http)

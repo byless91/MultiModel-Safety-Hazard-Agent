@@ -1,15 +1,15 @@
 # 多模态基层安全隐患智能研判与处置辅助系统
 
-面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。单实例工程 MVP 已完成 R0–R8 回归与交付验收，无 API Key 时可用 Mock 跑通演示；真实现场识别与法规质量仍待验收。
+面向社区网格员、厂区安全员、林区巡查员，在原 Vue/FastAPI 项目上改造的分类与知识助手。M1 首页提供“照片/描述 → 类别与标签建议 → 参考条款 → 人工录入 → 角色审核”，风险等级由人工选填；也可仅人工录入。原 R0–R8 研判及整改记录继续可读。无 API Key 时为明确标识的 Mock 演示，真实现场识别与法规质量仍待验收。
 
-后续统一按[最终改造计划 v2.0](docs/最终改造计划.md)在本项目上增量实施，整合“知识库与分类助手＋行业数据分析”：分类与人工录入 → 多行业知识版本 → 位置/来源与导入 → 管理统计及同类整改对标 → 更新/趋势提醒 → 部署验证。M0 清理完成，M1–M6 待实施；当前交接与备份入口见 [HANDOVER.md](HANDOVER.md)。
+后续统一按[最终改造计划 v2.0](docs/最终改造计划.md)在本项目上增量实施，整合“知识库与分类助手＋行业数据分析”：分类与人工录入 → 多行业知识版本 → 位置/来源与导入 → 管理统计及同类整改对标 → 更新/趋势提醒 → 部署验证。M0、M1 已完成工程验收，下一阶段为 M2；当前交接与备份入口见 [HANDOVER.md](HANDOVER.md)。
 
 按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)完成 R0–R8 工程工作。最终结果、遗留条件和证据见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)，另有[当前架构](CURRENT_ARCHITECTURE.md)、[部署与回退](docs/DEPLOYMENT.md)、[评测索引](docs/evaluation/README.md)。新增或修改的测试统一放在根目录 `test/`；各阶段原始基线保留于 `docs/baselines/`。
 
 ## 技术栈
 
 - 后端：Python 3.11+、FastAPI、SQLAlchemy、SQLite / PostgreSQL
-- 智能体：LangGraph StateGraph 条件路由工作流（分析、追问、检索、二次研判、融合研判、证据判定、生成/人工复核），模型失败自动回退 Mock
+- 工作流：分类模式复用主 Provider、RAG 与现有任务队列，失败明确展示并允许人工录入；历史研判保留 LangGraph 条件流程及带标识的 Mock 降级
 - 模型：Qwen / GLM（模型名可配置，OpenAI 兼容 API），Mock 模式无需 Key
 - 检索：FAISS 或 NumPy 兜底向量检索，可选规则重排 Reranker（`RERANKER_ENABLED`，执行 Vector Top-K → 重排 → Top-N）
 - 前端：Vue 3、TypeScript、Vite、Element Plus、Pinia
@@ -50,7 +50,7 @@ $env:AUTH_MODE = 'none'
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8001
 ```
 
-注意用 `backend\.venv`，项目根目录下的 `.venv` 是旧环境，不要使用。
+注意使用 `backend\.venv`，根目录旧虚拟环境已在瘦身时移除。
 
 不安装 FAISS 时，省略 `--extra faiss`，使用 NumPy 检索。仅演示不开发时可省略 `--extra dev`。不要覆盖已有 `.env`；已有环境先核对配置。
 
@@ -136,10 +136,10 @@ jwt 模式使用：
 
 - `/health` 明确返回 `auth_mode`；JWT 使用账号密码登录，静态模式验证 `/auth/check`，none 显示无需登录说明。读取认证配置失败时不会默认为开放模式。
 - 登录：仅 JWT 提供 `POST /api/v1/auth/token`（OAuth2 密码流）；token/none 返回明确说明。前端仅按 JWT 会话处理 401，静态凭证 401 不自动删除凭证或循环跳转；候选凭证验证通过才替换保存值。
-- 角色权限：inspector 提交研判/整改照片，reviewer 确认复核与整改关闭，admin 管理知识库与用户（`GET/POST /api/v1/admin/users`）；
+- 角色权限：inspector 提交记录、补全人工分类/标签及整改照片，reviewer/admin 审核分类及原研判，admin 管理知识库与用户（`GET/POST /api/v1/admin/users`）；
 - 审计可信：复核人/整改操作人一律取认证身份，客户端传入的 `reviewer`/`by` 字段在 jwt 模式下不生效；
 - 复核保护：仅 `needs_more_info` 可追问，活动任务或已定稿记录不能被追问覆盖；复核只接受允许的终态，相同决定可幂等重放；
-- 人工修订：拒绝必须填写意见，edits 只允许 `hazard_category`、1–3 整数 `risk_level`、非空 `conclusion`；`human_review.history` 保留追加审计与首次复核前的 AI 快照，报告/工单/导出使用一致的有效结论；
+- 人工修订：拒绝必须填写意见。分类记录先保存人工类别/标签及可选等级，审核不能直接批准尚未录入的 AI 建议；历史研判仍支持 edits 修订类别、1–3 等级和结论。两者共用追加审计及 AI 快照；详情、历史与导出读取相同有效值；
 - 图片保护：`/uploads` 改为短期 HMAC 签名 URL（`UPLOAD_URL_TTL_MINUTES`），浏览器 `<img>` 无需携带凭证，过期/篡改即拒绝；
 - 限流（`RATE_LIMIT_ENABLED=true` 开启）：登录 10 次/分/IP（防爆破），研判提交 5 次/分/用户；
 - `/health` 与 `/metrics` 保持开放（探活与内网监控）。
@@ -148,11 +148,11 @@ jwt 模式使用：
 
 ## LLM 成本台账与工程化（B5）
 
-- **调用台账**：每次真实模型调用（含失败）逐条落 `llm_calls` 表——provider、模型、用途（analyze/refine/compare/embed）、prompt 版本、tokens 进出、延迟、重试次数、解析失败标记，并携带 request_id 与研判 ID 关联日志；`GET /api/v1/admin/llm-usage`（admin）按天×模型×用途聚合查看；
+- **调用台账**：每次真实模型调用（含失败）逐条落 `llm_calls` 表——provider、模型、用途（classification/analyze/refine/compare/embed）、prompt 版本、tokens 进出、延迟、重试次数、解析失败标记，并携带 request_id 与研判 ID 关联日志；`GET /api/v1/admin/llm-usage`（admin）按天×模型×用途聚合查看；
 - **预算熔断**：`DAILY_TOKEN_BUDGET`（默认 0 不限），当日 tokens 超限后新研判返回 429，进行中任务不受影响；
 - **并发治理**：`MAX_CONCURRENT_LLM_CALLS`（默认 4）统一限制单进程内所有 Provider 的 analyze/refine/compare/embed 实际 HTTP 并发。`LLM_QUEUE_TIMEOUT_SECONDS`（默认 60 秒）限制等待名额的时间，排队超时不发送 HTTP、不在 Provider 内重试；每次 HTTP 重试重新申请名额，退避、解析和台账写入不占名额。双模型线程池仅调度任务。此限制不提供分布式限流或严格日预算预留；
 - **输出可信**：模型输出 JSON 解析失败不再静默——结果带 `parse_failed` 标记、台账记 `parse_failed` 状态、model_guard 强制人工复核（与"未检出隐患"可区分）；
-- **Prompt 版本化**：prompt 集中在 `backend/app/prompts/`（当前 `vision-v2`），改动必须递增版本号，评测与台账据此归因；
+- **Prompt 版本化**：prompt 集中在 `backend/app/prompts/`，历史研判保留 `vision-v2`，新增分类使用 `classification-m1-v1`；每类提示词独立递增，成功/失败调用均记录实际版本，不混用历史评测基线；
 - **RAG 修复**：分块按「第X条」边界（多条文法规溯源不再张冠李戴）、语料原子写、重建/查询读写锁、向量 L2 归一化（分数恢复 cosine 语义）、embedding 降级留日志且重建时自动重试真实 API；
 - **评测诚实化**：生产置信度公式中的 mock 特判已移除（`MOCK_DEMO_BOOST` 默认关，仅演示场景显式开启），评测数字不再被演示加成污染。
 
@@ -175,7 +175,15 @@ jwt 模式使用：
 - 前端每次新建生成独立 key；结果不确定时先查询，明确未找到才按内存中的原内容和原 key 重发。页面提供查询、原内容重试及记录入口；sessionStorage 仅保留恢复元数据，刷新后不自动重传照片。同步失败保留原记录，需要再次执行时明确新建研判。
 - `POST /assessments/{id}/rectification/compare` 在同整改状态的 `COMPARE_DEDUP_MINUTES` 窗口内复用上次比对结果，不重复调用模型。
 
-## 已实现能力
+## M1 分类录入合同
+
+- `GET /api/v1/classification/taxonomy` 返回 `m1-v1` 的类别和通用标签，前端不另维护一份分类表。
+- `POST /api/v1/assessments` 沿用原图片、描述、幂等键与异步响应。表单 `mode=classification` 请求主 Provider 生成建议，`mode=manual` 不调用模型或向量检索；省略 mode 仍为历史研判接口。
+- `record_mode=classification` 时，`classification.suggested_category/suggested_tags` 是不可变建议，`hazard_category` 和 `classification.final_tags` 为人工值；`risk_level=null` 表示未分级，不生成 AI 风险分数或整改工单。
+- `POST /api/v1/assessments/{id}/classification` 保存 category、tags、可空 risk_level、note、taxonomy_version、revision；陈旧 revision 返回 409。保存不等于审核，定稿仍走原 `/confirm` 权限和审计，定稿后不能覆盖。
+- 同一幂等键不能切换录入模式。未知类别、模型失败、检索不足及 Mock 演示均明确展示；参考条款仍须核对来源、版本和适用性。
+
+## 历史研判与共用能力（R0–R8）
 
 - 多图上传 + 文字描述的多模态研判
 - Mock 模式全链路演示：解析、检索、分级、成文
@@ -323,9 +331,7 @@ Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样�
 
 ## 下一步
 
-- 扩充法规条款覆盖灭火器、井盖、电气等场景，提升条款命中率
-- 增加知识库审核发布流程、法规版本自动监测
-- 开展试点试用并持续维护评测集
+下一阶段只推进[最终改造计划中的 M2](docs/最终改造计划.md)：在原知识库补齐行业、版本、来源与适用范围和人工审核。位置、管理分析及更新监测按后续阶段依次实施。
 
 ## 浏览器 E2E
 

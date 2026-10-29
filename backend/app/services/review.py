@@ -123,6 +123,8 @@ def apply_human_review(
             if history else {"available": True, **before, "report": read_object(item.report_json),
                              "risk_result": read_object(item.risk_result_json)}
         )
+        if is_classification:
+            review["ai_original"] = {"available": True, **before, "classification": data.model_dump()}
     after = {**before, **payload.edits, "confirmed": payload.confirmed,
              "status": "confirmed" if payload.confirmed else "needs_review"}
     if not payload.edits.get("conclusion") and {"hazard_category", "risk_level"} & payload.edits.keys():

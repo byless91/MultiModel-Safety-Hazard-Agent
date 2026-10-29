@@ -1,10 +1,12 @@
-# 当前架构（R8 工程交付快照）
+# 当前架构（M1 增量改造）
 
-更新：2026-10-29。实现与验收范围见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)；部署、备份和回退见 [部署说明](docs/DEPLOYMENT.md)。历史 V2/B 系列任务书保留用于追溯。
+更新：2026-10-29。当前范围和下一阶段见 [最终改造计划](docs/最终改造计划.md)；R0–R8 原能力见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)，部署、备份和回退见 [部署说明](docs/DEPLOYMENT.md)。
 
 ## 边界与数据流
 
-系统辅助基层巡查识别隐患、提供证据并完成复核整改。模型提取事实，规则计算风险，知识库提供材料，人工决定最终结论。Mock、合成图片和开发法规节选验证工程链路；真实识图、误报控制和法规适用性尚未验收。
+M1 主流程是分类与人工录入：原上传/任务设施 → 主 Provider 专用分类请求 → RAG 参考条款 → 人工类别/标签和可选等级 → 原角色审核/审计 → 历史与导出。仅人工录入跳过模型及检索；分类请求不进入风险引擎、融合判级或报告工单生成。分类建议、最终值和体系版本共同保存于原 Assessment，不另建业务记录系统。
+
+以下 LangGraph 数据流保留给历史研判接口及记录。Mock、合成图片和开发法规节选验证工程链路；真实识图、误报控制和法规适用性尚未验收。
 
 ```text
 Vue 3 / Pinia / 页面任务会话
@@ -26,7 +28,7 @@ SQLAlchemy：SQLite 或 PostgreSQL
 
 ## 模型、规则与防护
 
-- `services/providers/` 统一 analyze/complete/embed/compare 接口，接入 Qwen、GLM 的兼容 HTTP。配置模型名与服务返回模型标识分别记录；auto 无 Key 时仍是 Mock。
+- `services/providers/` 统一 classify/analyze/complete/embed/compare 接口，接入 Qwen、GLM 的兼容 HTTP。分类只调用当前主 Provider，使用禁用判级的专用 Prompt；真实图片字节由原 image_url 传输。分类调用/解析失败不回退为成功建议；auto 无 Key 时仍是明确标识的 Mock。
 - 双模型并行分析记录独立状态、延迟和错误，明确 full/partial/fallback。全部失败的 Mock 兜底、解析失败等异常触发人工复核。
 - HTTP 入口统一申请单进程并发名额，覆盖分析、refine、compare、embedding 和重试；退避及解析不占名额，排队超时不发送请求。
 - 标准化、事实/位置去重、分歧分析和 Ensemble Judge 先于风险及证据判定。稳定、不透明的 finding_id 区分同类不同位置隐患。
@@ -47,7 +49,7 @@ SQLAlchemy：SQLite 或 PostgreSQL
 研判状态包括 pending、needs_more_info、awaiting_human_review、completed、needs_review、confirmed、failed；任务状态与整改状态独立。
 
 - 只有 needs_more_info 可追问，活动任务、已完成或定稿记录拒绝覆盖。
-- reviewer/admin 可批准、拒绝和修订类别、1–3 整数等级、非空结论；拒绝必须有意见。JWT 操作人取认证身份。
+- 分类记录允许 inspector/reviewer/admin 保存类别、标签、可空等级及现场备注，以 revision/条件更新拒绝陈旧覆盖；reviewer/admin 只能在人工录入后批准，也可带意见拒绝。前端有未保存修改时禁用审核。历史研判仍可由 reviewer/admin 修订类别、1–3 整数等级和结论。JWT 操作人取认证身份。
 - human_review 保存首次复核前 AI 快照及追加历史，相同审批可幂等重放。详情、工单、导出读取同一有效结果，不冒充重新计算 AI 风险因子。
 - 整改状态为 open / assigned / rectifying / pending_verification / verified / closed，允许受控退回/重开。照片成对比对和 rectification-assessment-v1 完成度仅辅助判断，必须人工 verified 才能 closed。
 - inspector 可提交研判及整改照片；复核和整改状态流转由 reviewer/admin 执行；知识及用户管理需要 admin。none/token 无个人角色身份保证，前端标识兼容模式。
@@ -58,13 +60,13 @@ sync 保留同步响应；async 在研判和任务同事务落库后返回 202�
 
 - 条件 UPDATE 原子认领任务，worker_id、attempt_token、lease_expires_at 隔离执行代次。运行时心跳、监测及进程锁处理失联，旧执行迟到不能回写新代次。
 - 追问在接受时预留次数及 followup_token，失败/恢复按代次释放。checkpoint 恢复已暂停线程，通常不重跑原视觉分析。
-- Idempotency-Key 绑定初始文字/OCR/图片指纹；相同内容复用原记录/任务，不同内容 409。GET /assessment-submissions/{key} 只查询；无指纹旧映射可查，但拒绝不明确的 POST 重放。
+- Idempotency-Key 绑定初始录入模式、文字/OCR/图片指纹；相同内容复用原记录/任务，不同内容或模式 409。GET /assessment-submissions/{key} 只查询；无指纹旧映射可查，但拒绝不明确的 POST 重放。
 - 前端 sessionStorage 只保留恢复元信息，响应丢失后先查原 key，刷新不自动重传照片或重新调用模型。
 - useAssessmentSession 按页面和记录持有任务、定时器和 AbortController。刷新、历史入口、路由换 id 查询记录与最新任务；离开停止本地轮询。两分钟是本地等待窗口，继续查询不重建任务，终态停止轮询。
 
 ## 持久化、认证与运行
 
-模型包括 Assessment、AssessmentImage、AssessmentJob、IdempotencyKey、KnowledgeDocument、User、LLMCall。Alembic head 为 `f04b62a9c310`，启动接管未版本化库并增量升级；任何迁移失败拒绝启动。
+模型包括 Assessment、AssessmentImage、AssessmentJob、IdempotencyKey、KnowledgeDocument、User、LLMCall。Alembic head 为 `a12f083bcd71`；M1 只给原 Assessment 增加 record_mode/classification_json，旧记录默认 assessment，旧人工结果和审计不重算。启动接管未版本化库并增量升级；任何迁移失败拒绝启动。
 
 R3/R4 新增任务 worker/代次/租约、追问预留 token、幂等初始指纹列，允许历史值为 null。人工历史和 AI 快照使用既有 JSON 字段，没有迁移重写存量人工结论。
 

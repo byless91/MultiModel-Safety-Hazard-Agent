@@ -39,6 +39,8 @@ R6/T16 起，历史 `test_safe_ground_truth_is_not_silently_auto_passed` 要求�
 
 运行 PG 矩阵时，创建本机专用测试库后设置 `TEST_DATABASE_URL`，另把 `R3_TEST_POSTGRES_URL`、`R4_TEST_POSTGRES_URL`、`R8_TEST_POSTGRES_URL` 指向该专用库，分别启用独立 schema 的认领/幂等/发布迁移用例。未设置时这些条件用例跳过。不得指向业务库；全量套件会创建/清理测试数据。CI PG 任务已设置全部四个入口。
 
+历史 PG 套件包含固定幂等键；重复验收应新建空的专用测试库，避免重放上轮记录而误报失败。不要为运行测试清理业务库或共用数据库。
+
 R8 新增 `test/backend/test_release_migrations.py`：SQLite/PG 各三条路径（空库、R3 前旧库、未版本化旧库），验证到 head、重复执行和人工结果/审计/任务/幂等保留。历史 SQLite 专用迁移测试在 PG 模式跳过，由此矩阵补足。
 
 所有运行产物均忽略提交。保留运行目录便于排查；本轮不提供自动递归清理命令。
@@ -76,12 +78,15 @@ node test/e2e/viewport-layout.mjs
 node test/e2e/human-review.mjs
 node test/e2e/async-resume.mjs
 node test/e2e/assessment-lifecycle.mjs
+node test/e2e/classification.mjs
 node test/e2e/submission-recovery.mjs
 node test/e2e/auth_modes.mjs
 .\backend\.venv\Scripts\python.exe scripts/check_eval_baseline.py
 ```
 
 这些入口自建隔离后端，固定 Mock 并清除模型 Key。认证/幂等和旧部署入口仍沿用 r4/r5 产物文件名，每轮验收应核对修改时间并保存独立摘要；R7 浏览器产物目录自带 UUID。容器验收命令见 [部署说明](../docs/DEPLOYMENT.md)，合成集与真实标签边界见 [评测索引](../docs/evaluation/README.md)。
+
+M1 的后端合同/流程测试在 `test/backend/test_classification_*.py`，前端在 `test/frontend/classification.spec.ts`；发布迁移矩阵增加 R8 head → M1 的无损升级。`classification.mjs` 从真实首页上传合成图片，验证建议/人工值分离、未分级、巡查员录入/复核员审核、刷新、重复保存、历史/Markdown 导出及桌面/手机布局。原 `assessment-lifecycle.mjs` 通过兼容 API 创建历史研判，再验证原追问和整改页面；默认首页分类上传由 M1 用例覆盖。HTTP 请求合同使用 MockTransport 检查 Qwen/GLM 收到的图片字节，不能当作真实模型识别质量成绩。
 
 两分钟恢复 E2E 使用浏览器虚拟时钟推进本地等待窗口，并暂停测试 worker；不等于真实模型运行两分钟的稳定性或费用验证。
 
