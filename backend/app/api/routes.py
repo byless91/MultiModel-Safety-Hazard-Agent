@@ -30,7 +30,16 @@ from app.core.security import (
     sign_upload_url,
     verify_password,
 )
-from app.models import Assessment, AssessmentImage, AssessmentJob, IdempotencyKey, KnowledgeDocument, User
+from app.models import (
+    Assessment,
+    AssessmentImage,
+    AssessmentJob,
+    IdempotencyKey,
+    KnowledgeDocument,
+    KnowledgeSource,
+    TrendAlert,
+    User,
+)
 from app.models.entities import utcnow
 from app.schemas.analytics import AnalyticsOptionsOut, AnalyticsOverviewOut, BenchmarksOut
 from app.schemas.assessment import (
@@ -51,6 +60,7 @@ from app.schemas.assessment import (
 from app.schemas.classification import CATEGORIES, TAGS, TAXONOMY_VERSION, ClassificationData, ClassificationSaveIn
 from app.schemas.knowledge import INDUSTRIES, Industry, KnowledgeMetadataIn, KnowledgeReviewIn
 from app.schemas.location import ImportResultOut, ImportRowsIn, LocationData, utc_event_time
+from app.schemas.updates import AlertOut, AlertReviewIn, SourceIn, SourceOut, TrendReportOut
 from app.services import llm_ledger
 from app.services.analytics import analytics_benchmarks, analytics_options, analytics_overview
 from app.services.assessment_io import apply_state, images_from_db
@@ -78,6 +88,13 @@ from app.services.job_runner import (
     get_job_runner,
 )
 from app.services.knowledge import document_to_records, rebuild_knowledge
+from app.services.knowledge_sources import (
+    acknowledge_source,
+    check_source,
+    create_source,
+    delete_source,
+    source_out,
+)
 from app.services.knowledge_versions import (
     create_document_version,
     delete_document_version,
@@ -100,6 +117,7 @@ from app.services.rectification import (
 )
 from app.services.rectification_assessment import assess_rectification_completion
 from app.services.review import apply_human_review, effective_result
+from app.services.trends import alert_out, refresh_alerts, review_alert, trend_report
 from app.services.workflow import run_workflow
 
 settings = get_settings()
@@ -1322,6 +1340,43 @@ def get_analytics_benchmarks(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@router.get(
+    "/analytics/trend-alerts",
+    response_model=TrendReportOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
+def get_trend_alerts(db: Session = Depends(get_db)) -> TrendReportOut:
+    return TrendReportOut(**trend_report(db))
+
+
+@router.post(
+    "/analytics/trend-alerts/refresh",
+    response_model=TrendReportOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
+def refresh_trend_alerts(db: Session = Depends(get_db)) -> TrendReportOut:
+    refresh_alerts(db)
+    return TrendReportOut(**trend_report(db))
+
+
+@router.post(
+    "/analytics/trend-alerts/{alert_id}",
+    response_model=AlertOut,
+    dependencies=[Depends(require_roles("reviewer", "admin"))],
+)
+def review_trend_alert(
+    alert_id: str, payload: AlertReviewIn, request: Request, db: Session = Depends(get_db),
+) -> AlertOut:
+    item = db.get(TrendAlert, alert_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="趋势提示不存在")
+    user = get_request_user(request)
+    updated = review_alert(
+        db, item, payload.status, payload.note, user.username if user else None, user.id if user else None,
+    )
+    return AlertOut(**alert_out(updated))
+
+
 def _export_content(item: Assessment) -> str:
     if item.record_mode == "classification":
         data = ClassificationData.model_validate_json(item.classification_json or "{}")
@@ -1372,6 +1427,64 @@ def export_assessment(assessment_id: str, db: Session = Depends(get_db)) -> JSON
     if not item:
         raise HTTPException(status_code=404, detail="研判记录不存在")
     return JSONResponse({"filename": f"{assessment_id}.md", "content": _export_content(item)})
+
+
+@router.get(
+    "/knowledge/sources",
+    response_model=list[SourceOut],
+    dependencies=[Depends(require_roles("admin"))],
+)
+def list_knowledge_sources(db: Session = Depends(get_db)) -> list[SourceOut]:
+    items = db.scalars(select(KnowledgeSource).order_by(
+        KnowledgeSource.created_at, KnowledgeSource.id)).all()
+    return [SourceOut(**source_out(item)) for item in items]
+
+
+@router.post(
+    "/knowledge/sources",
+    response_model=SourceOut,
+    status_code=201,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def add_knowledge_source(payload: SourceIn, db: Session = Depends(get_db)) -> SourceOut:
+    return SourceOut(**source_out(create_source(db, payload.name, payload.url, payload.industry)))
+
+
+@router.post(
+    "/knowledge/sources/{source_id}/check",
+    response_model=SourceOut,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def check_knowledge_source(source_id: str, db: Session = Depends(get_db)) -> SourceOut:
+    item = db.get(KnowledgeSource, source_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    return SourceOut(**source_out(check_source(db, item)))
+
+
+@router.post(
+    "/knowledge/sources/{source_id}/ack",
+    response_model=SourceOut,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def acknowledge_knowledge_source(source_id: str, db: Session = Depends(get_db)) -> SourceOut:
+    item = db.get(KnowledgeSource, source_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    return SourceOut(**source_out(acknowledge_source(db, item)))
+
+
+@router.delete(
+    "/knowledge/sources/{source_id}",
+    status_code=204,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def remove_knowledge_source(source_id: str, db: Session = Depends(get_db)) -> Response:
+    item = db.get(KnowledgeSource, source_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="来源不存在")
+    delete_source(db, item)
+    return Response(status_code=204)
 
 
 @router.post(

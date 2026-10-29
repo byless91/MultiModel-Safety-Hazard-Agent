@@ -9,7 +9,7 @@ vi.mock('../../frontend/src/api/client', () => ({
 }))
 
 import AnalyticsView from '../../frontend/src/views/AnalyticsView.vue'
-import type { AnalyticsOptions, AnalyticsOverview, Benchmarks } from '../../frontend/src/types'
+import type { AnalyticsOptions, AnalyticsOverview, Benchmarks, TrendReport } from '../../frontend/src/types'
 
 const options: AnalyticsOptions = {
   districts: ['甲区', '乙区'], categories: ['占用疏散通道', '消防器材失效'],
@@ -51,6 +51,31 @@ const benchmarks: Benchmarks = {
   ],
   notice: '对标仅汇总已确认记录；不能据此直接作出处置决定。',
 }
+const trend: TrendReport = {
+  as_of: '2026-09',
+  rule: { version: 'trend-rule-v1', baseline_months: 6, min_latest: 5, ratio_threshold: 2, min_window_records: 10 },
+  backtest: { months_evaluated: 1, triggered: 1, followed: 0, sample_size: 11,
+    note: '历史触发回放，不是预测准确率。' },
+  sufficiency: { supported: true, reason: '', categories_sufficient: 1, categories_evaluated: 1 },
+  evaluations: [{ category: '电气线路隐患', observed: 5, baseline: 1, sample_size: 11,
+    sufficient: true, triggered: true, reason: '' }],
+  alerts: [{
+    id: 'alert-1', rule_version: 'trend-rule-v1', scope_type: 'category', scope_value: '电气线路隐患',
+    month: '2026-09', observed: 5, baseline: 1, ratio_threshold: 2, sample_size: 11,
+    explanation: '2026-09「电气线路隐患」已确认 5 条，前 6 个月月均 1.0 条，达到 2 倍阈值；评估窗口样本 11 条。',
+    status: 'open', created_at: '2026-10-01T00:00:00Z',
+  }],
+  false_positive_count: 0,
+}
+const insufficientTrend: TrendReport = {
+  ...trend,
+  sufficiency: { supported: false, reason: '历史资料不足：每个类别近 7 个月需至少 10 条已确认记录',
+    categories_sufficient: 0, categories_evaluated: 1 },
+  evaluations: [{ category: '电气线路隐患', observed: 2, baseline: 0, sample_size: 2,
+    sufficient: false, triggered: false, reason: '近 7 个月已确认记录仅 2 条，少于 10 条' }],
+  alerts: [],
+  backtest: { months_evaluated: 0, triggered: 0, followed: 0, sample_size: 2, note: '历史触发回放，不是预测准确率。' },
+}
 
 const wrappers: ReturnType<typeof mount>[] = []
 
@@ -63,15 +88,20 @@ function mountPage() {
   return wrapper
 }
 
-beforeEach(() => {
-  vi.resetAllMocks()
-  setActivePinia(createPinia())
+function mockApi(trendData: TrendReport = trend) {
   apiMock.get.mockImplementation(async (url: string) => {
     if (url === '/analytics/options') return { data: options }
     if (url === '/analytics/overview') return { data: overview }
     if (url === '/analytics/benchmarks') return { data: benchmarks }
+    if (url === '/analytics/trend-alerts') return { data: structuredClone(trendData) }
     throw new Error(`unexpected ${url}`)
   })
+}
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  setActivePinia(createPinia())
+  mockApi()
 })
 afterEach(() => { wrappers.splice(0).forEach(wrapper => wrapper.unmount()); document.body.innerHTML = '' })
 
@@ -132,5 +162,39 @@ describe('M4 management analytics', () => {
     const failed = mountPage()
     await flushPromises()
     expect(failed.text()).toContain('需要角色：reviewer/admin')
+  })
+
+  it('renders explainable trend alerts and records a false-positive decision', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('规则 trend-rule-v1')
+    expect(wrapper.text()).toContain('回测：评估 1 个月')
+    expect(wrapper.text()).toContain('误报记录 0 条')
+    expect(wrapper.text()).toContain('本期 5 条')
+    expect(wrapper.text()).toContain('样本 11 条')
+    expect(wrapper.text()).toContain('待处理')
+    await wrapper.get('[aria-label="趋势处理备注"]').setValue('现场核查为集中排查')
+    apiMock.post.mockResolvedValueOnce({ data: {
+      ...trend.alerts[0], status: 'false_positive', note: '现场核查为集中排查',
+    } })
+    await wrapper.findAll('button').find(button => button.text() === '标记误报')!.trigger('click')
+    await flushPromises()
+    expect(apiMock.post).toHaveBeenCalledWith('/analytics/trend-alerts/alert-1', {
+      status: 'false_positive', note: '现场核查为集中排查',
+    })
+    expect(wrapper.text()).toContain('误报记录 1 条')
+  })
+
+  it('refreshes the latest complete month and shows insufficient-history guidance', async () => {
+    mockApi(insufficientTrend)
+    const wrapper = mountPage()
+    await flushPromises()
+    expect(wrapper.text()).toContain('历史资料不足')
+    expect(wrapper.text()).toContain('当前没有触发规则的趋势提示')
+    apiMock.post.mockResolvedValueOnce({ data: structuredClone(trend) })
+    await wrapper.findAll('button').find(button => button.text() === '评估最新完整月份')!.trigger('click')
+    await flushPromises()
+    expect(apiMock.post).toHaveBeenCalledWith('/analytics/trend-alerts/refresh')
+    expect(wrapper.text()).toContain('待处理')
   })
 })

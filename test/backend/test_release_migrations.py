@@ -16,9 +16,10 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from _support.environment import validate_database_url
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
-HEAD = "d5e2f7a91c04"
+HEAD = "e91c4f7a2d68"
 PRE_R3 = "7122c95a212f"
 M3_PARENT = "b27e619ac430"
+M5_PARENT = "d5e2f7a91c04"
 AUDIT = json.dumps({"history": [{"decision": "edit", "reviewer": "release-reviewer"}]})
 REPORT = json.dumps({"summary": "人工最终结论", "risk_level": 1}, ensure_ascii=False)
 
@@ -149,6 +150,22 @@ def test_m3_upgrade_preserves_legacy_records_without_inventing_location(release_
     assert_head(engine)
     command.upgrade(config, "head")
     assert_head(engine)
+
+
+def test_m5_upgrade_adds_source_and_alert_tables_without_touching_records(release_database):
+    engine, config = release_database
+    command.upgrade(config, M5_PARENT)
+    insert_legacy_records(engine)
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        assert connection.execute(sa.text("SELECT COUNT(*) FROM knowledge_sources")).scalar_one() == 0
+        assert connection.execute(sa.text("SELECT COUNT(*) FROM trend_alerts")).scalar_one() == 0
+        row = connection.execute(sa.text(
+            "SELECT * FROM assessments WHERE id='release-assessment'")).mappings().one()
+        assert row["status"] == "confirmed" and row["conclusion"] == "人工最终结论"
+    assert_head(engine, retained=True)
+    command.upgrade(config, "head")
+    assert_head(engine, retained=True)
 
 
 def test_pre_r3_upgrade_preserves_business_and_audit(release_database):

@@ -189,3 +189,49 @@ class KnowledgeDocument(Base):
     content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     review_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class KnowledgeSource(Base):
+    """Authoritative source watched for version changes; never publishes content itself."""
+
+    __tablename__ = "knowledge_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(255))
+    url: Mapped[str] = mapped_column(Text)
+    industry: Mapped[str] = mapped_column(String(24), default="general", server_default="general")
+    last_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    acknowledged_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    change_detected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TrendAlert(Base):
+    """One explainable rule hit per scope and month; human decisions are retained."""
+
+    __tablename__ = "trend_alerts"
+    __table_args__ = (
+        Index("uq_trend_alert_scope_month", "rule_version", "scope_type", "scope_value", "month", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    rule_version: Mapped[str] = mapped_column(String(32))
+    scope_type: Mapped[str] = mapped_column(String(24), default="category")
+    scope_value: Mapped[str] = mapped_column(String(128), index=True)
+    month: Mapped[str] = mapped_column(String(7), index=True)
+    observed: Mapped[int] = mapped_column(Integer)
+    baseline: Mapped[float] = mapped_column(Float)
+    ratio_threshold: Mapped[float] = mapped_column(Float)
+    sample_size: Mapped[int] = mapped_column(Integer)
+    explanation: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="open", server_default="open")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewed_by_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewed_by_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

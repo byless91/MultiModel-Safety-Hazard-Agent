@@ -32,8 +32,10 @@ def record_time(item: Assessment) -> datetime:
     return _as_utc(item.event_time or item.created_at)
 
 
-def month_key(value: datetime) -> str:
-    return _as_utc(value).strftime("%Y-%m")
+def month_key(value: datetime | date) -> str:
+    if isinstance(value, datetime):
+        value = _as_utc(value)
+    return value.strftime("%Y-%m")
 
 
 def parse_month(value: str) -> date:

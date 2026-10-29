@@ -9,7 +9,7 @@ vi.mock('../../frontend/src/api/client', () => ({
 }))
 import KnowledgeView from '../../frontend/src/views/KnowledgeView.vue'
 import { useAuthStore } from '../../frontend/src/stores/auth'
-import type { KnowledgeDocumentDetail } from '../../frontend/src/types'
+import type { KnowledgeDocumentDetail, KnowledgeSourceItem } from '../../frontend/src/types'
 
 const industries = [{ value: 'general', label: '通用' }, { value: 'fire', label: '消防' },
   { value: 'forest', label: '林区' }, { value: 'community', label: '社区' }, { value: 'production', label: '安全生产' }]
@@ -37,6 +37,7 @@ beforeEach(() => {
     series_id: 'document-v1', review_history: [] }
   apiMock.get.mockImplementation(async (url: string) => {
     if (url === '/knowledge/catalog') return { data: { industries } }
+    if (url === '/knowledge/sources') return { data: [] }
     if (url === '/knowledge/documents') return { data: [serverDoc] }
     if (url.endsWith('/articles')) return { data: { items: [{ id: 'chunk-1', article: '第一条', version: 'v1', text: '第一条 测试条款' }], offset: 0, limit: 30, total: 1 } }
     if (url === '/knowledge/search') return { data: { items: [], notice: '未找到已审核的有效条款' } }
@@ -157,5 +158,56 @@ describe('M2 original knowledge page', () => {
     expect(wrapper.text()).toContain('索引：已构建')
     expect(wrapper.text()).not.toContain('构建失败，请重试')
     expect((wrapper.get('[aria-label="审核意见"]').element as HTMLTextAreaElement).value).toBe('正在核对，请保留备注')
+  })
+})
+
+describe('M5 authoritative source reminders', () => {
+  const pendingSource: KnowledgeSourceItem = {
+    id: 'source-1', name: 'M5 消防法', url: 'https://example.test/fire-law', industry: 'fire',
+    last_status: 'changed', last_checked_at: '2026-10-30T00:00:00Z', pending: true,
+  }
+
+  it('adds a source and reports check failures without a false success', async () => {
+    const wrapper = await page()
+    await wrapper.get('[aria-label="来源名称"]').setValue('M5 测试来源')
+    await wrapper.get('[aria-label="来源链接"]').setValue('https://example.test/law')
+    apiMock.post.mockResolvedValueOnce({ data: {
+      id: 'source-new', name: 'M5 测试来源', url: 'https://example.test/law', industry: 'general', pending: false,
+    } })
+    await wrapper.get('.source-form').trigger('submit')
+    await flushPromises()
+    expect(apiMock.post).toHaveBeenCalledWith('/knowledge/sources', {
+      name: 'M5 测试来源', url: 'https://example.test/law', industry: 'general',
+    })
+    expect(wrapper.text()).toContain('M5 测试来源')
+
+    apiMock.post.mockResolvedValueOnce({ data: {
+      ...pendingSource, id: 'source-new', pending: false, last_status: 'unreachable',
+      last_error: '来源不可达：ConnectError',
+    } })
+    await buttons(wrapper, '检查').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('检查失败')
+    expect(wrapper.text()).toContain('来源不可达：ConnectError')
+  })
+
+  it('shows a changed source as pending until acknowledged and never claims automatic publication', async () => {
+    apiMock.get.mockImplementation(async (url: string) => {
+      if (url === '/knowledge/catalog') return { data: { industries } }
+      if (url === '/knowledge/sources') return { data: [pendingSource] }
+      if (url === '/knowledge/documents') return { data: [] }
+      return { data: {} }
+    })
+    const wrapper = await page()
+    expect(wrapper.text()).toContain('《M5 消防法》内容已变化，请上传并人工审核新版本')
+    expect(wrapper.text()).toContain('不会自动生成或发布知识版本')
+    expect(wrapper.text()).toContain('待处理')
+    apiMock.post.mockResolvedValueOnce({ data: {
+      ...pendingSource, pending: false, acknowledged_at: '2026-10-30T01:00:00Z',
+    } })
+    await wrapper.findAll('button').find(button => button.text() === '确认已阅')!.trigger('click')
+    await flushPromises()
+    expect(apiMock.post).toHaveBeenCalledWith('/knowledge/sources/source-1/ack')
+    expect(wrapper.text()).not.toContain('内容已变化，请上传并人工审核新版本')
   })
 })

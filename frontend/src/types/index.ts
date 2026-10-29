@@ -676,3 +676,71 @@ export interface Benchmarks {
   items: BenchmarkItem[]
   notice: string
 }
+
+export interface KnowledgeSourceItem {
+  id: string
+  name: string
+  url: string
+  industry: KnowledgeIndustry
+  last_status?: 'ok' | 'changed' | 'unreachable' | null
+  last_error?: string | null
+  last_checked_at?: string | null
+  change_detected_at?: string | null
+  acknowledged_at?: string | null
+  pending: boolean
+}
+
+export interface TrendAlertItem {
+  id: string
+  rule_version: string
+  scope_type: string
+  scope_value: string
+  month: string
+  observed: number
+  baseline: number
+  ratio_threshold: number
+  sample_size: number
+  explanation: string
+  status: 'open' | 'acknowledged' | 'false_positive'
+  note?: string | null
+  reviewed_by_name?: string | null
+  reviewed_at?: string | null
+  created_at: string
+}
+
+export interface TrendEvaluation {
+  category: string
+  observed: number
+  baseline: number
+  sample_size: number
+  sufficient: boolean
+  triggered: boolean
+  reason: string
+}
+
+export interface TrendReport {
+  as_of: string
+  rule: {
+    version: string
+    baseline_months: number
+    min_latest: number
+    ratio_threshold: number
+    min_window_records: number
+  }
+  backtest: {
+    months_evaluated: number
+    triggered: number
+    followed: number
+    sample_size: number
+    note: string
+  }
+  sufficiency: {
+    supported: boolean
+    reason: string
+    categories_sufficient: number
+    categories_evaluated: number
+  }
+  evaluations: TrendEvaluation[]
+  alerts: TrendAlertItem[]
+  false_positive_count: number
+}

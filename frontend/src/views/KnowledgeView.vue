@@ -72,6 +72,60 @@
         </form>
       </details>
     </el-card>
+    <el-card v-if="auth.canManageKnowledge" class="source-card">
+      <h2>权威来源更新提醒</h2>
+      <p class="hint">检查只比较来源内容，不会自动生成或发布知识版本；发现变化后请上传新版本并人工审核。</p>
+      <el-alert
+        v-for="source in pendingSources"
+        :key="source.id"
+        class="pending-alert"
+        :title="`《${source.name}》内容已变化，请上传并人工审核新版本`"
+        type="warning"
+        :closable="false"
+        show-icon
+      >
+        <el-button size="small" @click="ackSource(source.id)">确认已阅</el-button>
+      </el-alert>
+      <form class="doc-form source-form" @submit.prevent="addSource">
+        <div class="doc-grid">
+          <label>来源名称<input v-model="sourceName" aria-label="来源名称" :maxlength="255" required /></label>
+          <label>来源链接<input v-model="sourceLink" aria-label="来源链接" :maxlength="2000" placeholder="https://..." required /></label>
+          <label>来源行业<select v-model="sourceIndustry" aria-label="来源行业">
+            <option v-for="item in industries" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select></label>
+        </div>
+        <div class="doc-actions">
+          <el-button native-type="submit" type="primary" :loading="sourceSaving"
+            :disabled="!sourceName.trim() || !sourceLink.trim() || !industries.length">
+            添加来源
+          </el-button>
+        </div>
+      </form>
+      <p v-if="sourceError" class="source-error" role="alert">{{ sourceError }}</p>
+      <el-table :data="updates.sources" empty-text="尚未添加权威来源" class="source-table">
+        <el-table-column prop="name" label="名称" min-width="160" show-overflow-tooltip />
+        <el-table-column label="行业" width="110">
+          <template #default="{ row }">{{ industryName(row.industry) }}</template>
+        </el-table-column>
+        <el-table-column label="上次检查" width="170">
+          <template #default="{ row }">{{ row.last_checked_at ? formatTime(row.last_checked_at) : '未检查' }}</template>
+        </el-table-column>
+        <el-table-column label="结果" min-width="200">
+          <template #default="{ row }">
+            <span>{{ sourceStatus(row) }}</span>
+            <el-tag v-if="row.pending" type="warning" size="small" class="pending-tag">待处理</el-tag>
+            <p v-if="row.last_error" class="source-error">{{ row.last_error }}</p>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="230">
+          <template #default="{ row }">
+            <el-button link type="primary" :loading="checkingSource === row.id" @click="checkSource(row.id)">检查</el-button>
+            <el-button v-if="row.pending" link type="warning" @click="ackSource(row.id)">确认已阅</el-button>
+            <el-button link type="danger" @click="removeSource(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
     <el-card v-if="preview || detailLoading" class="detail-card">
       <section ref="detailSection" v-loading="detailLoading" tabindex="-1" aria-label="文档版本详情">
         <template v-if="preview">
@@ -129,12 +183,13 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '../api/client'
 import { useAssessmentStore } from '../stores/assessment'
 import { useAuthStore } from '../stores/auth'
+import { useUpdatesStore } from '../stores/updates'
 import type { EvidenceItem, KnowledgeArticlePage, KnowledgeDocument, KnowledgeDocumentDetail,
-  KnowledgeIndustry, KnowledgeReviewRequest, KnowledgeReviewStatus } from '../types'
+  KnowledgeIndustry, KnowledgeReviewRequest, KnowledgeReviewStatus, KnowledgeSourceItem } from '../types'
 import { extractError } from '../utils/errors'
 import { formatTime } from '../utils/format'
 
-const store = useAssessmentStore(), auth = useAuthStore()
+const store = useAssessmentStore(), auth = useAuthStore(), updates = useUpdatesStore()
 const documents = ref<KnowledgeDocument[]>([])
 const industries = ref<{ value: KnowledgeIndustry; label: string }[]>([])
 const statuses: Record<KnowledgeReviewStatus, string> = { unreviewed: '未审核', approved: '已审核发布',
@@ -153,6 +208,9 @@ const reviewNote = ref(''), sourceChecked = ref(false)
 const decision = ref<KnowledgeReviewRequest['decision']>('approve')
 const reviewBusy = computed(() => Boolean(preview.value && store.reviewPending[`knowledge:${preview.value.id}`]))
 const sourceUrl = computed(() => /^https?:\/\//i.test(preview.value?.source || '') ? preview.value?.source : undefined)
+const sourceName = ref(''), sourceLink = ref(''), sourceIndustry = ref<KnowledgeIndustry>('general')
+const sourceSaving = ref(false), checkingSource = ref(''), sourceError = ref('')
+const pendingSources = computed(() => updates.sources.filter(item => item.pending))
 let listSequence = 0, detailSequence = 0, searchSequence = 0
 onUnmounted(() => { listSequence++; detailSequence++; searchSequence++ })
 onMounted(initialize)
@@ -163,8 +221,50 @@ async function initialize() {
     industries.value = result.data.industries
   } catch (err) { error.value = extractError(err) }
   await load()
+  if (auth.canManageKnowledge) await loadSources()
 }
 function industryName(value?: string | null) { return industries.value.find(item => item.value === value)?.label || '未归类 / 通用' }
+function sourceStatus(item: KnowledgeSourceItem) {
+  const labels: Record<string, string> = { ok: '无变化', changed: '发现变化', unreachable: '检查失败' }
+  return labels[item.last_status || ''] || '未检查'
+}
+async function loadSources() {
+  sourceError.value = ''
+  try { await updates.loadSources() } catch (err) { sourceError.value = extractError(err) }
+}
+async function addSource() {
+  if (!sourceName.value.trim() || !sourceLink.value.trim() || sourceSaving.value) return
+  sourceError.value = ''
+  sourceSaving.value = true
+  try {
+    await updates.addSource({ name: sourceName.value.trim(), url: sourceLink.value.trim(),
+      industry: sourceIndustry.value })
+    sourceName.value = ''
+    sourceLink.value = ''
+    ElMessage.success('来源已添加，尚未检查')
+  } catch (err) { sourceError.value = extractError(err) }
+  finally { sourceSaving.value = false }
+}
+async function checkSource(id: string) {
+  checkingSource.value = id
+  sourceError.value = ''
+  try {
+    const item = await updates.checkSource(id)
+    if (item.last_status === 'changed') ElMessage.warning('来源内容已变化，请上传并人工审核新版本')
+    else if (item.last_status === 'unreachable') ElMessage.error('来源不可达，请查看检查错误')
+    else ElMessage.success('来源无变化')
+  } catch (err) { sourceError.value = extractError(err) }
+  finally { checkingSource.value = '' }
+}
+async function ackSource(id: string) {
+  sourceError.value = ''
+  try { await updates.acknowledgeSource(id); ElMessage.success('已确认已阅，后续仍会继续检查') }
+  catch (err) { sourceError.value = extractError(err) }
+}
+async function removeSource(id: string) {
+  sourceError.value = ''
+  try { await updates.deleteSource(id) } catch (err) { sourceError.value = extractError(err) }
+}
 async function load() {
   const sequence = ++listSequence
   listing.value = true
@@ -284,6 +384,11 @@ input:not([type=checkbox]), select, textarea { box-sizing: border-box; width: 10
 .review-form button { align-self: flex-start; }
 .hint, .identity { color: var(--muted); font-size: var(--fs-sm); }
 .identity { overflow-wrap: anywhere; }
+.source-card { margin-top: var(--s-4); }
+.source-form { margin: var(--s-3) 0; }
+.source-error { color: var(--danger, #d14343); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.pending-alert { margin-bottom: var(--s-2); }
+.pending-tag { margin-left: var(--s-2); }
 summary { cursor: pointer; font-weight: 600; }
 .article-list, .search-results ol { padding-left: 24px; }
 .article-list li, .search-results li { margin-block: var(--s-3); }
