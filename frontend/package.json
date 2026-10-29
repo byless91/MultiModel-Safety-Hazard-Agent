@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.22",
-    "@types/node": "^20.16.11",
+    "@types/node": "^26.6.5",
     "@vitejs/plugin-vue": "^5.1.4",
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/test-utils": "^2.5.1",
