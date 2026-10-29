@@ -20,6 +20,25 @@ async function freePort() {
   return value
 }
 
+export async function assertNoHorizontalOverflow(page, { timeout = 5000 } = {}) {
+  try {
+    // ResizeObserver-driven controls can retain desktop widths for a frame.
+    // Keep the exact width contract; a persistent overflow must still fail.
+    await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth,
+      undefined, { polling: 'raf', timeout })
+  } catch (cause) {
+    const detail = await page.evaluate(() => ({
+      viewport: window.innerWidth, document: document.documentElement.scrollWidth,
+      elements: [...document.querySelectorAll('body *')].filter((element) => {
+        const bounds = element.getBoundingClientRect()
+        return bounds.width > 0 && bounds.right > window.innerWidth
+      }).slice(0, 12).map((element) => ({ tag: element.tagName, class: element.className,
+        right: element.getBoundingClientRect().right })),
+    }))
+    throw new Error(`Persistent horizontal overflow: ${JSON.stringify(detail)}`, { cause })
+  }
+}
+
 export async function launch(name, backendArguments = []) {
   const directory = path.join(root, 'test/.artifacts/reports', `${name}-${randomUUID()}`)
   await mkdir(directory, { recursive: true })

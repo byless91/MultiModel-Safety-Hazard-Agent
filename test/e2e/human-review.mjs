@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
-import { launch } from './support.mjs'
+import { assertNoHorizontalOverflow, launch } from './support.mjs'
 
 const before = process.argv.includes('--before')
 const app = await launch('r7-human-review')
@@ -58,7 +58,7 @@ try {
     await page.screenshot({ path: path.join(app.directory, 'edit-desktop.png'), fullPage: true })
     await page.setViewportSize({ width: 390, height: 844 })
     await page.evaluate(() => window.scrollTo(0, 0))
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    await assertNoHorizontalOverflow(page)
     await page.screenshot({ path: path.join(app.directory, 'edit-mobile.png'), fullPage: true })
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.getByRole('button', { name: '保存修订并定稿', exact: true }).click()
@@ -78,7 +78,7 @@ try {
     assert.ok(await page.locator('.conclusion-title').innerText().then((text) => text.includes('消防器材失效')))
     await page.screenshot({ path: path.join(app.directory, 'after-desktop.png'), fullPage: true })
     await page.setViewportSize({ width: 390, height: 844 })
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    await assertNoHorizontalOverflow(page)
     await page.screenshot({ path: path.join(app.directory, 'after-mobile.png'), fullPage: true })
     const inspectorContext = await app.browser.newContext()
     const inspectorPage = await inspectorContext.newPage()

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
-import { launch, root } from './support.mjs'
+import { assertNoHorizontalOverflow, launch, root } from './support.mjs'
 
 const app = await launch('r7-assessment-lifecycle')
 const pages = []
@@ -128,7 +128,7 @@ try {
   await admin.screenshot({ path: path.join(app.directory, 'closed-desktop.png'), fullPage: true })
   await admin.setViewportSize({ width: 390, height: 844 })
   await admin.evaluate(() => window.scrollTo(0, 0))
-  assert.ok(await admin.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+  await assertNoHorizontalOverflow(admin)
   await admin.screenshot({ path: path.join(app.directory, 'closed-mobile.png'), fullPage: true })
   await admin.getByRole('button', { name: '切换到暗色模式' }).click()
   await admin.screenshot({ path: path.join(app.directory, 'closed-mobile-dark.png'), fullPage: true })

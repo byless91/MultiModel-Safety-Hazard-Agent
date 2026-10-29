@@ -72,6 +72,7 @@ node node_modules/vite/bin/vite.js build
 仓库根目录运行以下隔离浏览器回归，Windows 使用已安装 Edge，Linux 需先安装 Playwright Chromium。默认 Python 为 backend/.venv，可设置 PYTHON 覆盖：
 
 ```powershell
+node test/e2e/viewport-layout.mjs
 node test/e2e/human-review.mjs
 node test/e2e/async-resume.mjs
 node test/e2e/assessment-lifecycle.mjs
@@ -83,6 +84,8 @@ node test/e2e/auth_modes.mjs
 这些入口自建隔离后端，固定 Mock 并清除模型 Key。认证/幂等和旧部署入口仍沿用 r4/r5 产物文件名，每轮验收应核对修改时间并保存独立摘要；R7 浏览器产物目录自带 UUID。容器验收命令见 [部署说明](../docs/DEPLOYMENT.md)，合成集与真实标签边界见 [评测索引](../docs/evaluation/README.md)。
 
 两分钟恢复 E2E 使用浏览器虚拟时钟推进本地等待窗口，并暂停测试 worker；不等于真实模型运行两分钟的稳定性或费用验证。
+
+视口检查等待 ResizeObserver 等响应式布局更新，最多 5 秒，仍严格要求 scrollWidth 不超过视口。viewport-layout.mjs 用真实浏览器覆盖即时正常、延迟恢复和永久溢出；永久溢出必须失败并附越界元素，不通过增大宽度容差掩盖缺陷。
 
 ## 记录实施基线
 

@@ -384,6 +384,143 @@
         "mobile_viewport_emulated": true,
         "real_model_calls": 0
       }
+    },
+    "test/.artifacts/reports/r8-final/viewport-layout.json": {
+      "sha256": "462c410d1cde89b77d6c3fe0fe7c3bd62e0ea876ac29c4f787e8232130bdccfb",
+      "result": {
+        "passed": true,
+        "fitting_layout": true,
+        "delayed_layout_settles": true,
+        "persistent_overflow_rejected": true,
+        "width_tolerance_px": 0
+      }
+    },
+    "test/.artifacts/reports/r7-human-review-fb483783-3809-401a-b1fa-3738056d7a5b/result.json": {
+      "sha256": "8f6bcbc360947ce9f10b6573410061a255c30cf9ba2e28f2c2b1a0e41a33e3bf",
+      "result": {
+        "passed": true,
+        "provider": "mock",
+        "browser": "Edge headless",
+        "approved_id": "4ed827a3-36d3-4176-95f1-816073c1dfd8",
+        "revised_id": "6055b307-b814-4484-84df-a537be04af93",
+        "approve_post_count": 1,
+        "rejection_requires_note": true,
+        "revision_history_count": 2,
+        "export_consistent": true,
+        "inspector_ui_hidden_and_api_403": true,
+        "mobile_viewport_emulated": true
+      }
+    },
+    "test/.artifacts/reports/r7-async-resume-22bc6282-5e66-4487-b0e4-fc2f667e51af/result.json": {
+      "sha256": "413406a00a4e111fc1fdd859ee509ef3fb5b0dbac7fb541b476f53c4993db2ae",
+      "result": {
+        "passed": true,
+        "refreshed_real_running_job": true,
+        "virtual_local_wait_ms": 120100,
+        "server_kept_running": true,
+        "temporary_network_failure_recovered": true,
+        "terminal_polling_stopped": true,
+        "reused_route_id_updated": true,
+        "left_page_stopped_queries": true,
+        "failed_record_visible": true,
+        "real_model_calls": 0
+      }
+    },
+    "test/.artifacts/reports/r7-assessment-lifecycle-2d0dd61b-13aa-4e12-9c4b-fb03b6222a34/result.json": {
+      "sha256": "ec67b94d717f6ec5798cf27888ad2c8e129c89854f2fddd7d8921f31772e04ca",
+      "result": {
+        "passed": true,
+        "provider": "mock",
+        "synthetic_image_fixtures": true,
+        "assessment_id": "03f8e435-d804-450c-9e95-42cd08b36506",
+        "statuses": [
+          "needs_more_info",
+          "awaiting_human_review",
+          "confirmed",
+          "rectifying",
+          "pending_verification",
+          "verified",
+          "closed"
+        ],
+        "role_separation": [
+          "inspector-submit-and-upload",
+          "reviewer-approve-and-verify",
+          "admin-close"
+        ],
+        "followup_job_id": "8a1e2be0-c084-4db6-a345-49fae4f1a566",
+        "followup_used": 1,
+        "human_review_events": 1,
+        "rectification_history": [
+          {
+            "action": "开始整改",
+            "from_status": "open",
+            "to_status": "rectifying",
+            "note": "开始整改",
+            "by": "browser-reviewer",
+            "created_at": "2026-10-29T07:58:30.268363+00:00"
+          },
+          {
+            "action": "提交整改照片并 AI 比对",
+            "from_status": "rectifying",
+            "to_status": "pending_verification",
+            "note": "已完成清理和移除杂物，通道恢复畅通，隐患已消除",
+            "by": "browser-inspector",
+            "created_at": "2026-10-29T07:58:31.102985+00:00"
+          },
+          {
+            "action": "人工确认整改完成",
+            "from_status": "pending_verification",
+            "to_status": "verified",
+            "note": "",
+            "by": "browser-reviewer",
+            "created_at": "2026-10-29T07:58:32.497980+00:00"
+          },
+          {
+            "action": "关闭工单",
+            "from_status": "verified",
+            "to_status": "closed",
+            "note": "",
+            "by": "browser-admin",
+            "created_at": "2026-10-29T07:58:33.969612+00:00"
+          }
+        ],
+        "failed_close_preserved_state": true,
+        "downloaded_report_consistent": true,
+        "mobile_viewport_emulated": true,
+        "real_model_calls": 0
+      }
+    },
+    "test/.artifacts/reports/r7-human-review-cdb42e71-1c18-4575-8f39-57077f9f7871/result.json": {
+      "sha256": "a96c55caeef01e233e62750cc56b039d787b35e5349c3e132e31d7e0632429d3",
+      "result": {
+        "passed": true,
+        "provider": "mock",
+        "browser": "Edge headless",
+        "approved_id": "a7e59369-c801-4a7e-989e-397b723c8c26",
+        "revised_id": "5f4a7725-44a3-44b7-a2b0-c9fcf50a8551",
+        "approve_post_count": 1,
+        "rejection_requires_note": true,
+        "revision_history_count": 2,
+        "export_consistent": true,
+        "inspector_ui_hidden_and_api_403": true,
+        "mobile_viewport_emulated": true
+      }
+    },
+    "test/.artifacts/reports/r7-human-review-545c1b64-d7db-429f-838f-92b83c4cd66e/result.json": {
+      "sha256": "f1f78c8378ee849ad13b1291f67d2a830a9574321bb6079937ccccc13ad68e85",
+      "result": {
+        "passed": true,
+        "provider": "mock",
+        "browser": "Edge headless",
+        "approved_id": "793d7afc-da26-4687-803f-d8892617dbbb",
+        "revised_id": "87cf5be1-ff20-46bb-b0e5-ba7b32d4010b",
+        "approve_post_count": 1,
+        "rejection_requires_note": true,
+        "revision_history_count": 2,
+        "export_consistent": true,
+        "inspector_ui_hidden_and_api_403": true,
+        "mobile_viewport_emulated": true
+      }
     }
   },
   "evaluation_current": {
@@ -448,8 +585,26 @@
     "frontend/nginx.conf": "4d2b6057fb06189abd562646e33828bf3112b9b806a4dc33e803dc497c531f3d",
     "docker-compose.yml": "db5400396f7ee2a038759ab6d9ea038ae4a8fed9a7cfe1f8a5a02e2189df9a45",
     "docker-compose.pg.yml": "3b6ec8259ff67c38aa3488bc872175ac219e6deceed86973600d316f908e43d5",
-    ".github/workflows/ci.yml": "2123ef7afafb52cfdc26ce8731831754c24838530856814b0824806a8c89a998",
-    "test/backend/test_release_migrations.py": "1cd248739c7cbc3ce3417aa25d6338777a31ec4eaa760e71d39bfe8260280ce7"
+    ".github/workflows/ci.yml": "fd25e4408314a0e4cd7b993b2596c58c5b0ee67386c5f6f04530bd68a2718c95",
+    "test/backend/test_release_migrations.py": "1cd248739c7cbc3ce3417aa25d6338777a31ec4eaa760e71d39bfe8260280ce7",
+    "test/e2e/support.mjs": "903408e1320c1b51b34618012f7b4e86e31316cbb2e27a8c26a3514556874007",
+    "test/e2e/human-review.mjs": "2085c99291b896c89288882ab039f47472942218b41cd0191e5210dc61844125",
+    "test/e2e/assessment-lifecycle.mjs": "d87a824508d078056b034fdcfdd6acf5d5cd3b5b72dcddc9944b92f585003b30",
+    "test/e2e/viewport-layout.mjs": "670ff1d262e4ed1a86637d5726a2f297474dd6af83dd0fef32a746a589672231"
   },
-  "provenance_note": "Pre-documentation commit and dirty flag are intentional. Product digest matches unchanged R7 business code; test/deployment inputs and all fresh R8 results are recorded separately. Ignored raw artifacts remain local; portable summaries are embedded here."
+  "provenance_note": "Pre-documentation commit and dirty flag are intentional. Product digest matches unchanged R7 business code; test/deployment inputs and all fresh R8 results are recorded separately. Ignored raw artifacts remain local; portable summaries are embedded here.",
+  "viewport_ci_followup": {
+    "base_revision": "686be40dbcd968665280c06d7d98fc1aadf8f1db",
+    "failed_run_id": 40838284757,
+    "failed_job_id": 123328191464,
+    "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40838284757/job/123328191464",
+    "failure": "immediate scrollWidth assertion after mobile viewport change",
+    "evidence": "failure screenshot captured at width 390; same business code passed preceding run",
+    "correction": "wait up to 5 seconds for exact width condition; persistent overflow still fails with element diagnostics",
+    "focused_browser_contracts": 3,
+    "width_tolerance_px": 0,
+    "production_sources_unchanged": true,
+    "initial_ci_input_sha256": "2123ef7afafb52cfdc26ce8731831754c24838530856814b0824806a8c89a998",
+    "cloud_followup": "Each follow-up commit has its own CI run; final delivery links its verified run."
+  }
 }

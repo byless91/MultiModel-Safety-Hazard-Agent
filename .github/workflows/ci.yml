@@ -183,6 +183,7 @@ jobs:
         run: node frontend/node_modules/playwright-core/cli.js install chromium --with-deps
       - name: 复核操作、长任务恢复和三角色整改闭环
         run: |
+          node test/e2e/viewport-layout.mjs
           node test/e2e/human-review.mjs
           node test/e2e/async-resume.mjs
           node test/e2e/assessment-lifecycle.mjs
@@ -190,7 +191,9 @@ jobs:
         if: always()
         with:
           name: r7-browser-evidence
-          path: test/.artifacts/reports/r7-*/
+          path: |
+            test/.artifacts/reports/r7-*/
+            test/.artifacts/reports/r8-final/viewport-layout.json
 
   pip-audit:
     name: 后端依赖安全审计
