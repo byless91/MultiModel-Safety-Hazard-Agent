@@ -118,8 +118,17 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --frozen --extra dev
-      - name: 跑 mock 评测并与基线对比（劣化 >2pp 失败）
+      - name: 图片、配置、检测指标、数据与门禁合同（假 Provider）
+        run: uv run python ../test/run_backend.py --suite new -q -k eval_ --reports-dir ../test/.artifacts/reports/r6-ci
+      - name: 隔离 Mock 图片边界集与 schema 2 基线比较（劣化 >2pp 失败）
         run: uv run python ../scripts/check_eval_baseline.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-r6-mock
+          path: |
+            test/.artifacts/evaluation/r6-gate-*/
+            test/.artifacts/reports/r6-ci/
 
   docker:
     name: Compose 业务闭环（${{ matrix.variant }} / Mock）

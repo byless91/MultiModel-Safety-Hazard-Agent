@@ -140,19 +140,30 @@ def compute_metrics(results: list[dict[str, Any]]) -> dict[str, Any]:
     rate("detection_specificity", tn, tn + fp, len(negatives) - tn - fp)
     rate("detection_coverage", len(known), total, total - len(known))
     rate("end_to_end_hazard_recall", tp, len(hazards), len(hazards) - tp - fn)
-    rate("category_accuracy", sum(r["metric_flags"]["category_match"] for r in hazards), len(hazards))
-    rate("level_accuracy", sum(r["metric_flags"]["level_match"] for r in hazards), len(hazards))
-    rate("level_accuracy_tolerance1", sum(r["metric_flags"]["level_tolerance"] for r in hazards), len(hazards))
+    missing_category = sum(r.get("predicted_category") is None for r in hazards)
+    missing_level = sum(r.get("predicted_level") is None for r in hazards)
+    rate("category_accuracy", sum(r["metric_flags"]["category_match"] for r in hazards), len(hazards), missing_category)
+    rate("level_accuracy", sum(r["metric_flags"]["level_match"] for r in hazards), len(hazards), missing_level)
+    rate("level_accuracy_tolerance1", sum(r["metric_flags"]["level_tolerance"] for r in hazards),
+         len(hazards), missing_level)
     mae = [r["metric_flags"]["severity_mae"] for r in hazards if r["metric_flags"]["severity_mae"] is not None]
     rate("severity_mae", sum(mae), len(mae), len(hazards) - len(mae))
-    rate("clause_hit_rate", sum(f["clause_hit"] for f in flags), total)
-    rate("evidence_hit_rate", sum(f["clause_hit"] for f in flags), total)
+    clause_labeled = [r for r in results if r["case"].get("expected_clause_terms")]
+    rate("clause_hit_rate", sum(r["metric_flags"]["clause_hit"] for r in clause_labeled),
+         len(clause_labeled), total - len(clause_labeled))
+    rate("evidence_hit_rate", sum(r["metric_flags"]["clause_hit"] for r in clause_labeled),
+         len(clause_labeled), total - len(clause_labeled))
     self_evidence = [f["evidence_support"] for f in flags if f["evidence_support"] is not None]
     independent = [f["independent_evidence_correct"] for f in flags if f["independent_evidence_correct"] is not None]
     rate("system_evidence_support_rate", sum(self_evidence), len(self_evidence), total - len(self_evidence))
     values["evidence_support_rate"] = values["system_evidence_support_rate"]  # Explicitly a self-assessment alias.
     definitions["evidence_support_rate"] = dict(definitions["system_evidence_support_rate"])
     rate("independent_evidence_accuracy", sum(independent), len(independent), total - len(independent))
+    human_evidence = [r["metric_flags"]["independent_evidence_correct"] for r in results
+                      if r["case"].get("annotation_method") == "human"
+                      and r["case"].get("review_status") == "reviewed"
+                      and r["metric_flags"]["independent_evidence_correct"] is not None]
+    rate("independent_human_evidence_accuracy", sum(human_evidence), len(human_evidence), total - len(human_evidence))
     rate("unsupported_claim_rate", sum(f["unsupported_claims"] for f in flags), total)
     dual = sum(f["multi_model_configured"] for f in flags)
     rate("model_conflict_rate", sum(f["model_conflict"] for f in flags), dual)

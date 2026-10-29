@@ -1,5 +1,7 @@
 # 评测体系文档
 
+> 本页及原有 dataset/reports/results 为历史归档，原样保留。当前工程基线见 [R6 schema 2 报告](r6-v2/reports/evaluation_report.md)，数据规范与执行说明见 [R6 边界集](../../test/evaluation/README.md)。历史 30/60 条文本成绩与新版指标不可直接比较；旧 source_type 标记不代表已经完成本轮来源授权、现场图片和人工复核核验。
+
 本目录是正式评测体系的说明和结果归档。评测本身由 `scripts/evaluate.py` 与
 `scripts/ablation.py` 执行，数据源为 `backend/data/eval_cases/`。
 

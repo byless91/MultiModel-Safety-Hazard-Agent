@@ -2,7 +2,7 @@
 
 面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。当前为 MVP 骨架，无 API Key 时使用 Mock 模式即可跑通完整演示链路。
 
-后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R5 已完成，后续从 R6 可信评测开始；新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)、[R4 验证记录](docs/baselines/r4-2026-10-28.md)、[R5 验证记录](docs/baselines/r5-2026-10-28.md)。
+后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R6 工程工作已完成，后续从 R7 人工复核与长任务前端开始；真实场景评测仍待取得授权数据与独立人工标签。新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)、[R4 验证记录](docs/baselines/r4-2026-10-28.md)、[R5 验证记录](docs/baselines/r5-2026-10-28.md)、[R6 验证记录](docs/baselines/r6-2026-10-29.md)。
 
 ## 技术栈
 
@@ -88,11 +88,12 @@ docker compose exec backend python -m app.cli.create_user --username admin --rol
 - 当前仅支持一个后端实例、一个 Uvicorn worker（`--workers 1`）。任务认领已原子化，但本地 SQLite checkpoint、上传目录和检索索引尚不支持多副本；PG 不改变这一限制。异步 worker 启动时通过 checkpoint 旁的 OS 锁拒绝重复启动；部署时保持同一数据目录，禁止通过分离 checkpoint 路径绕开此限制。
 - `/api/v1/live` 检查基础存活，`/health` 保留元信息；部署应检查 `/api/v1/ready`（数据库、迁移版本、知识/索引、持久存储和 worker），未就绪返回 503。两套 Compose 已使用此健康依赖，迁移失败拒绝启动。
 
-## 质量保障（B6：评测回归门禁）
+## 质量保障（R6：版本化评测回归门禁）
 
-`scripts/check_eval_baseline.py`：mock 模式跑 60 条评测（v2 数据集）并与
-`docs/evaluation` 基线对比——类别准确率、人工复核率劣化 >2pp 或不安全自动
-通过率上升 >2pp 即失败。CI 的 `eval-gate` job 每次 push 都会执行；本地：
+`scripts/check_eval_baseline.py` 在隔离路径运行 12 条合成图片工程边界案例，与
+`docs/evaluation/r6-v2/` 的 schema 2 基线比较。缺失指标、无有效分母，或数据、配置、
+模型模式、Prompt/规则版本不一致时明确失败；关键指标劣化 >2pp、出现危险自动通过或执行失败也失败。
+高风险复核率使用真值等级 1 隐患为分母。CI 运行 Mock 与假 Provider，不请求真实付费服务。
 
 ```powershell
 .\backend\.venv\Scripts\python.exe scripts\check_eval_baseline.py
@@ -263,61 +264,26 @@ Remove-Item -Recurse -Force backend\data\faiss
 
 安装 `faiss-cpu` 才会启用索引持久化；未安装时回退到 NumPy 检索，embedding 缓存仍然生效。
 
-## 离线评测
+## 离线与消融评测
 
-评测案例位于 `backend/data/eval_cases/cases.jsonl`，当前共 30 条，覆盖消防、生产安全、社区、林区四类场景。
+历史文本回归集 `backend/data/eval_cases/cases.jsonl` 保留 60 条；R6 新建了 12 条 synthetic 图片边界案例，覆盖四类场景、负例、低质量图、多隐患、图文矛盾和证据不足。来源、授权与标注状态见 [数据说明](test/evaluation/README.md)；真实现场图片和独立人工标签仍待取得。
 
-运行 Mock 模式评测：
-
-```powershell
-.\backend\.venv\Scripts\python.exe scripts\evaluate.py --provider mock
-```
-
-运行真实模型评测（会调用 30 次模型接口，按量计费）：
+运行隔离 Mock 评测与六变体消融，每次使用新的输出目录：
 
 ```powershell
-.\backend\.venv\Scripts\python.exe scripts\evaluate.py --provider auto
+.\backend\.venv\Scripts\python.exe test/evaluation/run_mock.py --output test/.artifacts/evaluation/my-run
+.\backend\.venv\Scripts\python.exe test/evaluation/run_mock.py --output test/.artifacts/evaluation/my-run --ablation
 ```
 
-单独对比 Reranker 开关（只跑知识库检索，不调用模型）：
+[当前报告](docs/evaluation/r6-v2/reports/evaluation_report.md) 使用报告/指标 schema 2.0，记录图片声明/加载/失败、配置摘要、模型标识、Prompt/规则版本、内容摘要与指标分母。检测 FP/FN 不因转人工消失，信息不足与失败单列，证据自评和独立人工正确率分开；缺少标签为 N/A。多隐患清单保留逐项真值，当前汇总指标仍为案例存在性与主类别。
 
-```powershell
-.\backend\.venv\Scripts\python.exe scripts\evaluate_reranker.py
-```
+通用脚本 `scripts/evaluate.py` 和 `scripts/ablation.py` 支持 `--cases`、`--dataset-version`、`--output`、`--gate-policy`、`--pricing`。auto 没有可用 Key 时仍是 Mock；真实模型批次需使用已授权且已人工复核的数据，并在执行前登记质量目标和价格。调用次数包括 embedding、追问、refine 与重试，按实际 HTTP 统计，不能用案例数估计费用。缺少用量或价格时费用为 N/A。报告与归档均拒绝覆盖已有结果。
 
-输出 `backend/data/eval/reranker_report.json`。当前 30 条评测中 Reranker 未带来条款命中率的可测量提升，因此保留为可选配置，不默认强制。
+Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样本未测得提升的结论仅适用于当时的批次；R6 不据此声称新数据上的检索效果。
 
-## 消融评测
+### 历史 B5 记录（与 R6 不可直接比较）
 
-运行 A（Qwen only）→ B（GLM only）→ C（Qwen+GLM）→ D（+Risk Engine）→ E（+Evidence RAG）→ F（完整系统）六组对比：
-
-```powershell
-.\backend\.venv\Scripts\python.exe scripts\ablation.py --provider mock
-```
-
-真实模型版本（会额外调用模型接口，按量计费）：
-
-```powershell
-.\backend\.venv\Scripts\python.exe scripts\ablation.py --provider auto
-```
-
-输出：`backend/data/eval/ablation_report.json`、`ablation_report.md`、`ablation_results.jsonl`。Mock 模式下 A/B/C 共用同一个确定性 Mock，模型间差异需 `--provider auto` 验证。
-
-输出文件：
-
-- `backend/data/eval/report.json`：整体指标
-- `backend/data/eval/report.md`：可直接查看的人工可读报告（总体指标、场景细分、逐条结果）
-- `backend/data/eval/results.jsonl`：逐条命中详情
-
-指标定义：
-
-- 类别准确率：预测隐患类别与标注一致的比例
-- 等级准确率：预测等级与标注完全一致的比例
-- 等级容差准确率：预测等级与标注相差不超过 1 级的比例
-- 条款命中率：预期条款关键词出现在检索证据中的比例
-- 幻觉率：检索证据未覆盖预期条款关键词的比例，作为无依据输出的代理指标
-- 高风险复核率：地面真值高风险案例中进入人工复核的比例
-- 不安全自动通过率（Unsafe Auto-Pass Rate）：地面真值高风险却被系统自动通过的比例，越低越好
+以下原始成绩与解释保留用于追溯，不作为 R6 图片识别、来源授权、独立证据或真实场景验收结论。
 
 当前 Mock 模式 30 条评测（B5 基线，2026-10-24，移除置信度 mock 特判后）：类别准确率 100%，等级容差准确率 100%，高风险复核率 100%，条款命中率 63.3%（B5 条文感知分块 + 向量归一化后由 40% 提升），人工复核率 100%（诚实数字：演示加成已移除，复核阈值不再被隐性抬高）。
 

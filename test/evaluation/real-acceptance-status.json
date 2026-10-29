@@ -1,0 +1,11 @@
+{
+  "status": "pending_data_and_independent_human_review",
+  "real_image_count": 0,
+  "reviewed_real_case_count": 0,
+  "required_scenarios": ["消防", "生产安全", "社区", "林区"],
+  "required_boundaries": ["safe_negative", "low_quality", "multiple_hazards", "image_text_conflict", "insufficient_evidence"],
+  "required_per_case": ["source_reference", "usage_authorization", "image_paths", "expected_findings", "ground_truth_hazard_present", "annotator", "annotation_method=human", "review_status=reviewed", "expected_evidence_supported"],
+  "real_model_run_count": 0,
+  "quality_threshold_registration": "pending_before_first_real_batch",
+  "notes": "合成图和 Mock 指标不能替代真实现场验收；实际取得授权数据和完成标注后再登记真实批次与质量目标。"
+}

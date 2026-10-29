@@ -1,0 +1,2693 @@
+{
+  "report_schema_version": "2.0",
+  "metrics_schema_version": "2.0",
+  "dataset_schema_version": "2.0",
+  "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+  "sample_ids": [
+    "syn-community-hazard",
+    "syn-community-hazard",
+    "syn-community-hazard",
+    "syn-community-hazard",
+    "syn-community-hazard",
+    "syn-community-hazard",
+    "syn-community-safe",
+    "syn-community-safe",
+    "syn-community-safe",
+    "syn-community-safe",
+    "syn-community-safe",
+    "syn-community-safe",
+    "syn-contradiction",
+    "syn-contradiction",
+    "syn-contradiction",
+    "syn-contradiction",
+    "syn-contradiction",
+    "syn-contradiction",
+    "syn-factory-hazard",
+    "syn-factory-hazard",
+    "syn-factory-hazard",
+    "syn-factory-hazard",
+    "syn-factory-hazard",
+    "syn-factory-hazard",
+    "syn-factory-safe",
+    "syn-factory-safe",
+    "syn-factory-safe",
+    "syn-factory-safe",
+    "syn-factory-safe",
+    "syn-factory-safe",
+    "syn-fire-hazard",
+    "syn-fire-hazard",
+    "syn-fire-hazard",
+    "syn-fire-hazard",
+    "syn-fire-hazard",
+    "syn-fire-hazard",
+    "syn-fire-safe",
+    "syn-fire-safe",
+    "syn-fire-safe",
+    "syn-fire-safe",
+    "syn-fire-safe",
+    "syn-fire-safe",
+    "syn-forest-hazard",
+    "syn-forest-hazard",
+    "syn-forest-hazard",
+    "syn-forest-hazard",
+    "syn-forest-hazard",
+    "syn-forest-hazard",
+    "syn-forest-safe",
+    "syn-forest-safe",
+    "syn-forest-safe",
+    "syn-forest-safe",
+    "syn-forest-safe",
+    "syn-forest-safe",
+    "syn-low-quality",
+    "syn-low-quality",
+    "syn-low-quality",
+    "syn-low-quality",
+    "syn-low-quality",
+    "syn-low-quality",
+    "syn-multi-hazard",
+    "syn-multi-hazard",
+    "syn-multi-hazard",
+    "syn-multi-hazard",
+    "syn-multi-hazard",
+    "syn-multi-hazard",
+    "syn-unsupported",
+    "syn-unsupported",
+    "syn-unsupported",
+    "syn-unsupported",
+    "syn-unsupported",
+    "syn-unsupported"
+  ],
+  "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+  "configuration_summary": [
+    {
+      "provider_mode": "mock",
+      "vision_model": "qwen-vl-plus",
+      "text_model": "qwen-plus",
+      "embedding_model": "text-embedding-v3",
+      "zhipu_vision_model": "glm-4v-flash",
+      "zhipu_text_model": "glm-4-flash",
+      "zhipu_embedding_model": "embedding-2",
+      "model_timeout": 60.0,
+      "model_max_retries": 1,
+      "model_retry_backoff": 0.5,
+      "risk_rule_version": "risk-engine-v1",
+      "refine_with_evidence": false,
+      "reranker_enabled": true,
+      "reranker_top_k": 5,
+      "enable_risk_engine": false,
+      "enable_evidence_rag": false,
+      "max_images": 3,
+      "max_followups": 2,
+      "max_file_bytes": 10485760,
+      "conf_weights": "0.3,0.3,0.2,0.2",
+      "max_concurrent_llm_calls": 4,
+      "llm_queue_timeout_seconds": 60.0,
+      "mock_demo_boost": false,
+      "retrieval_top_k": 5,
+      "embedding_recovery_seconds": 60.0,
+      "rerank_vector_weight": 0.4,
+      "rerank_lexical_weight": 0.4,
+      "rerank_metadata_weight": 0.2,
+      "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+    },
+    {
+      "provider_mode": "mock",
+      "vision_model": "qwen-vl-plus",
+      "text_model": "qwen-plus",
+      "embedding_model": "text-embedding-v3",
+      "zhipu_vision_model": "glm-4v-flash",
+      "zhipu_text_model": "glm-4-flash",
+      "zhipu_embedding_model": "embedding-2",
+      "model_timeout": 60.0,
+      "model_max_retries": 1,
+      "model_retry_backoff": 0.5,
+      "risk_rule_version": "risk-engine-v1",
+      "refine_with_evidence": false,
+      "reranker_enabled": true,
+      "reranker_top_k": 5,
+      "enable_risk_engine": true,
+      "enable_evidence_rag": false,
+      "max_images": 3,
+      "max_followups": 2,
+      "max_file_bytes": 10485760,
+      "conf_weights": "0.3,0.3,0.2,0.2",
+      "max_concurrent_llm_calls": 4,
+      "llm_queue_timeout_seconds": 60.0,
+      "mock_demo_boost": false,
+      "retrieval_top_k": 5,
+      "embedding_recovery_seconds": 60.0,
+      "rerank_vector_weight": 0.4,
+      "rerank_lexical_weight": 0.4,
+      "rerank_metadata_weight": 0.2,
+      "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+    },
+    {
+      "provider_mode": "mock",
+      "vision_model": "qwen-vl-plus",
+      "text_model": "qwen-plus",
+      "embedding_model": "text-embedding-v3",
+      "zhipu_vision_model": "glm-4v-flash",
+      "zhipu_text_model": "glm-4-flash",
+      "zhipu_embedding_model": "embedding-2",
+      "model_timeout": 60.0,
+      "model_max_retries": 1,
+      "model_retry_backoff": 0.5,
+      "risk_rule_version": "risk-engine-v1",
+      "refine_with_evidence": true,
+      "reranker_enabled": true,
+      "reranker_top_k": 5,
+      "enable_risk_engine": true,
+      "enable_evidence_rag": true,
+      "max_images": 3,
+      "max_followups": 2,
+      "max_file_bytes": 10485760,
+      "conf_weights": "0.3,0.3,0.2,0.2",
+      "max_concurrent_llm_calls": 4,
+      "llm_queue_timeout_seconds": 60.0,
+      "mock_demo_boost": false,
+      "retrieval_top_k": 5,
+      "embedding_recovery_seconds": 60.0,
+      "rerank_vector_weight": 0.4,
+      "rerank_lexical_weight": 0.4,
+      "rerank_metadata_weight": 0.2,
+      "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+    }
+  ],
+  "configuration_digest": "9fbab040fee3599b36eee8c892e68ccb0d6e0b6ea900171809fbeec13217f902",
+  "variant_ids": [
+    "A_qwen_only",
+    "B_glm_only",
+    "C_ensemble",
+    "D_plus_risk",
+    "E_plus_rag",
+    "F_full"
+  ],
+  "prompt_version": "vision-v2",
+  "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+  "rule_versions": [
+    "risk-engine-v1"
+  ],
+  "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+  "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+  "worktree_dirty": true,
+  "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+  "model_identifiers": [
+    "mock:mock-vision"
+  ],
+  "evaluation_timestamp": "2026-10-29T06:36:54.019013+00:00",
+  "dataset_version": "r6-synthetic-v1",
+  "case_count": 12,
+  "provider_mode": "mock",
+  "evaluation_mode": "mock",
+  "source_type_counts": {
+    "synthetic": 12
+  },
+  "partitions": {
+    "synthetic": 12
+  },
+  "variants": {
+    "qwen": {
+      "label": "Qwen only",
+      "metrics": {
+        "total": 12,
+        "metrics_schema_version": "2.0",
+        "detection_precision": 0.875,
+        "detection_recall": 1.0,
+        "detection_specificity": 0.0,
+        "detection_coverage": 0.6667,
+        "end_to_end_hazard_recall": 0.875,
+        "category_accuracy": 0.75,
+        "level_accuracy": 0.0,
+        "level_accuracy_tolerance1": 0.0,
+        "severity_mae": null,
+        "clause_hit_rate": null,
+        "evidence_hit_rate": null,
+        "system_evidence_support_rate": 0.0,
+        "evidence_support_rate": 0.0,
+        "independent_evidence_accuracy": 1.0,
+        "independent_human_evidence_accuracy": null,
+        "unsupported_claim_rate": 0.6667,
+        "model_conflict_rate": null,
+        "human_review_rate": 0.6667,
+        "high_risk_review_rate": 0.8333,
+        "hazard_interception_rate": 1.0,
+        "unsafe_auto_pass_rate": 0.0,
+        "information_insufficient_rate": 0.3333,
+        "abstention_accuracy": 0.75,
+        "execution_failure_rate": 0.0,
+        "true_positive_count": 7,
+        "true_negative_count": 0,
+        "false_positive_count": 1,
+        "false_negative_count": 0,
+        "detection_missing_count": 4,
+        "human_review_count": 8,
+        "high_risk_case_count": 6,
+        "unsafe_auto_pass_count": 0,
+        "unsafe_hazard_base_count": 8,
+        "information_insufficient_count": 4,
+        "execution_failure_count": 0,
+        "correct_abstention_count": 1,
+        "evidence_failure_count": 8,
+        "severity_error_count": 6,
+        "model_conflict_count": 0,
+        "avg_latency_s": 0.04,
+        "metric_basis": {
+          "detection_precision": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 4
+          },
+          "detection_recall": {
+            "numerator": 7,
+            "denominator": 7,
+            "missing": 1
+          },
+          "detection_specificity": {
+            "numerator": 0,
+            "denominator": 1,
+            "missing": 3
+          },
+          "detection_coverage": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 4
+          },
+          "end_to_end_hazard_recall": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "category_accuracy": {
+            "numerator": 6,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 8
+          },
+          "level_accuracy_tolerance1": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 8
+          },
+          "severity_mae": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 8
+          },
+          "clause_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "evidence_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "system_evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "independent_evidence_accuracy": {
+            "numerator": 1,
+            "denominator": 1,
+            "missing": 11
+          },
+          "independent_human_evidence_accuracy": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "unsupported_claim_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "model_conflict_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 0
+          },
+          "human_review_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "high_risk_review_rate": {
+            "numerator": 5,
+            "denominator": 6,
+            "missing": 0
+          },
+          "hazard_interception_rate": {
+            "numerator": 8,
+            "denominator": 8,
+            "missing": 0
+          },
+          "unsafe_auto_pass_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 0
+          },
+          "information_insufficient_rate": {
+            "numerator": 4,
+            "denominator": 12,
+            "missing": 0
+          },
+          "abstention_accuracy": {
+            "numerator": 9,
+            "denominator": 12,
+            "missing": 0
+          },
+          "execution_failure_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          }
+        }
+      },
+      "mode": "mock",
+      "report_identity": {
+        "report_schema_version": "2.0",
+        "metrics_schema_version": "2.0",
+        "dataset_schema_version": "2.0",
+        "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "sample_ids": [
+          "syn-community-hazard",
+          "syn-community-safe",
+          "syn-contradiction",
+          "syn-factory-hazard",
+          "syn-factory-safe",
+          "syn-fire-hazard",
+          "syn-fire-safe",
+          "syn-forest-hazard",
+          "syn-forest-safe",
+          "syn-low-quality",
+          "syn-multi-hazard",
+          "syn-unsupported"
+        ],
+        "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "configuration_summary": [
+          {
+            "provider_mode": "mock",
+            "vision_model": "qwen-vl-plus",
+            "text_model": "qwen-plus",
+            "embedding_model": "text-embedding-v3",
+            "zhipu_vision_model": "glm-4v-flash",
+            "zhipu_text_model": "glm-4-flash",
+            "zhipu_embedding_model": "embedding-2",
+            "model_timeout": 60.0,
+            "model_max_retries": 1,
+            "model_retry_backoff": 0.5,
+            "risk_rule_version": "risk-engine-v1",
+            "refine_with_evidence": false,
+            "reranker_enabled": true,
+            "reranker_top_k": 5,
+            "enable_risk_engine": false,
+            "enable_evidence_rag": false,
+            "max_images": 3,
+            "max_followups": 2,
+            "max_file_bytes": 10485760,
+            "conf_weights": "0.3,0.3,0.2,0.2",
+            "max_concurrent_llm_calls": 4,
+            "llm_queue_timeout_seconds": 60.0,
+            "mock_demo_boost": false,
+            "retrieval_top_k": 5,
+            "embedding_recovery_seconds": 60.0,
+            "rerank_vector_weight": 0.4,
+            "rerank_lexical_weight": 0.4,
+            "rerank_metadata_weight": 0.2,
+            "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+          }
+        ],
+        "configuration_digest": "8acf1158e0d2f008cac7ed387d988d6574594e28a1430ff96f75022e2b4ba870",
+        "variant_ids": [
+          "A_qwen_only"
+        ],
+        "prompt_version": "vision-v2",
+        "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+        "rule_versions": [
+          "risk-engine-v1"
+        ],
+        "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+        "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+        "worktree_dirty": true,
+        "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+        "model_identifiers": [
+          "mock:mock-vision"
+        ]
+      },
+      "source_partition_metrics": {
+        "synthetic": {
+          "total": 12,
+          "metrics_schema_version": "2.0",
+          "detection_precision": 0.875,
+          "detection_recall": 1.0,
+          "detection_specificity": 0.0,
+          "detection_coverage": 0.6667,
+          "end_to_end_hazard_recall": 0.875,
+          "category_accuracy": 0.75,
+          "level_accuracy": 0.0,
+          "level_accuracy_tolerance1": 0.0,
+          "severity_mae": null,
+          "clause_hit_rate": null,
+          "evidence_hit_rate": null,
+          "system_evidence_support_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "independent_evidence_accuracy": 1.0,
+          "independent_human_evidence_accuracy": null,
+          "unsupported_claim_rate": 0.6667,
+          "model_conflict_rate": null,
+          "human_review_rate": 0.6667,
+          "high_risk_review_rate": 0.8333,
+          "hazard_interception_rate": 1.0,
+          "unsafe_auto_pass_rate": 0.0,
+          "information_insufficient_rate": 0.3333,
+          "abstention_accuracy": 0.75,
+          "execution_failure_rate": 0.0,
+          "true_positive_count": 7,
+          "true_negative_count": 0,
+          "false_positive_count": 1,
+          "false_negative_count": 0,
+          "detection_missing_count": 4,
+          "human_review_count": 8,
+          "high_risk_case_count": 6,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_hazard_base_count": 8,
+          "information_insufficient_count": 4,
+          "execution_failure_count": 0,
+          "correct_abstention_count": 1,
+          "evidence_failure_count": 8,
+          "severity_error_count": 6,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.04,
+          "metric_basis": {
+            "detection_precision": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 4
+            },
+            "detection_recall": {
+              "numerator": 7,
+              "denominator": 7,
+              "missing": 1
+            },
+            "detection_specificity": {
+              "numerator": 0,
+              "denominator": 1,
+              "missing": 3
+            },
+            "detection_coverage": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 4
+            },
+            "end_to_end_hazard_recall": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "category_accuracy": {
+              "numerator": 6,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 8
+            },
+            "level_accuracy_tolerance1": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 8
+            },
+            "severity_mae": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 8
+            },
+            "clause_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "evidence_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "system_evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "independent_evidence_accuracy": {
+              "numerator": 1,
+              "denominator": 1,
+              "missing": 11
+            },
+            "independent_human_evidence_accuracy": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "unsupported_claim_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "model_conflict_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 0
+            },
+            "human_review_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "high_risk_review_rate": {
+              "numerator": 5,
+              "denominator": 6,
+              "missing": 0
+            },
+            "hazard_interception_rate": {
+              "numerator": 8,
+              "denominator": 8,
+              "missing": 0
+            },
+            "unsafe_auto_pass_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 0
+            },
+            "information_insufficient_rate": {
+              "numerator": 4,
+              "denominator": 12,
+              "missing": 0
+            },
+            "abstention_accuracy": {
+              "numerator": 9,
+              "denominator": 12,
+              "missing": 0
+            },
+            "execution_failure_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            }
+          }
+        }
+      }
+    },
+    "glm": {
+      "label": "GLM only",
+      "metrics": {
+        "total": 12,
+        "metrics_schema_version": "2.0",
+        "detection_precision": 0.875,
+        "detection_recall": 1.0,
+        "detection_specificity": 0.0,
+        "detection_coverage": 0.6667,
+        "end_to_end_hazard_recall": 0.875,
+        "category_accuracy": 0.75,
+        "level_accuracy": 0.0,
+        "level_accuracy_tolerance1": 0.0,
+        "severity_mae": null,
+        "clause_hit_rate": null,
+        "evidence_hit_rate": null,
+        "system_evidence_support_rate": 0.0,
+        "evidence_support_rate": 0.0,
+        "independent_evidence_accuracy": 1.0,
+        "independent_human_evidence_accuracy": null,
+        "unsupported_claim_rate": 0.6667,
+        "model_conflict_rate": null,
+        "human_review_rate": 0.6667,
+        "high_risk_review_rate": 0.8333,
+        "hazard_interception_rate": 1.0,
+        "unsafe_auto_pass_rate": 0.0,
+        "information_insufficient_rate": 0.3333,
+        "abstention_accuracy": 0.75,
+        "execution_failure_rate": 0.0,
+        "true_positive_count": 7,
+        "true_negative_count": 0,
+        "false_positive_count": 1,
+        "false_negative_count": 0,
+        "detection_missing_count": 4,
+        "human_review_count": 8,
+        "high_risk_case_count": 6,
+        "unsafe_auto_pass_count": 0,
+        "unsafe_hazard_base_count": 8,
+        "information_insufficient_count": 4,
+        "execution_failure_count": 0,
+        "correct_abstention_count": 1,
+        "evidence_failure_count": 8,
+        "severity_error_count": 6,
+        "model_conflict_count": 0,
+        "avg_latency_s": 0.002,
+        "metric_basis": {
+          "detection_precision": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 4
+          },
+          "detection_recall": {
+            "numerator": 7,
+            "denominator": 7,
+            "missing": 1
+          },
+          "detection_specificity": {
+            "numerator": 0,
+            "denominator": 1,
+            "missing": 3
+          },
+          "detection_coverage": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 4
+          },
+          "end_to_end_hazard_recall": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "category_accuracy": {
+            "numerator": 6,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 8
+          },
+          "level_accuracy_tolerance1": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 8
+          },
+          "severity_mae": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 8
+          },
+          "clause_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "evidence_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "system_evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "independent_evidence_accuracy": {
+            "numerator": 1,
+            "denominator": 1,
+            "missing": 11
+          },
+          "independent_human_evidence_accuracy": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "unsupported_claim_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "model_conflict_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 0
+          },
+          "human_review_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "high_risk_review_rate": {
+            "numerator": 5,
+            "denominator": 6,
+            "missing": 0
+          },
+          "hazard_interception_rate": {
+            "numerator": 8,
+            "denominator": 8,
+            "missing": 0
+          },
+          "unsafe_auto_pass_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 0
+          },
+          "information_insufficient_rate": {
+            "numerator": 4,
+            "denominator": 12,
+            "missing": 0
+          },
+          "abstention_accuracy": {
+            "numerator": 9,
+            "denominator": 12,
+            "missing": 0
+          },
+          "execution_failure_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          }
+        }
+      },
+      "mode": "mock",
+      "report_identity": {
+        "report_schema_version": "2.0",
+        "metrics_schema_version": "2.0",
+        "dataset_schema_version": "2.0",
+        "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "sample_ids": [
+          "syn-community-hazard",
+          "syn-community-safe",
+          "syn-contradiction",
+          "syn-factory-hazard",
+          "syn-factory-safe",
+          "syn-fire-hazard",
+          "syn-fire-safe",
+          "syn-forest-hazard",
+          "syn-forest-safe",
+          "syn-low-quality",
+          "syn-multi-hazard",
+          "syn-unsupported"
+        ],
+        "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "configuration_summary": [
+          {
+            "provider_mode": "mock",
+            "vision_model": "qwen-vl-plus",
+            "text_model": "qwen-plus",
+            "embedding_model": "text-embedding-v3",
+            "zhipu_vision_model": "glm-4v-flash",
+            "zhipu_text_model": "glm-4-flash",
+            "zhipu_embedding_model": "embedding-2",
+            "model_timeout": 60.0,
+            "model_max_retries": 1,
+            "model_retry_backoff": 0.5,
+            "risk_rule_version": "risk-engine-v1",
+            "refine_with_evidence": false,
+            "reranker_enabled": true,
+            "reranker_top_k": 5,
+            "enable_risk_engine": false,
+            "enable_evidence_rag": false,
+            "max_images": 3,
+            "max_followups": 2,
+            "max_file_bytes": 10485760,
+            "conf_weights": "0.3,0.3,0.2,0.2",
+            "max_concurrent_llm_calls": 4,
+            "llm_queue_timeout_seconds": 60.0,
+            "mock_demo_boost": false,
+            "retrieval_top_k": 5,
+            "embedding_recovery_seconds": 60.0,
+            "rerank_vector_weight": 0.4,
+            "rerank_lexical_weight": 0.4,
+            "rerank_metadata_weight": 0.2,
+            "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+          }
+        ],
+        "configuration_digest": "8acf1158e0d2f008cac7ed387d988d6574594e28a1430ff96f75022e2b4ba870",
+        "variant_ids": [
+          "B_glm_only"
+        ],
+        "prompt_version": "vision-v2",
+        "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+        "rule_versions": [
+          "risk-engine-v1"
+        ],
+        "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+        "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+        "worktree_dirty": true,
+        "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+        "model_identifiers": [
+          "mock:mock-vision"
+        ]
+      },
+      "source_partition_metrics": {
+        "synthetic": {
+          "total": 12,
+          "metrics_schema_version": "2.0",
+          "detection_precision": 0.875,
+          "detection_recall": 1.0,
+          "detection_specificity": 0.0,
+          "detection_coverage": 0.6667,
+          "end_to_end_hazard_recall": 0.875,
+          "category_accuracy": 0.75,
+          "level_accuracy": 0.0,
+          "level_accuracy_tolerance1": 0.0,
+          "severity_mae": null,
+          "clause_hit_rate": null,
+          "evidence_hit_rate": null,
+          "system_evidence_support_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "independent_evidence_accuracy": 1.0,
+          "independent_human_evidence_accuracy": null,
+          "unsupported_claim_rate": 0.6667,
+          "model_conflict_rate": null,
+          "human_review_rate": 0.6667,
+          "high_risk_review_rate": 0.8333,
+          "hazard_interception_rate": 1.0,
+          "unsafe_auto_pass_rate": 0.0,
+          "information_insufficient_rate": 0.3333,
+          "abstention_accuracy": 0.75,
+          "execution_failure_rate": 0.0,
+          "true_positive_count": 7,
+          "true_negative_count": 0,
+          "false_positive_count": 1,
+          "false_negative_count": 0,
+          "detection_missing_count": 4,
+          "human_review_count": 8,
+          "high_risk_case_count": 6,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_hazard_base_count": 8,
+          "information_insufficient_count": 4,
+          "execution_failure_count": 0,
+          "correct_abstention_count": 1,
+          "evidence_failure_count": 8,
+          "severity_error_count": 6,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.002,
+          "metric_basis": {
+            "detection_precision": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 4
+            },
+            "detection_recall": {
+              "numerator": 7,
+              "denominator": 7,
+              "missing": 1
+            },
+            "detection_specificity": {
+              "numerator": 0,
+              "denominator": 1,
+              "missing": 3
+            },
+            "detection_coverage": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 4
+            },
+            "end_to_end_hazard_recall": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "category_accuracy": {
+              "numerator": 6,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 8
+            },
+            "level_accuracy_tolerance1": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 8
+            },
+            "severity_mae": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 8
+            },
+            "clause_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "evidence_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "system_evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "independent_evidence_accuracy": {
+              "numerator": 1,
+              "denominator": 1,
+              "missing": 11
+            },
+            "independent_human_evidence_accuracy": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "unsupported_claim_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "model_conflict_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 0
+            },
+            "human_review_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "high_risk_review_rate": {
+              "numerator": 5,
+              "denominator": 6,
+              "missing": 0
+            },
+            "hazard_interception_rate": {
+              "numerator": 8,
+              "denominator": 8,
+              "missing": 0
+            },
+            "unsafe_auto_pass_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 0
+            },
+            "information_insufficient_rate": {
+              "numerator": 4,
+              "denominator": 12,
+              "missing": 0
+            },
+            "abstention_accuracy": {
+              "numerator": 9,
+              "denominator": 12,
+              "missing": 0
+            },
+            "execution_failure_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            }
+          }
+        }
+      }
+    },
+    "ensemble": {
+      "label": "Qwen+GLM",
+      "metrics": {
+        "total": 12,
+        "metrics_schema_version": "2.0",
+        "detection_precision": 0.875,
+        "detection_recall": 1.0,
+        "detection_specificity": 0.0,
+        "detection_coverage": 0.6667,
+        "end_to_end_hazard_recall": 0.875,
+        "category_accuracy": 0.75,
+        "level_accuracy": 0.0,
+        "level_accuracy_tolerance1": 0.0,
+        "severity_mae": null,
+        "clause_hit_rate": null,
+        "evidence_hit_rate": null,
+        "system_evidence_support_rate": 0.0,
+        "evidence_support_rate": 0.0,
+        "independent_evidence_accuracy": 1.0,
+        "independent_human_evidence_accuracy": null,
+        "unsupported_claim_rate": 0.6667,
+        "model_conflict_rate": 0.0,
+        "human_review_rate": 0.6667,
+        "high_risk_review_rate": 0.8333,
+        "hazard_interception_rate": 1.0,
+        "unsafe_auto_pass_rate": 0.0,
+        "information_insufficient_rate": 0.3333,
+        "abstention_accuracy": 0.75,
+        "execution_failure_rate": 0.0,
+        "true_positive_count": 7,
+        "true_negative_count": 0,
+        "false_positive_count": 1,
+        "false_negative_count": 0,
+        "detection_missing_count": 4,
+        "human_review_count": 8,
+        "high_risk_case_count": 6,
+        "unsafe_auto_pass_count": 0,
+        "unsafe_hazard_base_count": 8,
+        "information_insufficient_count": 4,
+        "execution_failure_count": 0,
+        "correct_abstention_count": 1,
+        "evidence_failure_count": 8,
+        "severity_error_count": 6,
+        "model_conflict_count": 0,
+        "avg_latency_s": 0.002,
+        "metric_basis": {
+          "detection_precision": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 4
+          },
+          "detection_recall": {
+            "numerator": 7,
+            "denominator": 7,
+            "missing": 1
+          },
+          "detection_specificity": {
+            "numerator": 0,
+            "denominator": 1,
+            "missing": 3
+          },
+          "detection_coverage": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 4
+          },
+          "end_to_end_hazard_recall": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "category_accuracy": {
+            "numerator": 6,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 8
+          },
+          "level_accuracy_tolerance1": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 8
+          },
+          "severity_mae": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 8
+          },
+          "clause_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "evidence_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "system_evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "independent_evidence_accuracy": {
+            "numerator": 1,
+            "denominator": 1,
+            "missing": 11
+          },
+          "independent_human_evidence_accuracy": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "unsupported_claim_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "model_conflict_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          },
+          "human_review_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "high_risk_review_rate": {
+            "numerator": 5,
+            "denominator": 6,
+            "missing": 0
+          },
+          "hazard_interception_rate": {
+            "numerator": 8,
+            "denominator": 8,
+            "missing": 0
+          },
+          "unsafe_auto_pass_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 0
+          },
+          "information_insufficient_rate": {
+            "numerator": 4,
+            "denominator": 12,
+            "missing": 0
+          },
+          "abstention_accuracy": {
+            "numerator": 9,
+            "denominator": 12,
+            "missing": 0
+          },
+          "execution_failure_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          }
+        }
+      },
+      "mode": "mock",
+      "report_identity": {
+        "report_schema_version": "2.0",
+        "metrics_schema_version": "2.0",
+        "dataset_schema_version": "2.0",
+        "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "sample_ids": [
+          "syn-community-hazard",
+          "syn-community-safe",
+          "syn-contradiction",
+          "syn-factory-hazard",
+          "syn-factory-safe",
+          "syn-fire-hazard",
+          "syn-fire-safe",
+          "syn-forest-hazard",
+          "syn-forest-safe",
+          "syn-low-quality",
+          "syn-multi-hazard",
+          "syn-unsupported"
+        ],
+        "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "configuration_summary": [
+          {
+            "provider_mode": "mock",
+            "vision_model": "qwen-vl-plus",
+            "text_model": "qwen-plus",
+            "embedding_model": "text-embedding-v3",
+            "zhipu_vision_model": "glm-4v-flash",
+            "zhipu_text_model": "glm-4-flash",
+            "zhipu_embedding_model": "embedding-2",
+            "model_timeout": 60.0,
+            "model_max_retries": 1,
+            "model_retry_backoff": 0.5,
+            "risk_rule_version": "risk-engine-v1",
+            "refine_with_evidence": false,
+            "reranker_enabled": true,
+            "reranker_top_k": 5,
+            "enable_risk_engine": false,
+            "enable_evidence_rag": false,
+            "max_images": 3,
+            "max_followups": 2,
+            "max_file_bytes": 10485760,
+            "conf_weights": "0.3,0.3,0.2,0.2",
+            "max_concurrent_llm_calls": 4,
+            "llm_queue_timeout_seconds": 60.0,
+            "mock_demo_boost": false,
+            "retrieval_top_k": 5,
+            "embedding_recovery_seconds": 60.0,
+            "rerank_vector_weight": 0.4,
+            "rerank_lexical_weight": 0.4,
+            "rerank_metadata_weight": 0.2,
+            "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+          }
+        ],
+        "configuration_digest": "8acf1158e0d2f008cac7ed387d988d6574594e28a1430ff96f75022e2b4ba870",
+        "variant_ids": [
+          "C_ensemble"
+        ],
+        "prompt_version": "vision-v2",
+        "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+        "rule_versions": [
+          "risk-engine-v1"
+        ],
+        "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+        "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+        "worktree_dirty": true,
+        "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+        "model_identifiers": [
+          "mock:mock-vision"
+        ]
+      },
+      "source_partition_metrics": {
+        "synthetic": {
+          "total": 12,
+          "metrics_schema_version": "2.0",
+          "detection_precision": 0.875,
+          "detection_recall": 1.0,
+          "detection_specificity": 0.0,
+          "detection_coverage": 0.6667,
+          "end_to_end_hazard_recall": 0.875,
+          "category_accuracy": 0.75,
+          "level_accuracy": 0.0,
+          "level_accuracy_tolerance1": 0.0,
+          "severity_mae": null,
+          "clause_hit_rate": null,
+          "evidence_hit_rate": null,
+          "system_evidence_support_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "independent_evidence_accuracy": 1.0,
+          "independent_human_evidence_accuracy": null,
+          "unsupported_claim_rate": 0.6667,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 0.6667,
+          "high_risk_review_rate": 0.8333,
+          "hazard_interception_rate": 1.0,
+          "unsafe_auto_pass_rate": 0.0,
+          "information_insufficient_rate": 0.3333,
+          "abstention_accuracy": 0.75,
+          "execution_failure_rate": 0.0,
+          "true_positive_count": 7,
+          "true_negative_count": 0,
+          "false_positive_count": 1,
+          "false_negative_count": 0,
+          "detection_missing_count": 4,
+          "human_review_count": 8,
+          "high_risk_case_count": 6,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_hazard_base_count": 8,
+          "information_insufficient_count": 4,
+          "execution_failure_count": 0,
+          "correct_abstention_count": 1,
+          "evidence_failure_count": 8,
+          "severity_error_count": 6,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.002,
+          "metric_basis": {
+            "detection_precision": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 4
+            },
+            "detection_recall": {
+              "numerator": 7,
+              "denominator": 7,
+              "missing": 1
+            },
+            "detection_specificity": {
+              "numerator": 0,
+              "denominator": 1,
+              "missing": 3
+            },
+            "detection_coverage": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 4
+            },
+            "end_to_end_hazard_recall": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "category_accuracy": {
+              "numerator": 6,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 8
+            },
+            "level_accuracy_tolerance1": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 8
+            },
+            "severity_mae": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 8
+            },
+            "clause_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "evidence_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "system_evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "independent_evidence_accuracy": {
+              "numerator": 1,
+              "denominator": 1,
+              "missing": 11
+            },
+            "independent_human_evidence_accuracy": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "unsupported_claim_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "model_conflict_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            },
+            "human_review_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "high_risk_review_rate": {
+              "numerator": 5,
+              "denominator": 6,
+              "missing": 0
+            },
+            "hazard_interception_rate": {
+              "numerator": 8,
+              "denominator": 8,
+              "missing": 0
+            },
+            "unsafe_auto_pass_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 0
+            },
+            "information_insufficient_rate": {
+              "numerator": 4,
+              "denominator": 12,
+              "missing": 0
+            },
+            "abstention_accuracy": {
+              "numerator": 9,
+              "denominator": 12,
+              "missing": 0
+            },
+            "execution_failure_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            }
+          }
+        }
+      }
+    },
+    "plus_risk": {
+      "label": "Qwen+GLM+Risk",
+      "metrics": {
+        "total": 12,
+        "metrics_schema_version": "2.0",
+        "detection_precision": 0.875,
+        "detection_recall": 1.0,
+        "detection_specificity": 0.0,
+        "detection_coverage": 0.6667,
+        "end_to_end_hazard_recall": 0.875,
+        "category_accuracy": 0.75,
+        "level_accuracy": 0.625,
+        "level_accuracy_tolerance1": 0.875,
+        "severity_mae": 0.2857,
+        "clause_hit_rate": null,
+        "evidence_hit_rate": null,
+        "system_evidence_support_rate": 0.0,
+        "evidence_support_rate": 0.0,
+        "independent_evidence_accuracy": 1.0,
+        "independent_human_evidence_accuracy": null,
+        "unsupported_claim_rate": 0.6667,
+        "model_conflict_rate": 0.0,
+        "human_review_rate": 0.6667,
+        "high_risk_review_rate": 0.8333,
+        "hazard_interception_rate": 1.0,
+        "unsafe_auto_pass_rate": 0.0,
+        "information_insufficient_rate": 0.3333,
+        "abstention_accuracy": 0.75,
+        "execution_failure_rate": 0.0,
+        "true_positive_count": 7,
+        "true_negative_count": 0,
+        "false_positive_count": 1,
+        "false_negative_count": 0,
+        "detection_missing_count": 4,
+        "human_review_count": 8,
+        "high_risk_case_count": 6,
+        "unsafe_auto_pass_count": 0,
+        "unsafe_hazard_base_count": 8,
+        "information_insufficient_count": 4,
+        "execution_failure_count": 0,
+        "correct_abstention_count": 1,
+        "evidence_failure_count": 8,
+        "severity_error_count": 1,
+        "model_conflict_count": 0,
+        "avg_latency_s": 0.002,
+        "metric_basis": {
+          "detection_precision": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 4
+          },
+          "detection_recall": {
+            "numerator": 7,
+            "denominator": 7,
+            "missing": 1
+          },
+          "detection_specificity": {
+            "numerator": 0,
+            "denominator": 1,
+            "missing": 3
+          },
+          "detection_coverage": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 4
+          },
+          "end_to_end_hazard_recall": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "category_accuracy": {
+            "numerator": 6,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy": {
+            "numerator": 5,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy_tolerance1": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "severity_mae": {
+            "numerator": 2,
+            "denominator": 7,
+            "missing": 1
+          },
+          "clause_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "evidence_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "system_evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "evidence_support_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 4
+          },
+          "independent_evidence_accuracy": {
+            "numerator": 1,
+            "denominator": 1,
+            "missing": 11
+          },
+          "independent_human_evidence_accuracy": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "unsupported_claim_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "model_conflict_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          },
+          "human_review_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "high_risk_review_rate": {
+            "numerator": 5,
+            "denominator": 6,
+            "missing": 0
+          },
+          "hazard_interception_rate": {
+            "numerator": 8,
+            "denominator": 8,
+            "missing": 0
+          },
+          "unsafe_auto_pass_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 0
+          },
+          "information_insufficient_rate": {
+            "numerator": 4,
+            "denominator": 12,
+            "missing": 0
+          },
+          "abstention_accuracy": {
+            "numerator": 9,
+            "denominator": 12,
+            "missing": 0
+          },
+          "execution_failure_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          }
+        }
+      },
+      "mode": "mock",
+      "report_identity": {
+        "report_schema_version": "2.0",
+        "metrics_schema_version": "2.0",
+        "dataset_schema_version": "2.0",
+        "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "sample_ids": [
+          "syn-community-hazard",
+          "syn-community-safe",
+          "syn-contradiction",
+          "syn-factory-hazard",
+          "syn-factory-safe",
+          "syn-fire-hazard",
+          "syn-fire-safe",
+          "syn-forest-hazard",
+          "syn-forest-safe",
+          "syn-low-quality",
+          "syn-multi-hazard",
+          "syn-unsupported"
+        ],
+        "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "configuration_summary": [
+          {
+            "provider_mode": "mock",
+            "vision_model": "qwen-vl-plus",
+            "text_model": "qwen-plus",
+            "embedding_model": "text-embedding-v3",
+            "zhipu_vision_model": "glm-4v-flash",
+            "zhipu_text_model": "glm-4-flash",
+            "zhipu_embedding_model": "embedding-2",
+            "model_timeout": 60.0,
+            "model_max_retries": 1,
+            "model_retry_backoff": 0.5,
+            "risk_rule_version": "risk-engine-v1",
+            "refine_with_evidence": false,
+            "reranker_enabled": true,
+            "reranker_top_k": 5,
+            "enable_risk_engine": true,
+            "enable_evidence_rag": false,
+            "max_images": 3,
+            "max_followups": 2,
+            "max_file_bytes": 10485760,
+            "conf_weights": "0.3,0.3,0.2,0.2",
+            "max_concurrent_llm_calls": 4,
+            "llm_queue_timeout_seconds": 60.0,
+            "mock_demo_boost": false,
+            "retrieval_top_k": 5,
+            "embedding_recovery_seconds": 60.0,
+            "rerank_vector_weight": 0.4,
+            "rerank_lexical_weight": 0.4,
+            "rerank_metadata_weight": 0.2,
+            "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+          }
+        ],
+        "configuration_digest": "05ea73e2dd809d644243d2bc0caaef7a1cc3eb6f456581855d34b8dcc3a9a4f9",
+        "variant_ids": [
+          "D_plus_risk"
+        ],
+        "prompt_version": "vision-v2",
+        "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+        "rule_versions": [
+          "risk-engine-v1"
+        ],
+        "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+        "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+        "worktree_dirty": true,
+        "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+        "model_identifiers": [
+          "mock:mock-vision"
+        ]
+      },
+      "source_partition_metrics": {
+        "synthetic": {
+          "total": 12,
+          "metrics_schema_version": "2.0",
+          "detection_precision": 0.875,
+          "detection_recall": 1.0,
+          "detection_specificity": 0.0,
+          "detection_coverage": 0.6667,
+          "end_to_end_hazard_recall": 0.875,
+          "category_accuracy": 0.75,
+          "level_accuracy": 0.625,
+          "level_accuracy_tolerance1": 0.875,
+          "severity_mae": 0.2857,
+          "clause_hit_rate": null,
+          "evidence_hit_rate": null,
+          "system_evidence_support_rate": 0.0,
+          "evidence_support_rate": 0.0,
+          "independent_evidence_accuracy": 1.0,
+          "independent_human_evidence_accuracy": null,
+          "unsupported_claim_rate": 0.6667,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 0.6667,
+          "high_risk_review_rate": 0.8333,
+          "hazard_interception_rate": 1.0,
+          "unsafe_auto_pass_rate": 0.0,
+          "information_insufficient_rate": 0.3333,
+          "abstention_accuracy": 0.75,
+          "execution_failure_rate": 0.0,
+          "true_positive_count": 7,
+          "true_negative_count": 0,
+          "false_positive_count": 1,
+          "false_negative_count": 0,
+          "detection_missing_count": 4,
+          "human_review_count": 8,
+          "high_risk_case_count": 6,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_hazard_base_count": 8,
+          "information_insufficient_count": 4,
+          "execution_failure_count": 0,
+          "correct_abstention_count": 1,
+          "evidence_failure_count": 8,
+          "severity_error_count": 1,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.002,
+          "metric_basis": {
+            "detection_precision": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 4
+            },
+            "detection_recall": {
+              "numerator": 7,
+              "denominator": 7,
+              "missing": 1
+            },
+            "detection_specificity": {
+              "numerator": 0,
+              "denominator": 1,
+              "missing": 3
+            },
+            "detection_coverage": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 4
+            },
+            "end_to_end_hazard_recall": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "category_accuracy": {
+              "numerator": 6,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy": {
+              "numerator": 5,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy_tolerance1": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "severity_mae": {
+              "numerator": 2,
+              "denominator": 7,
+              "missing": 1
+            },
+            "clause_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "evidence_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "system_evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "evidence_support_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 4
+            },
+            "independent_evidence_accuracy": {
+              "numerator": 1,
+              "denominator": 1,
+              "missing": 11
+            },
+            "independent_human_evidence_accuracy": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "unsupported_claim_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "model_conflict_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            },
+            "human_review_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "high_risk_review_rate": {
+              "numerator": 5,
+              "denominator": 6,
+              "missing": 0
+            },
+            "hazard_interception_rate": {
+              "numerator": 8,
+              "denominator": 8,
+              "missing": 0
+            },
+            "unsafe_auto_pass_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 0
+            },
+            "information_insufficient_rate": {
+              "numerator": 4,
+              "denominator": 12,
+              "missing": 0
+            },
+            "abstention_accuracy": {
+              "numerator": 9,
+              "denominator": 12,
+              "missing": 0
+            },
+            "execution_failure_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            }
+          }
+        }
+      }
+    },
+    "plus_rag": {
+      "label": "Qwen+GLM+Risk+RAG",
+      "metrics": {
+        "total": 12,
+        "metrics_schema_version": "2.0",
+        "detection_precision": 0.875,
+        "detection_recall": 1.0,
+        "detection_specificity": 0.0,
+        "detection_coverage": 0.6667,
+        "end_to_end_hazard_recall": 0.875,
+        "category_accuracy": 0.75,
+        "level_accuracy": 0.625,
+        "level_accuracy_tolerance1": 0.875,
+        "severity_mae": 0.2857,
+        "clause_hit_rate": null,
+        "evidence_hit_rate": null,
+        "system_evidence_support_rate": 0.25,
+        "evidence_support_rate": 0.25,
+        "independent_evidence_accuracy": 1.0,
+        "independent_human_evidence_accuracy": null,
+        "unsupported_claim_rate": 0.5,
+        "model_conflict_rate": 0.0,
+        "human_review_rate": 0.6667,
+        "high_risk_review_rate": 0.8333,
+        "hazard_interception_rate": 1.0,
+        "unsafe_auto_pass_rate": 0.0,
+        "information_insufficient_rate": 0.3333,
+        "abstention_accuracy": 0.75,
+        "execution_failure_rate": 0.0,
+        "true_positive_count": 7,
+        "true_negative_count": 0,
+        "false_positive_count": 1,
+        "false_negative_count": 0,
+        "detection_missing_count": 4,
+        "human_review_count": 8,
+        "high_risk_case_count": 6,
+        "unsafe_auto_pass_count": 0,
+        "unsafe_hazard_base_count": 8,
+        "information_insufficient_count": 4,
+        "execution_failure_count": 0,
+        "correct_abstention_count": 1,
+        "evidence_failure_count": 6,
+        "severity_error_count": 1,
+        "model_conflict_count": 0,
+        "avg_latency_s": 0.003,
+        "metric_basis": {
+          "detection_precision": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 4
+          },
+          "detection_recall": {
+            "numerator": 7,
+            "denominator": 7,
+            "missing": 1
+          },
+          "detection_specificity": {
+            "numerator": 0,
+            "denominator": 1,
+            "missing": 3
+          },
+          "detection_coverage": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 4
+          },
+          "end_to_end_hazard_recall": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "category_accuracy": {
+            "numerator": 6,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy": {
+            "numerator": 5,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy_tolerance1": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "severity_mae": {
+            "numerator": 2,
+            "denominator": 7,
+            "missing": 1
+          },
+          "clause_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "evidence_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "system_evidence_support_rate": {
+            "numerator": 2,
+            "denominator": 8,
+            "missing": 4
+          },
+          "evidence_support_rate": {
+            "numerator": 2,
+            "denominator": 8,
+            "missing": 4
+          },
+          "independent_evidence_accuracy": {
+            "numerator": 1,
+            "denominator": 1,
+            "missing": 11
+          },
+          "independent_human_evidence_accuracy": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "unsupported_claim_rate": {
+            "numerator": 6,
+            "denominator": 12,
+            "missing": 0
+          },
+          "model_conflict_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          },
+          "human_review_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "high_risk_review_rate": {
+            "numerator": 5,
+            "denominator": 6,
+            "missing": 0
+          },
+          "hazard_interception_rate": {
+            "numerator": 8,
+            "denominator": 8,
+            "missing": 0
+          },
+          "unsafe_auto_pass_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 0
+          },
+          "information_insufficient_rate": {
+            "numerator": 4,
+            "denominator": 12,
+            "missing": 0
+          },
+          "abstention_accuracy": {
+            "numerator": 9,
+            "denominator": 12,
+            "missing": 0
+          },
+          "execution_failure_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          }
+        }
+      },
+      "mode": "mock",
+      "report_identity": {
+        "report_schema_version": "2.0",
+        "metrics_schema_version": "2.0",
+        "dataset_schema_version": "2.0",
+        "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "sample_ids": [
+          "syn-community-hazard",
+          "syn-community-safe",
+          "syn-contradiction",
+          "syn-factory-hazard",
+          "syn-factory-safe",
+          "syn-fire-hazard",
+          "syn-fire-safe",
+          "syn-forest-hazard",
+          "syn-forest-safe",
+          "syn-low-quality",
+          "syn-multi-hazard",
+          "syn-unsupported"
+        ],
+        "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "configuration_summary": [
+          {
+            "provider_mode": "mock",
+            "vision_model": "qwen-vl-plus",
+            "text_model": "qwen-plus",
+            "embedding_model": "text-embedding-v3",
+            "zhipu_vision_model": "glm-4v-flash",
+            "zhipu_text_model": "glm-4-flash",
+            "zhipu_embedding_model": "embedding-2",
+            "model_timeout": 60.0,
+            "model_max_retries": 1,
+            "model_retry_backoff": 0.5,
+            "risk_rule_version": "risk-engine-v1",
+            "refine_with_evidence": true,
+            "reranker_enabled": true,
+            "reranker_top_k": 5,
+            "enable_risk_engine": true,
+            "enable_evidence_rag": true,
+            "max_images": 3,
+            "max_followups": 2,
+            "max_file_bytes": 10485760,
+            "conf_weights": "0.3,0.3,0.2,0.2",
+            "max_concurrent_llm_calls": 4,
+            "llm_queue_timeout_seconds": 60.0,
+            "mock_demo_boost": false,
+            "retrieval_top_k": 5,
+            "embedding_recovery_seconds": 60.0,
+            "rerank_vector_weight": 0.4,
+            "rerank_lexical_weight": 0.4,
+            "rerank_metadata_weight": 0.2,
+            "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+          }
+        ],
+        "configuration_digest": "be0e5658ad9aa8027df3c484695110628850bf6e82b90b9b739e84e9325ca970",
+        "variant_ids": [
+          "E_plus_rag"
+        ],
+        "prompt_version": "vision-v2",
+        "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+        "rule_versions": [
+          "risk-engine-v1"
+        ],
+        "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+        "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+        "worktree_dirty": true,
+        "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+        "model_identifiers": [
+          "mock:mock-vision"
+        ]
+      },
+      "source_partition_metrics": {
+        "synthetic": {
+          "total": 12,
+          "metrics_schema_version": "2.0",
+          "detection_precision": 0.875,
+          "detection_recall": 1.0,
+          "detection_specificity": 0.0,
+          "detection_coverage": 0.6667,
+          "end_to_end_hazard_recall": 0.875,
+          "category_accuracy": 0.75,
+          "level_accuracy": 0.625,
+          "level_accuracy_tolerance1": 0.875,
+          "severity_mae": 0.2857,
+          "clause_hit_rate": null,
+          "evidence_hit_rate": null,
+          "system_evidence_support_rate": 0.25,
+          "evidence_support_rate": 0.25,
+          "independent_evidence_accuracy": 1.0,
+          "independent_human_evidence_accuracy": null,
+          "unsupported_claim_rate": 0.5,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 0.6667,
+          "high_risk_review_rate": 0.8333,
+          "hazard_interception_rate": 1.0,
+          "unsafe_auto_pass_rate": 0.0,
+          "information_insufficient_rate": 0.3333,
+          "abstention_accuracy": 0.75,
+          "execution_failure_rate": 0.0,
+          "true_positive_count": 7,
+          "true_negative_count": 0,
+          "false_positive_count": 1,
+          "false_negative_count": 0,
+          "detection_missing_count": 4,
+          "human_review_count": 8,
+          "high_risk_case_count": 6,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_hazard_base_count": 8,
+          "information_insufficient_count": 4,
+          "execution_failure_count": 0,
+          "correct_abstention_count": 1,
+          "evidence_failure_count": 6,
+          "severity_error_count": 1,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.003,
+          "metric_basis": {
+            "detection_precision": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 4
+            },
+            "detection_recall": {
+              "numerator": 7,
+              "denominator": 7,
+              "missing": 1
+            },
+            "detection_specificity": {
+              "numerator": 0,
+              "denominator": 1,
+              "missing": 3
+            },
+            "detection_coverage": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 4
+            },
+            "end_to_end_hazard_recall": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "category_accuracy": {
+              "numerator": 6,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy": {
+              "numerator": 5,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy_tolerance1": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "severity_mae": {
+              "numerator": 2,
+              "denominator": 7,
+              "missing": 1
+            },
+            "clause_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "evidence_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "system_evidence_support_rate": {
+              "numerator": 2,
+              "denominator": 8,
+              "missing": 4
+            },
+            "evidence_support_rate": {
+              "numerator": 2,
+              "denominator": 8,
+              "missing": 4
+            },
+            "independent_evidence_accuracy": {
+              "numerator": 1,
+              "denominator": 1,
+              "missing": 11
+            },
+            "independent_human_evidence_accuracy": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "unsupported_claim_rate": {
+              "numerator": 6,
+              "denominator": 12,
+              "missing": 0
+            },
+            "model_conflict_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            },
+            "human_review_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "high_risk_review_rate": {
+              "numerator": 5,
+              "denominator": 6,
+              "missing": 0
+            },
+            "hazard_interception_rate": {
+              "numerator": 8,
+              "denominator": 8,
+              "missing": 0
+            },
+            "unsafe_auto_pass_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 0
+            },
+            "information_insufficient_rate": {
+              "numerator": 4,
+              "denominator": 12,
+              "missing": 0
+            },
+            "abstention_accuracy": {
+              "numerator": 9,
+              "denominator": 12,
+              "missing": 0
+            },
+            "execution_failure_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            }
+          }
+        }
+      }
+    },
+    "full": {
+      "label": "Full system",
+      "metrics": {
+        "total": 12,
+        "metrics_schema_version": "2.0",
+        "detection_precision": 0.875,
+        "detection_recall": 1.0,
+        "detection_specificity": 0.0,
+        "detection_coverage": 0.6667,
+        "end_to_end_hazard_recall": 0.875,
+        "category_accuracy": 0.75,
+        "level_accuracy": 0.625,
+        "level_accuracy_tolerance1": 0.875,
+        "severity_mae": 0.2857,
+        "clause_hit_rate": null,
+        "evidence_hit_rate": null,
+        "system_evidence_support_rate": 0.25,
+        "evidence_support_rate": 0.25,
+        "independent_evidence_accuracy": 1.0,
+        "independent_human_evidence_accuracy": null,
+        "unsupported_claim_rate": 0.5,
+        "model_conflict_rate": 0.0,
+        "human_review_rate": 0.6667,
+        "high_risk_review_rate": 0.8333,
+        "hazard_interception_rate": 1.0,
+        "unsafe_auto_pass_rate": 0.0,
+        "information_insufficient_rate": 0.3333,
+        "abstention_accuracy": 0.75,
+        "execution_failure_rate": 0.0,
+        "true_positive_count": 7,
+        "true_negative_count": 0,
+        "false_positive_count": 1,
+        "false_negative_count": 0,
+        "detection_missing_count": 4,
+        "human_review_count": 8,
+        "high_risk_case_count": 6,
+        "unsafe_auto_pass_count": 0,
+        "unsafe_hazard_base_count": 8,
+        "information_insufficient_count": 4,
+        "execution_failure_count": 0,
+        "correct_abstention_count": 1,
+        "evidence_failure_count": 6,
+        "severity_error_count": 1,
+        "model_conflict_count": 0,
+        "avg_latency_s": 0.003,
+        "metric_basis": {
+          "detection_precision": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 4
+          },
+          "detection_recall": {
+            "numerator": 7,
+            "denominator": 7,
+            "missing": 1
+          },
+          "detection_specificity": {
+            "numerator": 0,
+            "denominator": 1,
+            "missing": 3
+          },
+          "detection_coverage": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 4
+          },
+          "end_to_end_hazard_recall": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "category_accuracy": {
+            "numerator": 6,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy": {
+            "numerator": 5,
+            "denominator": 8,
+            "missing": 1
+          },
+          "level_accuracy_tolerance1": {
+            "numerator": 7,
+            "denominator": 8,
+            "missing": 1
+          },
+          "severity_mae": {
+            "numerator": 2,
+            "denominator": 7,
+            "missing": 1
+          },
+          "clause_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "evidence_hit_rate": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "system_evidence_support_rate": {
+            "numerator": 2,
+            "denominator": 8,
+            "missing": 4
+          },
+          "evidence_support_rate": {
+            "numerator": 2,
+            "denominator": 8,
+            "missing": 4
+          },
+          "independent_evidence_accuracy": {
+            "numerator": 1,
+            "denominator": 1,
+            "missing": 11
+          },
+          "independent_human_evidence_accuracy": {
+            "numerator": 0,
+            "denominator": 0,
+            "missing": 12
+          },
+          "unsupported_claim_rate": {
+            "numerator": 6,
+            "denominator": 12,
+            "missing": 0
+          },
+          "model_conflict_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          },
+          "human_review_rate": {
+            "numerator": 8,
+            "denominator": 12,
+            "missing": 0
+          },
+          "high_risk_review_rate": {
+            "numerator": 5,
+            "denominator": 6,
+            "missing": 0
+          },
+          "hazard_interception_rate": {
+            "numerator": 8,
+            "denominator": 8,
+            "missing": 0
+          },
+          "unsafe_auto_pass_rate": {
+            "numerator": 0,
+            "denominator": 8,
+            "missing": 0
+          },
+          "information_insufficient_rate": {
+            "numerator": 4,
+            "denominator": 12,
+            "missing": 0
+          },
+          "abstention_accuracy": {
+            "numerator": 9,
+            "denominator": 12,
+            "missing": 0
+          },
+          "execution_failure_rate": {
+            "numerator": 0,
+            "denominator": 12,
+            "missing": 0
+          }
+        }
+      },
+      "mode": "mock",
+      "report_identity": {
+        "report_schema_version": "2.0",
+        "metrics_schema_version": "2.0",
+        "dataset_schema_version": "2.0",
+        "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "sample_ids": [
+          "syn-community-hazard",
+          "syn-community-safe",
+          "syn-contradiction",
+          "syn-factory-hazard",
+          "syn-factory-safe",
+          "syn-fire-hazard",
+          "syn-fire-safe",
+          "syn-forest-hazard",
+          "syn-forest-safe",
+          "syn-low-quality",
+          "syn-multi-hazard",
+          "syn-unsupported"
+        ],
+        "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+        "configuration_summary": [
+          {
+            "provider_mode": "mock",
+            "vision_model": "qwen-vl-plus",
+            "text_model": "qwen-plus",
+            "embedding_model": "text-embedding-v3",
+            "zhipu_vision_model": "glm-4v-flash",
+            "zhipu_text_model": "glm-4-flash",
+            "zhipu_embedding_model": "embedding-2",
+            "model_timeout": 60.0,
+            "model_max_retries": 1,
+            "model_retry_backoff": 0.5,
+            "risk_rule_version": "risk-engine-v1",
+            "refine_with_evidence": true,
+            "reranker_enabled": true,
+            "reranker_top_k": 5,
+            "enable_risk_engine": true,
+            "enable_evidence_rag": true,
+            "max_images": 3,
+            "max_followups": 2,
+            "max_file_bytes": 10485760,
+            "conf_weights": "0.3,0.3,0.2,0.2",
+            "max_concurrent_llm_calls": 4,
+            "llm_queue_timeout_seconds": 60.0,
+            "mock_demo_boost": false,
+            "retrieval_top_k": 5,
+            "embedding_recovery_seconds": 60.0,
+            "rerank_vector_weight": 0.4,
+            "rerank_lexical_weight": 0.4,
+            "rerank_metadata_weight": 0.2,
+            "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+            "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+          }
+        ],
+        "configuration_digest": "be0e5658ad9aa8027df3c484695110628850bf6e82b90b9b739e84e9325ca970",
+        "variant_ids": [
+          "F_full"
+        ],
+        "prompt_version": "vision-v2",
+        "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+        "rule_versions": [
+          "risk-engine-v1"
+        ],
+        "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+        "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+        "worktree_dirty": true,
+        "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+        "model_identifiers": [
+          "mock:mock-vision"
+        ]
+      },
+      "source_partition_metrics": {
+        "synthetic": {
+          "total": 12,
+          "metrics_schema_version": "2.0",
+          "detection_precision": 0.875,
+          "detection_recall": 1.0,
+          "detection_specificity": 0.0,
+          "detection_coverage": 0.6667,
+          "end_to_end_hazard_recall": 0.875,
+          "category_accuracy": 0.75,
+          "level_accuracy": 0.625,
+          "level_accuracy_tolerance1": 0.875,
+          "severity_mae": 0.2857,
+          "clause_hit_rate": null,
+          "evidence_hit_rate": null,
+          "system_evidence_support_rate": 0.25,
+          "evidence_support_rate": 0.25,
+          "independent_evidence_accuracy": 1.0,
+          "independent_human_evidence_accuracy": null,
+          "unsupported_claim_rate": 0.5,
+          "model_conflict_rate": 0.0,
+          "human_review_rate": 0.6667,
+          "high_risk_review_rate": 0.8333,
+          "hazard_interception_rate": 1.0,
+          "unsafe_auto_pass_rate": 0.0,
+          "information_insufficient_rate": 0.3333,
+          "abstention_accuracy": 0.75,
+          "execution_failure_rate": 0.0,
+          "true_positive_count": 7,
+          "true_negative_count": 0,
+          "false_positive_count": 1,
+          "false_negative_count": 0,
+          "detection_missing_count": 4,
+          "human_review_count": 8,
+          "high_risk_case_count": 6,
+          "unsafe_auto_pass_count": 0,
+          "unsafe_hazard_base_count": 8,
+          "information_insufficient_count": 4,
+          "execution_failure_count": 0,
+          "correct_abstention_count": 1,
+          "evidence_failure_count": 6,
+          "severity_error_count": 1,
+          "model_conflict_count": 0,
+          "avg_latency_s": 0.003,
+          "metric_basis": {
+            "detection_precision": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 4
+            },
+            "detection_recall": {
+              "numerator": 7,
+              "denominator": 7,
+              "missing": 1
+            },
+            "detection_specificity": {
+              "numerator": 0,
+              "denominator": 1,
+              "missing": 3
+            },
+            "detection_coverage": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 4
+            },
+            "end_to_end_hazard_recall": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "category_accuracy": {
+              "numerator": 6,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy": {
+              "numerator": 5,
+              "denominator": 8,
+              "missing": 1
+            },
+            "level_accuracy_tolerance1": {
+              "numerator": 7,
+              "denominator": 8,
+              "missing": 1
+            },
+            "severity_mae": {
+              "numerator": 2,
+              "denominator": 7,
+              "missing": 1
+            },
+            "clause_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "evidence_hit_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "system_evidence_support_rate": {
+              "numerator": 2,
+              "denominator": 8,
+              "missing": 4
+            },
+            "evidence_support_rate": {
+              "numerator": 2,
+              "denominator": 8,
+              "missing": 4
+            },
+            "independent_evidence_accuracy": {
+              "numerator": 1,
+              "denominator": 1,
+              "missing": 11
+            },
+            "independent_human_evidence_accuracy": {
+              "numerator": 0,
+              "denominator": 0,
+              "missing": 12
+            },
+            "unsupported_claim_rate": {
+              "numerator": 6,
+              "denominator": 12,
+              "missing": 0
+            },
+            "model_conflict_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            },
+            "human_review_rate": {
+              "numerator": 8,
+              "denominator": 12,
+              "missing": 0
+            },
+            "high_risk_review_rate": {
+              "numerator": 5,
+              "denominator": 6,
+              "missing": 0
+            },
+            "hazard_interception_rate": {
+              "numerator": 8,
+              "denominator": 8,
+              "missing": 0
+            },
+            "unsafe_auto_pass_rate": {
+              "numerator": 0,
+              "denominator": 8,
+              "missing": 0
+            },
+            "information_insufficient_rate": {
+              "numerator": 4,
+              "denominator": 12,
+              "missing": 0
+            },
+            "abstention_accuracy": {
+              "numerator": 9,
+              "denominator": 12,
+              "missing": 0
+            },
+            "execution_failure_rate": {
+              "numerator": 0,
+              "denominator": 12,
+              "missing": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  "gate_policy_digest": "7acf8407b4bde7b1fdddc5b914955cc911ed6ed6859c10debe954b24fdf361f6",
+  "call_statistics": {
+    "http_attempt_count": 0,
+    "http_error_count": 0,
+    "http_error_rate": null,
+    "http_latency_ms_sum": 0,
+    "tokens_in_reported": 0,
+    "tokens_out_reported": 0,
+    "usage_missing_count": 0,
+    "estimated_cost": 0.0,
+    "cost_status": "no_http_calls",
+    "currency": null,
+    "unpriced_attempt_count": 0,
+    "pricing_digest": null,
+    "response_model_identifiers": [],
+    "events": []
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "dataset_path": "test/evaluation/cases.jsonl",
+  "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+  "dataset_version": "r6-synthetic-v1",
+  "dataset_schema_version": "2.0",
+  "source_type_counts": {
+    "synthetic": 12
+  }
+}

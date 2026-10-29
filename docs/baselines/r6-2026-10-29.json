@@ -1,0 +1,320 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-29T14:37:42.515480+08:00",
+  "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+  "worktree_dirty": true,
+  "product_source_sha256": "56fc859e98a255c9613b65f0e1eafdc5e22c52df8db6a46636568fbcf62dbc35",
+  "scope": "Local offline SQLite/Mock, fake Provider HTTP and actual evaluation CLI; no paid service calls",
+  "offline_configuration": {
+    "provider_mode": "mock",
+    "auth_mode": "none",
+    "workflow_mode": "sync",
+    "real_api_keys": "cleared",
+    "database": "isolated SQLite",
+    "real_http": "blocked",
+    "test_artifacts": "test/.artifacts/"
+  },
+  "backend_new": {
+    "tests": 373,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 3,
+    "passed": 370
+  },
+  "backend_legacy": {
+    "tests": 335,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2,
+    "passed": 333
+  },
+  "frontend_combined": {
+    "tests": 48,
+    "passed": 48,
+    "failures": 0,
+    "skipped": 0
+  },
+  "evaluation_dataset": {
+    "sha256": "a0c5193f38011fa95387702c3785b33b4c640eb57fc7fd7e93f949165b795d5d",
+    "cases": 60,
+    "image_cases": 0,
+    "safe_negative_cases": 0,
+    "evidence_labeled_cases": 0,
+    "source_type_counts": {
+      "curated": 60
+    },
+    "category_counts": {
+      "占用疏散通道": 9,
+      "消防器材失效": 16,
+      "电气线路隐患": 14,
+      "危险化学品存储不规范": 3,
+      "公共区域安全隐患": 13,
+      "野外用火风险": 5
+    }
+  },
+  "not_validated": [
+    "Real field-image recognition and false-positive control",
+    "Independent human evidence accuracy",
+    "Current validity/applicability of regulation excerpts",
+    "Cloud GitHub Actions execution"
+  ],
+  "stage": "R6/T15-T17 engineering complete; real-scene acceptance pending",
+  "r6_added_tests": {
+    "T15": 18,
+    "T16": 18,
+    "T17": 66,
+    "total": 102
+  },
+  "metric_schema_version": "2.0",
+  "r6_dataset": {
+    "dataset_version": "r6-synthetic-v1",
+    "dataset_schema_version": "2.0",
+    "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+    "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+    "overview": {
+      "case_count": 12,
+      "dataset_version": "r6-synthetic-v1",
+      "source_type_counts": {
+        "synthetic": 12
+      },
+      "category_counts": {
+        "占用疏散通道": 4,
+        "无隐患": 4,
+        "电气线路隐患": 1,
+        "公共区域安全隐患": 1,
+        "野外用火风险": 1,
+        "危险化学品存储不规范": 1
+      },
+      "severity_counts": {
+        "1": 6,
+        "3": 4,
+        "2": 2
+      },
+      "scenario_counts": {
+        "林区": 2,
+        "消防": 5,
+        "生产安全": 3,
+        "社区": 2
+      },
+      "hazard_case_count": 8,
+      "safe_negative_case_count": 4,
+      "image_case_count": 12,
+      "evidence_labeled_count": 1,
+      "limitation_notes": [],
+      "executed_image_case_count": 12,
+      "declared_image_count": 12,
+      "loaded_image_count": 12,
+      "successfully_loaded_image_case_count": 12,
+      "input_failed_count": 0
+    }
+  },
+  "r6_evaluation_metrics": {
+    "total": 12,
+    "metrics_schema_version": "2.0",
+    "detection_precision": 0.875,
+    "detection_recall": 1.0,
+    "detection_specificity": 0.0,
+    "detection_coverage": 0.6667,
+    "end_to_end_hazard_recall": 0.875,
+    "category_accuracy": 0.75,
+    "level_accuracy": 0.625,
+    "level_accuracy_tolerance1": 0.875,
+    "severity_mae": 0.2857,
+    "clause_hit_rate": null,
+    "evidence_hit_rate": null,
+    "system_evidence_support_rate": 0.25,
+    "evidence_support_rate": 0.25,
+    "independent_evidence_accuracy": 1.0,
+    "independent_human_evidence_accuracy": null,
+    "unsupported_claim_rate": 0.5,
+    "model_conflict_rate": 0.0,
+    "human_review_rate": 0.6667,
+    "high_risk_review_rate": 0.8333,
+    "hazard_interception_rate": 1.0,
+    "unsafe_auto_pass_rate": 0.0,
+    "information_insufficient_rate": 0.3333,
+    "abstention_accuracy": 0.75,
+    "execution_failure_rate": 0.0,
+    "true_positive_count": 7,
+    "true_negative_count": 0,
+    "false_positive_count": 1,
+    "false_negative_count": 0,
+    "detection_missing_count": 4,
+    "human_review_count": 8,
+    "high_risk_case_count": 6,
+    "unsafe_auto_pass_count": 0,
+    "unsafe_hazard_base_count": 8,
+    "information_insufficient_count": 4,
+    "execution_failure_count": 0,
+    "correct_abstention_count": 1,
+    "evidence_failure_count": 6,
+    "severity_error_count": 1,
+    "model_conflict_count": 0,
+    "avg_latency_s": 0.039,
+    "metric_basis": {
+      "detection_precision": {
+        "numerator": 7,
+        "denominator": 8,
+        "missing": 4
+      },
+      "detection_recall": {
+        "numerator": 7,
+        "denominator": 7,
+        "missing": 1
+      },
+      "detection_specificity": {
+        "numerator": 0,
+        "denominator": 1,
+        "missing": 3
+      },
+      "detection_coverage": {
+        "numerator": 8,
+        "denominator": 12,
+        "missing": 4
+      },
+      "end_to_end_hazard_recall": {
+        "numerator": 7,
+        "denominator": 8,
+        "missing": 1
+      },
+      "category_accuracy": {
+        "numerator": 6,
+        "denominator": 8,
+        "missing": 1
+      },
+      "level_accuracy": {
+        "numerator": 5,
+        "denominator": 8,
+        "missing": 1
+      },
+      "level_accuracy_tolerance1": {
+        "numerator": 7,
+        "denominator": 8,
+        "missing": 1
+      },
+      "severity_mae": {
+        "numerator": 2,
+        "denominator": 7,
+        "missing": 1
+      },
+      "clause_hit_rate": {
+        "numerator": 0,
+        "denominator": 0,
+        "missing": 12
+      },
+      "evidence_hit_rate": {
+        "numerator": 0,
+        "denominator": 0,
+        "missing": 12
+      },
+      "system_evidence_support_rate": {
+        "numerator": 2,
+        "denominator": 8,
+        "missing": 4
+      },
+      "evidence_support_rate": {
+        "numerator": 2,
+        "denominator": 8,
+        "missing": 4
+      },
+      "independent_evidence_accuracy": {
+        "numerator": 1,
+        "denominator": 1,
+        "missing": 11
+      },
+      "independent_human_evidence_accuracy": {
+        "numerator": 0,
+        "denominator": 0,
+        "missing": 12
+      },
+      "unsupported_claim_rate": {
+        "numerator": 6,
+        "denominator": 12,
+        "missing": 0
+      },
+      "model_conflict_rate": {
+        "numerator": 0,
+        "denominator": 12,
+        "missing": 0
+      },
+      "human_review_rate": {
+        "numerator": 8,
+        "denominator": 12,
+        "missing": 0
+      },
+      "high_risk_review_rate": {
+        "numerator": 5,
+        "denominator": 6,
+        "missing": 0
+      },
+      "hazard_interception_rate": {
+        "numerator": 8,
+        "denominator": 8,
+        "missing": 0
+      },
+      "unsafe_auto_pass_rate": {
+        "numerator": 0,
+        "denominator": 8,
+        "missing": 0
+      },
+      "information_insufficient_rate": {
+        "numerator": 4,
+        "denominator": 12,
+        "missing": 0
+      },
+      "abstention_accuracy": {
+        "numerator": 9,
+        "denominator": 12,
+        "missing": 0
+      },
+      "execution_failure_rate": {
+        "numerator": 0,
+        "denominator": 12,
+        "missing": 0
+      }
+    }
+  },
+  "default_gate": {
+    "command": "python scripts/check_eval_baseline.py",
+    "result": "passed",
+    "execution": "fresh isolated directory against archived baseline"
+  },
+  "artifacts_sha256": {
+    "docs/evaluation/r6-v2/dataset/manifest-summary.json": "1167bd4f3b6bb9d33c61d794f95bdb9643e02424f47674c7be158c2d5e0e21cf",
+    "docs/evaluation/r6-v2/README.md": "73177cf39685fa18635d3cc7cba2a2d2f10705aa4d2814e6b8638235017913e9",
+    "docs/evaluation/r6-v2/reports/ablation_report.json": "3a04ab207d192fbe78318855983f75a52314b086a1227430d6aab4e8ff132770",
+    "docs/evaluation/r6-v2/reports/ablation_report.md": "753185bb1e234d363ab192d3d68d4d747ab9b200a80f60d923d1e868557010b8",
+    "docs/evaluation/r6-v2/reports/evaluation_report.json": "86b1c428731008a34f6189e590fcd6fc4210cd8ad1aadff4dfe21d98022ec3c3",
+    "docs/evaluation/r6-v2/reports/evaluation_report.md": "12e1a86e816b1cc7071e6441f5b9f2c3f399c3be830998e34113f28c018152c1",
+    "docs/evaluation/r6-v2/results/ablation_results.jsonl": "bb3c8227b4240a51c97785023adda34b20fef8db04027400ec61eff7b1006159",
+    "docs/evaluation/r6-v2/results/evaluation_results.jsonl": "f3be36d67bef8b3e91303cfa85fc53f50ebf8910fce4b367f239a496054e51af",
+    "test/evaluation/build_boundary.py": "117ce69b37baccb65a8a72412850404e6a7d475fc6541db064bf47a69323daa6",
+    "test/evaluation/cases.jsonl": "418038637fabe21926bb08724f08e36cb4848d6734d74139719909bd21feb974",
+    "test/evaluation/dataset_meta.json": "9b8f5f8de06075d5a18c2c47275f708bb6f4ed0b8c19c42ba30975ca45dbc2c5",
+    "test/evaluation/gate-policy-v2.json": "0ce5ed6f8e551beb74a26a10b289df1309648ced9f52b5499193228a359413f8",
+    "test/evaluation/images/community-hazard.png": "e7ea1074c8d9cc6c59fa22b5bb10b53ea304b90c70f341738b2ab443eea43aa1",
+    "test/evaluation/images/community-safe.png": "961d861a2b3826b14fc3a4fae209f36abeeab23d938654e8a29714abb4bc723c",
+    "test/evaluation/images/factory-hazard.png": "475c8b345e05faf614e2f9e3477988fccba64d2f1dc0a1177a09e5e1aaffd14e",
+    "test/evaluation/images/factory-safe.png": "a48671690656d3c3f6840b18b836d1992720fa15d4c79cbf20d7f6f65e398e46",
+    "test/evaluation/images/fire-hazard.png": "acac5b1026c7f67c2a560e3e2f78004e9788db6c1d36b558f33960335e45a49f",
+    "test/evaluation/images/fire-safe.png": "6e5c214a1ab80e47cc4aaa4a8273f3f41c6f25727769a0ecd7c4e687ed694b04",
+    "test/evaluation/images/forest-hazard.png": "c6e46904f8c3cfc097207c9df61dbaccf5d45b1d24826b06a2d7bd715b838725",
+    "test/evaluation/images/forest-safe.png": "263584607e4fe49ffe3598ade28cb3c0d83dc5df09cbe50dc78762714dd7e823",
+    "test/evaluation/images/low-quality.png": "7eae75b6f8fad970b34137dc4efb1b65f41a61b98d26a121045699903c8a3093",
+    "test/evaluation/images/multi-hazard.png": "c718fef9e74efbf7b0aa550338343bc58429c6b4e4e50bb40cc7704ef4129a85",
+    "test/evaluation/README.md": "4e0f34d91d93e9861753cb48926aee1c6b0163eaba437c122108b0d7ba3afe7e",
+    "test/evaluation/real-acceptance-status.json": "53d9f8f8e50f96a479fb3ec9373b0f06771be20c9567b12f80c7a067ee12e302",
+    "test/evaluation/run_mock.py": "2dba62289e7f3b81ae3b3038ca0913a8f2a5a8ed2fbcd7f6cc7a5f98716f4b3e",
+    "test/.artifacts/reports/r6-final/backend-new.xml": "bd6c59c85568e629f4b6fb6028a3fc85bfbe6ebb88b149244f27114fc1f40e9f",
+    "test/.artifacts/reports/r6-final/backend-legacy.xml": "fee3e7b01070276fd409d9e96ae543559c473afbdadb84b92bbebb7b38ea8314",
+    "test/.artifacts/reports/r6-final/frontend.json": "b59c8896882726aa95737e869e809117f685903ea75e4713520cdbecdd37a334"
+  },
+  "report_source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+  "real_http_attempt_count": 0,
+  "not_revalidated_in_R6": [
+    "PostgreSQL runtime",
+    "Docker Compose runtime",
+    "Full browser lifecycle E2E"
+  ],
+  "prior_environment_evidence": "docs/baselines/r5-2026-10-28.md"
+}

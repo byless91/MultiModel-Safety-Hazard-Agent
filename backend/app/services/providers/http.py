@@ -28,6 +28,7 @@ from app.prompts import COMPARE_PROMPT, GUARD_STATEMENT, PROMPT_VERSION, VISION_
 from app.services.guardrail.input_guard import build_external_text
 from app.services.llm_concurrency import http_gate
 from app.services.llm_ledger import mark_parse_failed, record_call
+from app.services.llm_observation import record_observation
 from app.services.providers.base import (
     BaseProvider,
     ImageInput,
@@ -125,10 +126,23 @@ class OpenAICompatibleProvider(BaseProvider):
             try:
                 # 仅实际 HTTP 持有名额；解析、台账、重试退避不占名额。
                 with http_gate.slot():
-                    response = self._client.post(path, json=payload)
-                response.raise_for_status()
-                data = response.json()
+                    attempt_started = time.perf_counter()
+                    try:
+                        response = self._client.post(path, json=payload)
+                        response.raise_for_status()
+                        data = response.json()
+                    except Exception as exc:
+                        record_observation(provider=self.name, requested_model=model, response_model=None,
+                                           status="failed", error_type=type(exc).__name__,
+                                           latency_ms=round((time.perf_counter() - attempt_started) * 1000, 3),
+                                           tokens_in=None, tokens_out=None, attempt=attempt)
+                        raise
                 usage = data.get("usage") or {}
+                record_observation(provider=self.name, requested_model=model, response_model=data.get("model"),
+                                   status="success", error_type="",
+                                   latency_ms=round((time.perf_counter() - attempt_started) * 1000, 3),
+                                   tokens_in=usage.get("prompt_tokens"), tokens_out=usage.get("completion_tokens"),
+                                   attempt=attempt)
                 ledger_id = record_call(
                     provider=self.name,
                     model=model,
@@ -261,6 +275,7 @@ class OpenAICompatibleProvider(BaseProvider):
             model_version=getattr(self, "model_version", ""),
         ).to_workflow_dict()
         output["parse_failed"] = bool(result.get("parse_failed"))
+        output["response_model"] = result_meta.data.get("model")
         return output
 
     def complete(self, system: str, user: str) -> dict[str, Any]:

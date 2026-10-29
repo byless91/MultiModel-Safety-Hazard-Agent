@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 from app.core.config import Settings, get_settings
+from app.eval.contracts import call_statistics, knowledge_identity, report_identity
 from app.eval.dataset import EvalCase, EvalDataset
 from app.eval.inputs import load_case_images
 from app.eval.metrics import (
@@ -24,6 +25,7 @@ from app.eval.metrics import (
     error_summary,
 )
 from app.services.ensemble.categories import canonicalize_hazard_type
+from app.services.llm_observation import observe_calls
 from app.services.providers import BaseProvider, build_providers
 from app.services.rag import RAGService
 
@@ -160,12 +162,16 @@ def run_ablation(
         for name in names
     }
     metrics = {name: compute_metrics(rows) for name, rows in per_variant.items()}
-    real_modes = {name: evaluation_mode(runtimes[name][0]) for name in names}
-    variant_modes = {
-        name: "real" if real_modes[name] == "real" else "mock"
-        for name in names
-    }
+    real_modes = {}
+    for name in names:
+        modes = {trace["provider_mode"] for trace in per_variant[name]}
+        real_modes[name] = (
+            next(iter(modes)) if len(modes) == 1 else "mixed" if modes else evaluation_mode(runtimes[name][0])
+        )
+    variant_modes = dict(real_modes)
     return {
+        **report_identity(dataset, traces),
+        "evaluation_timestamp": datetime.now(UTC).isoformat(),
         "dataset_version": dataset.version,
         "case_count": len(cases),
         "provider_mode": provider_mode,
@@ -184,6 +190,11 @@ def run_ablation(
                 "label": VARIANT_CONFIGS[name]["label"],
                 "metrics": metrics[name],
                 "mode": variant_modes[name],
+                "report_identity": report_identity(dataset, per_variant[name]),
+                "source_partition_metrics": {
+                    source: compute_metrics([r for r in per_variant[name] if r["case"]["source_type"] == source])
+                    for source in dataset.manifest.source_type_counts
+                },
             }
             for name in names
         },
@@ -211,7 +222,7 @@ def build_ablation_markdown(comparison: dict[str, Any]) -> str:
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for name, item in comparison.get("variants", {}).items():
-        row = item.get("metrics", {})
+        row = {key: "N/A" if value is None else value for key, value in item.get("metrics", {}).items()}
         lines.append(
             f"| {item.get('label', name)} | {item.get('mode', comparison.get('evaluation_mode', '-'))} "
             f"| {row.get('category_accuracy', '-')} "
@@ -361,6 +372,7 @@ def _model_slot_dict(
         "provider": run.get("provider", ""),
         "model": run.get("model", ""),
         "model_version": run.get("model_version", ""),
+        "response_model": (run.get("analysis") or {}).get("response_model"),
         "latency_ms": run.get("latency_ms", 0.0),
         "retry_count": run.get("retry_count", 0),
         "error_type": run.get("error_type", ""),
@@ -388,6 +400,15 @@ def _case_to_dict(case: EvalCase) -> dict[str, Any]:
         "expected_abstention": case.expected_abstention,
         "source_type": case.source_type.value,
         "dataset_version": case.dataset_version,
+        "schema_version": case.schema_version,
+        "source_reference": case.source_reference,
+        "usage_authorization": case.usage_authorization,
+        "annotator": case.annotator,
+        "annotation_method": case.annotation_method,
+        "review_status": case.review_status,
+        "coverage_tags": list(case.coverage_tags),
+        "expected_findings": [finding.model_dump() for finding in case.expected_findings],
+        "evidence_label_note": case.evidence_label_note,
         "image_paths": list(case.image_paths),
         "notes": case.notes,
     }
@@ -459,6 +480,30 @@ def _evidence_stats(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _execute_case(case, images, image_input, settings, providers, rag) -> dict[str, Any]:
+    from app.services.workflow import run_workflow
+
+    if image_input["errors"]:
+        return {"status": "input_failed"}
+    try:
+        if providers is None:
+            providers = build_providers(settings)
+        if rag is None:
+            rag = RAGService(settings, providers[0])
+        state = run_workflow(
+            description=case.description, images=images, followup_answer=None,
+            followup_used=0, settings=settings, rag=rag, providers=providers,
+        )
+        if state.get("status") == "needs_more_info" and case.user_text:
+            state = run_workflow(
+                description=case.description, images=images, followup_answer=case.user_text,
+                followup_used=1, settings=settings, rag=rag, providers=providers,
+            )
+        return state
+    except Exception as exc:
+        return {"status": "failed", "evaluation_error": type(exc).__name__}
+
+
 def run_evaluation_case(
     case: EvalCase,
     variant: dict[str, Any],
@@ -469,31 +514,12 @@ def run_evaluation_case(
     rag: RAGService | None = None,
 ) -> dict[str, Any]:
     """Run one real/mock evaluation case and collect the full trace."""
-    from app.services.workflow import run_workflow
-
     if settings is None:
         settings = build_variant_settings(get_settings(), variant, provider_mode=provider_mode)
     started = time.perf_counter()
     images, image_input = load_case_images(case, settings)
-    state: dict[str, Any] = {"status": "input_failed"}
-    if not image_input["errors"]:
-        if providers is None:
-            providers = build_providers(settings)
-        if rag is None:
-            rag = RAGService(settings, providers[0])
-        try:
-            state = run_workflow(
-                description=case.description, images=images, followup_answer=None,
-                followup_used=0, settings=settings, rag=rag, providers=providers,
-            )
-            if state.get("status") == "needs_more_info" and case.user_text:
-                state = run_workflow(
-                    description=case.description, images=images, followup_answer=case.user_text,
-                    followup_used=1, settings=settings, rag=rag, providers=providers,
-                )
-        except Exception as exc:
-            # Keep the batch auditable; exception text may contain credentials.
-            state = {"status": "failed", "evaluation_error": type(exc).__name__}
+    with observe_calls() as observation:
+        state = _execute_case(case, images, image_input, settings, providers, rag)
     elapsed = time.perf_counter() - started
 
     model_results = state.get("model_results") or []
@@ -572,12 +598,14 @@ def run_evaluation_case(
         "models": variant["models"],
         "evaluation_timestamp": datetime.now(UTC).isoformat(),
         "latency_s": round(elapsed, 2),
-        "provider_mode": evaluation_mode(settings),
+        "provider_mode": "real_with_mock_fallback" if state.get("analysis_fallback") else evaluation_mode(settings),
         "requested_provider_mode": settings.provider_mode,
         "configuration": configuration_summary(settings),
+        "knowledge_digest": knowledge_identity(settings.knowledge_dir),
+        "call_statistics": call_statistics(observation.events),
         "image_input": image_input,
         "evaluation_error": state.get("evaluation_error"),
-        "system_version": "eval-runner-3",
+        "system_version": "eval-runner-4",
         "ensemble_mode": state.get("multi_model", {}).get("ensemble_mode", ""),
         "model_a_result": _model_slot_dict(model_a, slot="model_a"),
         "model_b_result": _model_slot_dict(model_b, slot="model_b"),
@@ -715,17 +743,17 @@ def _review_and_risk_stats(results: list[dict[str, Any]]) -> dict[str, Any]:
     risk_suggestions = [
         item for item in results if (item.get("risk_result") or {}).get("review_suggestion")
     ]
+    scores = [(item.get("risk_result") or {}).get("risk_score") for item in results]
+    scored = [value for value in scores if value is not None]
     return {
         "high_risk_case_count": len(risky),
         "risk_review_suggestion_count": len(risk_suggestions),
         "risk_review_suggestion_rate": round(
             len(risk_suggestions) / max(1, len(results)), 4
         ),
-        "average_risk_score": round(
-            sum((item.get("risk_result") or {}).get("risk_score") or 0 for item in results)
-            / max(1, len(results)),
-            2,
-        ),
+        "average_risk_score": round(sum(scored) / len(scored), 2) if scored else None,
+        "risk_scored_case_count": len(scored),
+        "risk_missing_case_count": len(results) - len(scored),
     }
 
 
@@ -748,6 +776,8 @@ def build_evaluation_report(
     *,
     provider_mode: str,
     ablation_summary: dict[str, Any] | None = None,
+    gate_policy: dict[str, Any] | None = None,
+    call_summary: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], str]:
     """Build (summary, markdown) for one variant run."""
     metrics = compute_metrics(results)
@@ -759,35 +789,38 @@ def build_evaluation_report(
     overview["executed_image_case_count"] = sum(bool(r.get("image_input", {}).get("declared")) for r in results)
     overview["declared_image_count"] = sum(r.get("image_input", {}).get("declared", 0) for r in results)
     overview["loaded_image_count"] = sum(r.get("image_input", {}).get("loaded", 0) for r in results)
+    overview["successfully_loaded_image_case_count"] = sum(
+        bool(r.get("image_input", {}).get("declared")) and not r["image_input"]["errors"] for r in results)
     overview["input_failed_count"] = sum(r.get("status") == "input_failed" for r in results)
     modes = {r.get("provider_mode", provider_mode) for r in results}
     actual_mode = next(iter(modes)) if len(modes) == 1 else "mixed" if modes else provider_mode
     model_family_performance = _model_family_performance(results)
     review_and_risk = _review_and_risk_stats(results)
     evidence_overview = _evidence_stats_summary(results)
+    if metrics.get("metrics_schema_version") == "2.0":
+        evidence_basis = metrics["metric_basis"]["system_evidence_support_rate"]
+        evidence_overview.update(
+            supported_rate=metrics["system_evidence_support_rate"],
+            insufficient_rate=round(1 - metrics["system_evidence_support_rate"], 4)
+            if metrics["system_evidence_support_rate"] is not None else None,
+            evaluated_count=evidence_basis["denominator"], missing_count=evidence_basis["missing"],
+        )
     categories: Counter[str] = Counter()
     severities: Counter[int] = Counter()
     for item in results:
         categories[item["case"]["expected_category"]] += 1
         level = item["case"]["expected_level"]
         severities[level] += 1
-    scenario_rows: dict[str, dict[str, float | int]] = {}
-    for item in results:
-        scenario = item["case"]["scenario"]
-        entry = scenario_rows.setdefault(
-            scenario,
-            {"total": 0, "category_accuracy": 0, "level_accuracy": 0, "review_rate": 0, "clause_hit_rate": 0},
-        )
-        entry["total"] += 1
-        entry["category_accuracy"] += int(item["metric_flags"]["category_match"])
-        entry["level_accuracy"] += int(item["metric_flags"]["level_match"])
-        entry["review_rate"] += int(item["metric_flags"]["human_review"])
-        entry["clause_hit_rate"] += int(item["metric_flags"]["clause_hit"])
-    for entry in scenario_rows.values():
-        total = int(entry["total"])
-        for key in ("category_accuracy", "level_accuracy", "review_rate", "clause_hit_rate"):
-            entry[key] = round(entry[key] / total, 4)
+    scenario_rows: dict[str, dict[str, Any]] = {}
+    for scenario in sorted({item["case"]["scenario"] for item in results}):
+        subset = compute_metrics([item for item in results if item["case"]["scenario"] == scenario])
+        scenario_rows[scenario] = {
+            "total": subset["total"], "category_accuracy": subset["category_accuracy"],
+            "level_accuracy": subset["level_accuracy"], "review_rate": subset["human_review_rate"],
+            "clause_hit_rate": subset["clause_hit_rate"], "metric_basis": subset.get("metric_basis", {}),
+        }
     summary = {
+        **report_identity(dataset, results),
         "dataset_version": dataset.version,
         "title": dataset.manifest.title,
         "dataset_case_count": dataset.manifest.case_count,
@@ -798,7 +831,7 @@ def build_evaluation_report(
         "evaluation_mode": actual_mode,
         "requested_provider_mode": provider_mode,
         "evaluation_timestamp": datetime.now(UTC).isoformat(),
-        "system_version": "eval-runner-3",
+        "system_version": "eval-runner-4",
         **metrics,
         "metrics": metrics,
         "dataset_overview": overview,
@@ -811,7 +844,21 @@ def build_evaluation_report(
         "error_by_scenario": error_by_scenario,
         "error_analysis_count": len(error_rows),
         "error_analysis": error_rows,
+        "source_partition_metrics": {
+            source: compute_metrics([r for r in results if r["case"].get("source_type") == source])
+            for source in sorted({r["case"].get("source_type", "unknown") for r in results})
+        },
+        "call_statistics": call_statistics([event for r in results
+                                             for event in r.get("call_statistics", {}).get("events", [])]),
     }
+    from app.eval.contracts import digest
+
+    summary["gate_policy_digest"] = digest(gate_policy) if gate_policy else None
+    summary["gate_policy"] = gate_policy
+    if call_summary is not None:
+        summary["call_statistics"] = call_summary
+        summary["model_identifiers"] = sorted(set(summary["model_identifiers"]) | {
+            "served:" + model for model in call_summary["response_model_identifiers"]})
     lines = [
         "# 正式评测报告",
         "",
@@ -819,6 +866,11 @@ def build_evaluation_report(
         f"- 案例数：{dataset.manifest.case_count}；本次运行：{metrics['total']}",
         f"- 评测模式：{actual_mode}（请求：{provider_mode}）",
         f"- 生成时间：{summary['evaluation_timestamp']}",
+        f"- 报告/指标/数据 schema：{summary['report_schema_version']} / "
+        f"{summary['metrics_schema_version']} / {summary['dataset_schema_version']}",
+        f"- 数据集摘要：{summary['dataset_digest']}；本次样本摘要：{summary['sample_digest']}",
+        f"- Prompt：{summary['prompt_version']}；规则版本：{summary['rule_versions']}",
+        f"- 模型标识（服务返回值不保证供应商冻结版本）：{summary['model_identifiers']}",
         "",
         "## Dataset Overview",
         "",
@@ -852,6 +904,7 @@ def build_evaluation_report(
         ("clause_hit_rate", "法规证据命中率"),
         ("evidence_support_rate", "证据支持率（系统自评）"),
         ("independent_evidence_accuracy", "独立证据标签正确率"),
+        ("independent_human_evidence_accuracy", "独立人工证据标签正确率（排除合成规格）"),
         ("unsupported_claim_rate", "无依据结论率"),
         ("model_conflict_rate", "模型分歧率"),
         ("human_review_rate", "人工复核率"),
@@ -872,6 +925,16 @@ def build_evaluation_report(
         lines.extend(["", "### 指标分母与缺失", "", "| 指标 | 分子 | 分母 | 缺失 |", "| --- | --- | --- | --- |"])
         for name, basis in metrics["metric_basis"].items():
             lines.append(f"| {name} | {basis['numerator']} | {basis['denominator']} | {basis['missing']} |")
+    calls = summary["call_statistics"]
+    lines.extend(["", "### 调用与费用", "",
+                  f"- 实际 HTTP 尝试：{calls['http_attempt_count']}；错误：{calls['http_error_count']}；"
+                  f"累计 HTTP 耗时：{calls['http_latency_ms_sum']} ms（可能并发，不等于墙钟时间）",
+                  f"- 返回用量：input={calls['tokens_in_reported']}，output={calls['tokens_out_reported']}；"
+                  f"用量缺失尝试：{calls['usage_missing_count']}",
+                  f"- 费用：{calls['estimated_cost'] if calls['estimated_cost'] is not None else 'N/A'} "
+                  f"{calls['currency'] or ''}；状态：{calls['cost_status']}；"
+                  f"缺少计价依据：{calls['unpriced_attempt_count']}",
+                  "- 费用仅按执行前登记价格估算，不替代供应商账单。"])
     lines.extend(
         [
             "",
@@ -888,9 +951,10 @@ def build_evaluation_report(
         ]
     )
     for scenario, entry in scenario_rows.items():
+        display = {key: "N/A" if value is None else value for key, value in entry.items()}
         lines.append(
-            f"| {scenario} | {entry['total']} | {entry['category_accuracy']} "
-            f"| {entry['level_accuracy']} | {entry['clause_hit_rate']} | {entry['review_rate']} |"
+            f"| {scenario} | {display['total']} | {display['category_accuracy']} "
+            f"| {display['level_accuracy']} | {display['clause_hit_rate']} | {display['review_rate']} |"
         )
     error_labels = {
         "false_positive": "误报（无隐患被判有）",
@@ -946,7 +1010,7 @@ def build_evaluation_report(
         f"- Risk Engine：高风险案例 {review_and_risk['high_risk_case_count']} 条，"
         f"建议复核 {review_and_risk['risk_review_suggestion_count']} 条（"
         f"{review_and_risk['risk_review_suggestion_rate']}），平均风险分 "
-        f"{review_and_risk['average_risk_score']}"
+        f"{review_and_risk['average_risk_score'] if review_and_risk['average_risk_score'] is not None else 'N/A'}"
     )
     lines.append(
         f"- Evidence：支持 {evidence_overview['supported_count']} 条（"
@@ -974,7 +1038,11 @@ def build_evaluation_report(
     if overview["limitation_notes"]:
         for note in overview["limitation_notes"]:
             lines.append(f"- {note}")
-    lines.append("- 模型输出未经过真实场景图片评测，文本场景仅覆盖当前知识库范围")
+    if actual_mode != "real":
+        lines.append("- 本报告包含 Mock 或降级执行，只用于工程回归，不能代表真实图像识别效果")
+    if any(r["case"].get("source_type") == "synthetic" for r in results):
+        lines.append("- synthetic 图像与规格标签不是现场照片或人工真实标注；来源分区指标单独记录于 JSON")
+    lines.append("- 真实场景验收需授权图片、独立人工复核标签及执行前登记的质量目标；本报告不自动授予该结论")
     lines.append("- Evidence Judge 支持率是系统自评；独立证据正确率只使用有独立标签且有有效自评的案例，缺失为 N/A")
     lines.append("- 本报告不保证无错误；正式部署前需人工复核高风险与证据不足案例")
     return summary, "\n".join(lines)

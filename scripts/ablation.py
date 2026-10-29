@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Ablation evaluation over Qwen/GLM/Risk/RAG variants.
 
 Phase 6: this script is a thin CLI over ``app.eval.evaluation.run_ablation``
@@ -19,6 +18,7 @@ sys.path.insert(0, str(BACKEND))
 EVAL_CASES = BACKEND / "data" / "eval_cases" / "cases.jsonl"
 EVAL_DIR = BACKEND / "data" / "eval"
 
+from app.eval.contracts import call_statistics, digest, load_experiment_file
 from app.eval.dataset import load_dataset
 from app.eval.evaluation import (
     VARIANT_CONFIGS,
@@ -28,7 +28,7 @@ from app.eval.evaluation import (
     run_ablation,
     run_evaluation_case,
 )
-
+from app.services.llm_observation import observe_calls
 
 VARIANTS = [dict(VARIANT_CONFIGS[name]) for name in sorted(VARIANT_CONFIGS)]
 
@@ -85,8 +85,6 @@ def run_variant(case: dict, variant: dict, entry: tuple) -> dict:
         providers=None,
         rag=entry[2],
     )
-    evidence = trace.get("evidence") or {}
-    disagreement = trace.get("disagreement") or {}
     return {
         "case_id": case["id"],
         "variant": variant["id"],
@@ -185,51 +183,39 @@ def main() -> None:
     parser.add_argument("--cases", type=Path, default=EVAL_CASES)
     parser.add_argument("--output", type=Path, default=EVAL_DIR)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--dataset-version", default=None)
+    parser.add_argument("--gate-policy", type=Path)
+    parser.add_argument("--pricing", type=Path)
     parser.add_argument(
         "--variants",
         default="qwen,glm,ensemble,plus_risk,plus_rag,full",
         help="逗号分隔的变体名",
     )
     args = parser.parse_args()
+    policy = load_experiment_file(args.gate_policy)
+    pricing = load_experiment_file(args.pricing, pricing=True)
+    if args.limit is not None and args.limit <= 0:
+        parser.error("--limit must be positive")
+    if (args.output / "ablation_report.json").exists():
+        parser.error("output already contains an ablation report; use a new directory")
 
     os.environ["PROVIDER_MODE"] = args.provider
     variant_names = [name.strip() for name in args.variants.split(",") if name.strip()]
     for name in variant_names:
         pick_variant(name)
-    dataset = load_dataset(args.cases, dataset_version="v1", fail_on_issues=True)
+    dataset = load_dataset(args.cases, dataset_version=args.dataset_version, fail_on_issues=True)
     from app.core.config import get_settings
 
     base = get_settings()
-    runtimes = build_variant_runtimes(
-        base,
-        provider_mode=args.provider,
-        variant_names=variant_names,
-    )
-    comparison = run_ablation(
-        dataset,
-        provider_mode=args.provider,
-        runtimes=runtimes,
-        limit=args.limit,
-        variant_names=variant_names,
-    )
+    with observe_calls() as calls:
+        runtimes = build_variant_runtimes(base, provider_mode=args.provider, variant_names=variant_names)
+        comparison = run_ablation(dataset, provider_mode=args.provider, runtimes=runtimes,
+                                  limit=args.limit, variant_names=variant_names)
+    comparison["gate_policy_digest"] = digest(policy) if policy else None
+    comparison["call_statistics"] = call_statistics(calls.events, pricing)
     markdown = build_ablation_markdown(comparison)
     args.output.mkdir(parents=True, exist_ok=True)
-    summary_payload = {
-        "dataset_version": comparison["dataset_version"],
-        "case_count": comparison["case_count"],
-        "provider_mode": comparison["provider_mode"],
-        "evaluation_mode": comparison.get("evaluation_mode", comparison["provider_mode"]),
-        "source_type_counts": comparison.get("source_type_counts", {}),
-        "partitions": comparison.get("partitions", {}),
-        "variants": {
-            name: {
-                "label": item["label"],
-                "metrics": item["metrics"],
-                "mode": item.get("mode", comparison.get("evaluation_mode", "mock")),
-            }
-            for name, item in comparison["variants"].items()
-        },
-    }
+    summary_payload = {key: value for key, value in comparison.items() if key != "results"}
     (args.output / "ablation_report.json").write_text(
         json.dumps(summary_payload, ensure_ascii=False, indent=2),
         encoding="utf-8",

@@ -1,0 +1,1508 @@
+{
+  "report_schema_version": "2.0",
+  "metrics_schema_version": "2.0",
+  "dataset_schema_version": "2.0",
+  "dataset_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+  "sample_ids": [
+    "syn-community-hazard",
+    "syn-community-safe",
+    "syn-contradiction",
+    "syn-factory-hazard",
+    "syn-factory-safe",
+    "syn-fire-hazard",
+    "syn-fire-safe",
+    "syn-forest-hazard",
+    "syn-forest-safe",
+    "syn-low-quality",
+    "syn-multi-hazard",
+    "syn-unsupported"
+  ],
+  "sample_digest": "aaf382b956a1e3f4cc2417ca6c469b4f3d5c3c83c13b53168ffdab7c92de6ea1",
+  "configuration_summary": [
+    {
+      "provider_mode": "mock",
+      "vision_model": "qwen-vl-plus",
+      "text_model": "qwen-plus",
+      "embedding_model": "text-embedding-v3",
+      "zhipu_vision_model": "glm-4v-flash",
+      "zhipu_text_model": "glm-4-flash",
+      "zhipu_embedding_model": "embedding-2",
+      "model_timeout": 60.0,
+      "model_max_retries": 1,
+      "model_retry_backoff": 0.5,
+      "risk_rule_version": "risk-engine-v1",
+      "refine_with_evidence": true,
+      "reranker_enabled": true,
+      "reranker_top_k": 5,
+      "enable_risk_engine": true,
+      "enable_evidence_rag": true,
+      "max_images": 3,
+      "max_followups": 2,
+      "max_file_bytes": 10485760,
+      "conf_weights": "0.3,0.3,0.2,0.2",
+      "max_concurrent_llm_calls": 4,
+      "llm_queue_timeout_seconds": 60.0,
+      "mock_demo_boost": false,
+      "retrieval_top_k": 5,
+      "embedding_recovery_seconds": 60.0,
+      "rerank_vector_weight": 0.4,
+      "rerank_lexical_weight": 0.4,
+      "rerank_metadata_weight": 0.2,
+      "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "zhipu_base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "knowledge_digest": "3724a06905877ae7e472d22aebee5ed3c03fab8922acd411360500febb4f171b"
+    }
+  ],
+  "configuration_digest": "be0e5658ad9aa8027df3c484695110628850bf6e82b90b9b739e84e9325ca970",
+  "variant_ids": [
+    "F_full"
+  ],
+  "prompt_version": "vision-v2",
+  "prompt_digest": "2381b6794140845d8adc48e6ff1b58b3a981809b691da61575038724e5cae7b1",
+  "rule_versions": [
+    "risk-engine-v1"
+  ],
+  "rules_digest": "938b908f2d6b41527cbe1db4d8d1a33083783b751cd09f75f18cdface06128e7",
+  "git_revision": "1fda2ca7a240f5580ea164477367caa9aabc0c87",
+  "worktree_dirty": true,
+  "source_digest": "2cd29453cffa816b23b7bbf2b49ed049ca981eb9d50784dd5091572e7a483bd0",
+  "model_identifiers": [
+    "mock:mock-vision"
+  ],
+  "dataset_version": "r6-synthetic-v1",
+  "title": "R6 合成图片工程边界集（非真实现场）",
+  "dataset_case_count": 12,
+  "source_type_counts": {
+    "synthetic": 12
+  },
+  "category_counts": {
+    "占用疏散通道": 4,
+    "无隐患": 4,
+    "电气线路隐患": 1,
+    "公共区域安全隐患": 1,
+    "野外用火风险": 1,
+    "危险化学品存储不规范": 1
+  },
+  "severity_counts": {
+    "1": 6,
+    "3": 4,
+    "2": 2
+  },
+  "scenario_breakdown": {
+    "林区": {
+      "total": 2,
+      "category_accuracy": 1.0,
+      "level_accuracy": 1.0,
+      "review_rate": 1.0,
+      "clause_hit_rate": null,
+      "metric_basis": {
+        "detection_precision": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "detection_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "detection_specificity": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 0
+        },
+        "detection_coverage": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "end_to_end_hazard_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "category_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "level_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "level_accuracy_tolerance1": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "severity_mae": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 0
+        },
+        "clause_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "evidence_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "system_evidence_support_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        },
+        "evidence_support_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        },
+        "independent_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "independent_human_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "unsupported_claim_rate": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "model_conflict_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        },
+        "human_review_rate": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "high_risk_review_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "hazard_interception_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "unsafe_auto_pass_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 0
+        },
+        "information_insufficient_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        },
+        "abstention_accuracy": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "execution_failure_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        }
+      }
+    },
+    "消防": {
+      "total": 5,
+      "category_accuracy": 0.5,
+      "level_accuracy": 0.5,
+      "review_rate": 0.6,
+      "clause_hit_rate": null,
+      "metric_basis": {
+        "detection_precision": {
+          "numerator": 3,
+          "denominator": 3,
+          "missing": 2
+        },
+        "detection_recall": {
+          "numerator": 3,
+          "denominator": 3,
+          "missing": 1
+        },
+        "detection_specificity": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 1
+        },
+        "detection_coverage": {
+          "numerator": 3,
+          "denominator": 5,
+          "missing": 2
+        },
+        "end_to_end_hazard_recall": {
+          "numerator": 3,
+          "denominator": 4,
+          "missing": 1
+        },
+        "category_accuracy": {
+          "numerator": 2,
+          "denominator": 4,
+          "missing": 1
+        },
+        "level_accuracy": {
+          "numerator": 2,
+          "denominator": 4,
+          "missing": 1
+        },
+        "level_accuracy_tolerance1": {
+          "numerator": 3,
+          "denominator": 4,
+          "missing": 1
+        },
+        "severity_mae": {
+          "numerator": 1,
+          "denominator": 3,
+          "missing": 1
+        },
+        "clause_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 5
+        },
+        "evidence_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 5
+        },
+        "system_evidence_support_rate": {
+          "numerator": 2,
+          "denominator": 3,
+          "missing": 2
+        },
+        "evidence_support_rate": {
+          "numerator": 2,
+          "denominator": 3,
+          "missing": 2
+        },
+        "independent_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 5
+        },
+        "independent_human_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 5
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 5,
+          "missing": 0
+        },
+        "model_conflict_rate": {
+          "numerator": 0,
+          "denominator": 5,
+          "missing": 0
+        },
+        "human_review_rate": {
+          "numerator": 3,
+          "denominator": 5,
+          "missing": 0
+        },
+        "high_risk_review_rate": {
+          "numerator": 3,
+          "denominator": 4,
+          "missing": 0
+        },
+        "hazard_interception_rate": {
+          "numerator": 4,
+          "denominator": 4,
+          "missing": 0
+        },
+        "unsafe_auto_pass_rate": {
+          "numerator": 0,
+          "denominator": 4,
+          "missing": 0
+        },
+        "information_insufficient_rate": {
+          "numerator": 2,
+          "denominator": 5,
+          "missing": 0
+        },
+        "abstention_accuracy": {
+          "numerator": 4,
+          "denominator": 5,
+          "missing": 0
+        },
+        "execution_failure_rate": {
+          "numerator": 0,
+          "denominator": 5,
+          "missing": 0
+        }
+      }
+    },
+    "生产安全": {
+      "total": 3,
+      "category_accuracy": 1.0,
+      "level_accuracy": 0.5,
+      "review_rate": 0.6667,
+      "clause_hit_rate": null,
+      "metric_basis": {
+        "detection_precision": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 1
+        },
+        "detection_recall": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "detection_specificity": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 1
+        },
+        "detection_coverage": {
+          "numerator": 2,
+          "denominator": 3,
+          "missing": 1
+        },
+        "end_to_end_hazard_recall": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "category_accuracy": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "level_accuracy": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "level_accuracy_tolerance1": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "severity_mae": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "clause_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 3
+        },
+        "evidence_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 3
+        },
+        "system_evidence_support_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 1
+        },
+        "evidence_support_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 1
+        },
+        "independent_evidence_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 2
+        },
+        "independent_human_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 3
+        },
+        "unsupported_claim_rate": {
+          "numerator": 2,
+          "denominator": 3,
+          "missing": 0
+        },
+        "model_conflict_rate": {
+          "numerator": 0,
+          "denominator": 3,
+          "missing": 0
+        },
+        "human_review_rate": {
+          "numerator": 2,
+          "denominator": 3,
+          "missing": 0
+        },
+        "high_risk_review_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "hazard_interception_rate": {
+          "numerator": 2,
+          "denominator": 2,
+          "missing": 0
+        },
+        "unsafe_auto_pass_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        },
+        "information_insufficient_rate": {
+          "numerator": 1,
+          "denominator": 3,
+          "missing": 0
+        },
+        "abstention_accuracy": {
+          "numerator": 2,
+          "denominator": 3,
+          "missing": 0
+        },
+        "execution_failure_rate": {
+          "numerator": 0,
+          "denominator": 3,
+          "missing": 0
+        }
+      }
+    },
+    "社区": {
+      "total": 2,
+      "category_accuracy": 1.0,
+      "level_accuracy": 1.0,
+      "review_rate": 0.5,
+      "clause_hit_rate": null,
+      "metric_basis": {
+        "detection_precision": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 1
+        },
+        "detection_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "detection_specificity": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 1
+        },
+        "detection_coverage": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 1
+        },
+        "end_to_end_hazard_recall": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "category_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "level_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "level_accuracy_tolerance1": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "severity_mae": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 0
+        },
+        "clause_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "evidence_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "system_evidence_support_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 1
+        },
+        "evidence_support_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 1
+        },
+        "independent_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "independent_human_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 2
+        },
+        "unsupported_claim_rate": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "model_conflict_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        },
+        "human_review_rate": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "high_risk_review_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 0
+        },
+        "hazard_interception_rate": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 0
+        },
+        "unsafe_auto_pass_rate": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 0
+        },
+        "information_insufficient_rate": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "abstention_accuracy": {
+          "numerator": 1,
+          "denominator": 2,
+          "missing": 0
+        },
+        "execution_failure_rate": {
+          "numerator": 0,
+          "denominator": 2,
+          "missing": 0
+        }
+      }
+    }
+  },
+  "evaluation_mode": "mock",
+  "requested_provider_mode": "mock",
+  "evaluation_timestamp": "2026-10-29T06:36:51.570856+00:00",
+  "system_version": "eval-runner-4",
+  "total": 12,
+  "detection_precision": 0.875,
+  "detection_recall": 1.0,
+  "detection_specificity": 0.0,
+  "detection_coverage": 0.6667,
+  "end_to_end_hazard_recall": 0.875,
+  "category_accuracy": 0.75,
+  "level_accuracy": 0.625,
+  "level_accuracy_tolerance1": 0.875,
+  "severity_mae": 0.2857,
+  "clause_hit_rate": null,
+  "evidence_hit_rate": null,
+  "system_evidence_support_rate": 0.25,
+  "evidence_support_rate": 0.25,
+  "independent_evidence_accuracy": 1.0,
+  "independent_human_evidence_accuracy": null,
+  "unsupported_claim_rate": 0.5,
+  "model_conflict_rate": 0.0,
+  "human_review_rate": 0.6667,
+  "high_risk_review_rate": 0.8333,
+  "hazard_interception_rate": 1.0,
+  "unsafe_auto_pass_rate": 0.0,
+  "information_insufficient_rate": 0.3333,
+  "abstention_accuracy": 0.75,
+  "execution_failure_rate": 0.0,
+  "true_positive_count": 7,
+  "true_negative_count": 0,
+  "false_positive_count": 1,
+  "false_negative_count": 0,
+  "detection_missing_count": 4,
+  "human_review_count": 8,
+  "high_risk_case_count": 6,
+  "unsafe_auto_pass_count": 0,
+  "unsafe_hazard_base_count": 8,
+  "information_insufficient_count": 4,
+  "execution_failure_count": 0,
+  "correct_abstention_count": 1,
+  "evidence_failure_count": 6,
+  "severity_error_count": 1,
+  "model_conflict_count": 0,
+  "avg_latency_s": 0.039,
+  "metric_basis": {
+    "detection_precision": {
+      "numerator": 7,
+      "denominator": 8,
+      "missing": 4
+    },
+    "detection_recall": {
+      "numerator": 7,
+      "denominator": 7,
+      "missing": 1
+    },
+    "detection_specificity": {
+      "numerator": 0,
+      "denominator": 1,
+      "missing": 3
+    },
+    "detection_coverage": {
+      "numerator": 8,
+      "denominator": 12,
+      "missing": 4
+    },
+    "end_to_end_hazard_recall": {
+      "numerator": 7,
+      "denominator": 8,
+      "missing": 1
+    },
+    "category_accuracy": {
+      "numerator": 6,
+      "denominator": 8,
+      "missing": 1
+    },
+    "level_accuracy": {
+      "numerator": 5,
+      "denominator": 8,
+      "missing": 1
+    },
+    "level_accuracy_tolerance1": {
+      "numerator": 7,
+      "denominator": 8,
+      "missing": 1
+    },
+    "severity_mae": {
+      "numerator": 2,
+      "denominator": 7,
+      "missing": 1
+    },
+    "clause_hit_rate": {
+      "numerator": 0,
+      "denominator": 0,
+      "missing": 12
+    },
+    "evidence_hit_rate": {
+      "numerator": 0,
+      "denominator": 0,
+      "missing": 12
+    },
+    "system_evidence_support_rate": {
+      "numerator": 2,
+      "denominator": 8,
+      "missing": 4
+    },
+    "evidence_support_rate": {
+      "numerator": 2,
+      "denominator": 8,
+      "missing": 4
+    },
+    "independent_evidence_accuracy": {
+      "numerator": 1,
+      "denominator": 1,
+      "missing": 11
+    },
+    "independent_human_evidence_accuracy": {
+      "numerator": 0,
+      "denominator": 0,
+      "missing": 12
+    },
+    "unsupported_claim_rate": {
+      "numerator": 6,
+      "denominator": 12,
+      "missing": 0
+    },
+    "model_conflict_rate": {
+      "numerator": 0,
+      "denominator": 12,
+      "missing": 0
+    },
+    "human_review_rate": {
+      "numerator": 8,
+      "denominator": 12,
+      "missing": 0
+    },
+    "high_risk_review_rate": {
+      "numerator": 5,
+      "denominator": 6,
+      "missing": 0
+    },
+    "hazard_interception_rate": {
+      "numerator": 8,
+      "denominator": 8,
+      "missing": 0
+    },
+    "unsafe_auto_pass_rate": {
+      "numerator": 0,
+      "denominator": 8,
+      "missing": 0
+    },
+    "information_insufficient_rate": {
+      "numerator": 4,
+      "denominator": 12,
+      "missing": 0
+    },
+    "abstention_accuracy": {
+      "numerator": 9,
+      "denominator": 12,
+      "missing": 0
+    },
+    "execution_failure_rate": {
+      "numerator": 0,
+      "denominator": 12,
+      "missing": 0
+    }
+  },
+  "metrics": {
+    "total": 12,
+    "metrics_schema_version": "2.0",
+    "detection_precision": 0.875,
+    "detection_recall": 1.0,
+    "detection_specificity": 0.0,
+    "detection_coverage": 0.6667,
+    "end_to_end_hazard_recall": 0.875,
+    "category_accuracy": 0.75,
+    "level_accuracy": 0.625,
+    "level_accuracy_tolerance1": 0.875,
+    "severity_mae": 0.2857,
+    "clause_hit_rate": null,
+    "evidence_hit_rate": null,
+    "system_evidence_support_rate": 0.25,
+    "evidence_support_rate": 0.25,
+    "independent_evidence_accuracy": 1.0,
+    "independent_human_evidence_accuracy": null,
+    "unsupported_claim_rate": 0.5,
+    "model_conflict_rate": 0.0,
+    "human_review_rate": 0.6667,
+    "high_risk_review_rate": 0.8333,
+    "hazard_interception_rate": 1.0,
+    "unsafe_auto_pass_rate": 0.0,
+    "information_insufficient_rate": 0.3333,
+    "abstention_accuracy": 0.75,
+    "execution_failure_rate": 0.0,
+    "true_positive_count": 7,
+    "true_negative_count": 0,
+    "false_positive_count": 1,
+    "false_negative_count": 0,
+    "detection_missing_count": 4,
+    "human_review_count": 8,
+    "high_risk_case_count": 6,
+    "unsafe_auto_pass_count": 0,
+    "unsafe_hazard_base_count": 8,
+    "information_insufficient_count": 4,
+    "execution_failure_count": 0,
+    "correct_abstention_count": 1,
+    "evidence_failure_count": 6,
+    "severity_error_count": 1,
+    "model_conflict_count": 0,
+    "avg_latency_s": 0.039,
+    "metric_basis": {
+      "detection_precision": {
+        "numerator": 7,
+        "denominator": 8,
+        "missing": 4
+      },
+      "detection_recall": {
+        "numerator": 7,
+        "denominator": 7,
+        "missing": 1
+      },
+      "detection_specificity": {
+        "numerator": 0,
+        "denominator": 1,
+        "missing": 3
+      },
+      "detection_coverage": {
+        "numerator": 8,
+        "denominator": 12,
+        "missing": 4
+      },
+      "end_to_end_hazard_recall": {
+        "numerator": 7,
+        "denominator": 8,
+        "missing": 1
+      },
+      "category_accuracy": {
+        "numerator": 6,
+        "denominator": 8,
+        "missing": 1
+      },
+      "level_accuracy": {
+        "numerator": 5,
+        "denominator": 8,
+        "missing": 1
+      },
+      "level_accuracy_tolerance1": {
+        "numerator": 7,
+        "denominator": 8,
+        "missing": 1
+      },
+      "severity_mae": {
+        "numerator": 2,
+        "denominator": 7,
+        "missing": 1
+      },
+      "clause_hit_rate": {
+        "numerator": 0,
+        "denominator": 0,
+        "missing": 12
+      },
+      "evidence_hit_rate": {
+        "numerator": 0,
+        "denominator": 0,
+        "missing": 12
+      },
+      "system_evidence_support_rate": {
+        "numerator": 2,
+        "denominator": 8,
+        "missing": 4
+      },
+      "evidence_support_rate": {
+        "numerator": 2,
+        "denominator": 8,
+        "missing": 4
+      },
+      "independent_evidence_accuracy": {
+        "numerator": 1,
+        "denominator": 1,
+        "missing": 11
+      },
+      "independent_human_evidence_accuracy": {
+        "numerator": 0,
+        "denominator": 0,
+        "missing": 12
+      },
+      "unsupported_claim_rate": {
+        "numerator": 6,
+        "denominator": 12,
+        "missing": 0
+      },
+      "model_conflict_rate": {
+        "numerator": 0,
+        "denominator": 12,
+        "missing": 0
+      },
+      "human_review_rate": {
+        "numerator": 8,
+        "denominator": 12,
+        "missing": 0
+      },
+      "high_risk_review_rate": {
+        "numerator": 5,
+        "denominator": 6,
+        "missing": 0
+      },
+      "hazard_interception_rate": {
+        "numerator": 8,
+        "denominator": 8,
+        "missing": 0
+      },
+      "unsafe_auto_pass_rate": {
+        "numerator": 0,
+        "denominator": 8,
+        "missing": 0
+      },
+      "information_insufficient_rate": {
+        "numerator": 4,
+        "denominator": 12,
+        "missing": 0
+      },
+      "abstention_accuracy": {
+        "numerator": 9,
+        "denominator": 12,
+        "missing": 0
+      },
+      "execution_failure_rate": {
+        "numerator": 0,
+        "denominator": 12,
+        "missing": 0
+      }
+    }
+  },
+  "dataset_overview": {
+    "case_count": 12,
+    "dataset_version": "r6-synthetic-v1",
+    "source_type_counts": {
+      "synthetic": 12
+    },
+    "category_counts": {
+      "占用疏散通道": 4,
+      "无隐患": 4,
+      "电气线路隐患": 1,
+      "公共区域安全隐患": 1,
+      "野外用火风险": 1,
+      "危险化学品存储不规范": 1
+    },
+    "severity_counts": {
+      "1": 6,
+      "3": 4,
+      "2": 2
+    },
+    "scenario_counts": {
+      "林区": 2,
+      "消防": 5,
+      "生产安全": 3,
+      "社区": 2
+    },
+    "hazard_case_count": 8,
+    "safe_negative_case_count": 4,
+    "image_case_count": 12,
+    "evidence_labeled_count": 1,
+    "limitation_notes": [],
+    "executed_image_case_count": 12,
+    "declared_image_count": 12,
+    "loaded_image_count": 12,
+    "successfully_loaded_image_case_count": 12,
+    "input_failed_count": 0
+  },
+  "model_family_performance": [
+    {
+      "family": "mock",
+      "attempts": 12,
+      "category_accuracy": 0.5,
+      "level_accuracy": 0.1667
+    }
+  ],
+  "review_and_risk_stats": {
+    "high_risk_case_count": 6,
+    "risk_review_suggestion_count": 6,
+    "risk_review_suggestion_rate": 0.5,
+    "average_risk_score": 77.5,
+    "risk_scored_case_count": 8,
+    "risk_missing_case_count": 4
+  },
+  "evidence_stats_summary": {
+    "supported_count": 2,
+    "insufficient_count": 6,
+    "supported_rate": 0.25,
+    "insufficient_rate": 0.75,
+    "evaluated_count": 8,
+    "missing_count": 4
+  },
+  "ablation_study": null,
+  "error_summary": {
+    "counts": {
+      "false_positive": 1,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 6,
+      "severity_error": 1,
+      "information_insufficient": 4
+    },
+    "total_error_occurrences": 12,
+    "cases_with_error": 10
+  },
+  "error_by_category": {
+    "占用疏散通道": {
+      "total": 4,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0,
+      "information_insufficient": 1
+    },
+    "无隐患": {
+      "total": 4,
+      "false_positive": 1,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0,
+      "information_insufficient": 3
+    },
+    "电气线路隐患": {
+      "total": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0
+    },
+    "公共区域安全隐患": {
+      "total": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0
+    },
+    "野外用火风险": {
+      "total": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0
+    },
+    "危险化学品存储不规范": {
+      "total": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 1
+    }
+  },
+  "error_by_scenario": {
+    "消防": {
+      "total": 5,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0,
+      "information_insufficient": 2
+    },
+    "生产安全": {
+      "total": 3,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 2,
+      "severity_error": 1,
+      "information_insufficient": 1
+    },
+    "社区": {
+      "total": 2,
+      "false_positive": 0,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 1,
+      "severity_error": 0,
+      "information_insufficient": 1
+    },
+    "林区": {
+      "total": 2,
+      "false_positive": 1,
+      "false_negative": 0,
+      "unsafe_auto_pass": 0,
+      "model_conflict": 0,
+      "evidence_failure": 2,
+      "severity_error": 0
+    }
+  },
+  "error_analysis_count": 10,
+  "error_analysis": [
+    {
+      "case_id": "syn-fire-safe",
+      "category": "无隐患",
+      "scenario": "消防",
+      "expected": "无隐患/3",
+      "predicted": "None/None",
+      "status": "needs_more_info",
+      "flags": [
+        "information_insufficient"
+      ],
+      "reasons": [
+        {
+          "type": "information_insufficient",
+          "reason": "信息不足，未形成可用检测结论；按拒判标签单独评估"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-factory-hazard",
+      "category": "电气线路隐患",
+      "scenario": "生产安全",
+      "expected": "电气线路隐患/1",
+      "predicted": "电气线路隐患/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“超负荷”缺少法规依据"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-factory-safe",
+      "category": "无隐患",
+      "scenario": "生产安全",
+      "expected": "无隐患/3",
+      "predicted": "None/None",
+      "status": "needs_more_info",
+      "flags": [
+        "information_insufficient"
+      ],
+      "reasons": [
+        {
+          "type": "information_insufficient",
+          "reason": "信息不足，未形成可用检测结论；按拒判标签单独评估"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-community-hazard",
+      "category": "公共区域安全隐患",
+      "scenario": "社区",
+      "expected": "公共区域安全隐患/2",
+      "predicted": "公共区域安全隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-community-safe",
+      "category": "无隐患",
+      "scenario": "社区",
+      "expected": "无隐患/3",
+      "predicted": "None/None",
+      "status": "needs_more_info",
+      "flags": [
+        "information_insufficient"
+      ],
+      "reasons": [
+        {
+          "type": "information_insufficient",
+          "reason": "信息不足，未形成可用检测结论；按拒判标签单独评估"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-forest-hazard",
+      "category": "野外用火风险",
+      "scenario": "林区",
+      "expected": "野外用火风险/1",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-forest-safe",
+      "category": "无隐患",
+      "scenario": "林区",
+      "expected": "无隐患/3",
+      "predicted": "野外用火风险/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "false_positive",
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "false_positive",
+          "reason": "真值无隐患，但系统给出隐患 finding；人工复核不消除检测误报"
+        },
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：野外用火风险"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-low-quality",
+      "category": "占用疏散通道",
+      "scenario": "消防",
+      "expected": "占用疏散通道/1",
+      "predicted": "None/None",
+      "status": "needs_more_info",
+      "flags": [
+        "information_insufficient"
+      ],
+      "reasons": [
+        {
+          "type": "information_insufficient",
+          "reason": "信息不足，未形成可用检测结论；按拒判标签单独评估"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-multi-hazard",
+      "category": "占用疏散通道",
+      "scenario": "消防",
+      "expected": "占用疏散通道/1",
+      "predicted": "电气线路隐患/2",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核"
+        }
+      ]
+    },
+    {
+      "case_id": "syn-unsupported",
+      "category": "危险化学品存储不规范",
+      "scenario": "生产安全",
+      "expected": "危险化学品存储不规范/2",
+      "predicted": "危险化学品存储不规范/1",
+      "status": "awaiting_human_review",
+      "flags": [
+        "evidence_failure",
+        "severity_error"
+      ],
+      "reasons": [
+        {
+          "type": "evidence_failure",
+          "reason": "结论缺少法规证据支持（insufficient）：法规文本未覆盖该类隐患的禁止性行为，需人工复核；观察事实“化学品”缺少法规依据"
+        },
+        {
+          "type": "severity_error",
+          "reason": "类别正确但等级偏差（期望 2，预测 1）"
+        }
+      ]
+    }
+  ],
+  "source_partition_metrics": {
+    "synthetic": {
+      "total": 12,
+      "metrics_schema_version": "2.0",
+      "detection_precision": 0.875,
+      "detection_recall": 1.0,
+      "detection_specificity": 0.0,
+      "detection_coverage": 0.6667,
+      "end_to_end_hazard_recall": 0.875,
+      "category_accuracy": 0.75,
+      "level_accuracy": 0.625,
+      "level_accuracy_tolerance1": 0.875,
+      "severity_mae": 0.2857,
+      "clause_hit_rate": null,
+      "evidence_hit_rate": null,
+      "system_evidence_support_rate": 0.25,
+      "evidence_support_rate": 0.25,
+      "independent_evidence_accuracy": 1.0,
+      "independent_human_evidence_accuracy": null,
+      "unsupported_claim_rate": 0.5,
+      "model_conflict_rate": 0.0,
+      "human_review_rate": 0.6667,
+      "high_risk_review_rate": 0.8333,
+      "hazard_interception_rate": 1.0,
+      "unsafe_auto_pass_rate": 0.0,
+      "information_insufficient_rate": 0.3333,
+      "abstention_accuracy": 0.75,
+      "execution_failure_rate": 0.0,
+      "true_positive_count": 7,
+      "true_negative_count": 0,
+      "false_positive_count": 1,
+      "false_negative_count": 0,
+      "detection_missing_count": 4,
+      "human_review_count": 8,
+      "high_risk_case_count": 6,
+      "unsafe_auto_pass_count": 0,
+      "unsafe_hazard_base_count": 8,
+      "information_insufficient_count": 4,
+      "execution_failure_count": 0,
+      "correct_abstention_count": 1,
+      "evidence_failure_count": 6,
+      "severity_error_count": 1,
+      "model_conflict_count": 0,
+      "avg_latency_s": 0.039,
+      "metric_basis": {
+        "detection_precision": {
+          "numerator": 7,
+          "denominator": 8,
+          "missing": 4
+        },
+        "detection_recall": {
+          "numerator": 7,
+          "denominator": 7,
+          "missing": 1
+        },
+        "detection_specificity": {
+          "numerator": 0,
+          "denominator": 1,
+          "missing": 3
+        },
+        "detection_coverage": {
+          "numerator": 8,
+          "denominator": 12,
+          "missing": 4
+        },
+        "end_to_end_hazard_recall": {
+          "numerator": 7,
+          "denominator": 8,
+          "missing": 1
+        },
+        "category_accuracy": {
+          "numerator": 6,
+          "denominator": 8,
+          "missing": 1
+        },
+        "level_accuracy": {
+          "numerator": 5,
+          "denominator": 8,
+          "missing": 1
+        },
+        "level_accuracy_tolerance1": {
+          "numerator": 7,
+          "denominator": 8,
+          "missing": 1
+        },
+        "severity_mae": {
+          "numerator": 2,
+          "denominator": 7,
+          "missing": 1
+        },
+        "clause_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 12
+        },
+        "evidence_hit_rate": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 12
+        },
+        "system_evidence_support_rate": {
+          "numerator": 2,
+          "denominator": 8,
+          "missing": 4
+        },
+        "evidence_support_rate": {
+          "numerator": 2,
+          "denominator": 8,
+          "missing": 4
+        },
+        "independent_evidence_accuracy": {
+          "numerator": 1,
+          "denominator": 1,
+          "missing": 11
+        },
+        "independent_human_evidence_accuracy": {
+          "numerator": 0,
+          "denominator": 0,
+          "missing": 12
+        },
+        "unsupported_claim_rate": {
+          "numerator": 6,
+          "denominator": 12,
+          "missing": 0
+        },
+        "model_conflict_rate": {
+          "numerator": 0,
+          "denominator": 12,
+          "missing": 0
+        },
+        "human_review_rate": {
+          "numerator": 8,
+          "denominator": 12,
+          "missing": 0
+        },
+        "high_risk_review_rate": {
+          "numerator": 5,
+          "denominator": 6,
+          "missing": 0
+        },
+        "hazard_interception_rate": {
+          "numerator": 8,
+          "denominator": 8,
+          "missing": 0
+        },
+        "unsafe_auto_pass_rate": {
+          "numerator": 0,
+          "denominator": 8,
+          "missing": 0
+        },
+        "information_insufficient_rate": {
+          "numerator": 4,
+          "denominator": 12,
+          "missing": 0
+        },
+        "abstention_accuracy": {
+          "numerator": 9,
+          "denominator": 12,
+          "missing": 0
+        },
+        "execution_failure_rate": {
+          "numerator": 0,
+          "denominator": 12,
+          "missing": 0
+        }
+      }
+    }
+  },
+  "call_statistics": {
+    "http_attempt_count": 0,
+    "http_error_count": 0,
+    "http_error_rate": null,
+    "http_latency_ms_sum": 0,
+    "tokens_in_reported": 0,
+    "tokens_out_reported": 0,
+    "usage_missing_count": 0,
+    "estimated_cost": 0.0,
+    "cost_status": "no_http_calls",
+    "currency": null,
+    "unpriced_attempt_count": 0,
+    "pricing_digest": null,
+    "response_model_identifiers": [],
+    "events": []
+  },
+  "gate_policy_digest": "7acf8407b4bde7b1fdddc5b914955cc911ed6ed6859c10debe954b24fdf361f6",
+  "gate_policy": {
+    "policy_version": "r6-engineering-v2",
+    "registered_at": "2026-10-29T00:00:00+08:00",
+    "scope": "Mock 工程回归；不设真实识别质量验收结论。真实批次需执行前另行登记目标。",
+    "report_schema_version": "2.0",
+    "metrics_schema_version": "2.0",
+    "tolerance": 0.02,
+    "metrics": {
+      "category_accuracy": "higher",
+      "detection_precision": "higher",
+      "detection_recall": "higher",
+      "end_to_end_hazard_recall": "higher",
+      "detection_specificity": "higher",
+      "detection_coverage": "higher",
+      "high_risk_review_rate": "higher",
+      "unsafe_auto_pass_rate": "lower",
+      "execution_failure_rate": "lower"
+    },
+    "ceilings": {
+      "unsafe_auto_pass_rate": 0.0,
+      "execution_failure_rate": 0.0
+    }
+  },
+  "provider": "mock",
+  "variant": "F_full"
+}

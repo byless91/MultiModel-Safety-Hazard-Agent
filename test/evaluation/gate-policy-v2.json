@@ -1,0 +1,20 @@
+{
+  "policy_version": "r6-engineering-v2",
+  "registered_at": "2026-10-29T00:00:00+08:00",
+  "scope": "Mock 工程回归；不设真实识别质量验收结论。真实批次需执行前另行登记目标。",
+  "report_schema_version": "2.0",
+  "metrics_schema_version": "2.0",
+  "tolerance": 0.02,
+  "metrics": {
+    "category_accuracy": "higher",
+    "detection_precision": "higher",
+    "detection_recall": "higher",
+    "end_to_end_hazard_recall": "higher",
+    "detection_specificity": "higher",
+    "detection_coverage": "higher",
+    "high_risk_review_rate": "higher",
+    "unsafe_auto_pass_rate": "lower",
+    "execution_failure_rate": "lower"
+  },
+  "ceilings": {"unsafe_auto_pass_rate": 0.0, "execution_failure_rate": 0.0}
+}

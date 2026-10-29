@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Run formal offline evaluation against the labeled evaluation set.
 
 The runner loads the versioned dataset through ``app.eval.dataset``, executes
@@ -11,7 +10,6 @@ import argparse
 import json
 import os
 import sys
-import time
 import warnings
 from pathlib import Path
 
@@ -22,6 +20,7 @@ sys.path.insert(0, str(BACKEND))
 EVAL_CASES = BACKEND / "data" / "eval_cases" / "cases.jsonl"
 EVAL_DIR = BACKEND / "data" / "eval"
 
+from app.eval.contracts import call_statistics, digest, load_experiment_file
 from app.eval.dataset import EvalCase, load_dataset
 from app.eval.evaluation import (
     build_evaluation_report,
@@ -29,6 +28,7 @@ from app.eval.evaluation import (
     pick_variant,
     run_evaluation_case,
 )
+from app.services.llm_observation import observe_calls
 
 
 def load_cases(path: Path) -> list[dict]:
@@ -42,7 +42,6 @@ def load_cases(path: Path) -> list[dict]:
 
 def run_case(case: dict) -> dict:
     """Legacy single-case run used by existing tests (default full system)."""
-    started = time.perf_counter()
     eval_case = EvalCase.model_validate(
         {
             **case,
@@ -238,59 +237,6 @@ def _legacy_markdown(results: list[dict], summary: dict) -> str:
             f"| {'是' if item['review_required'] else '否'} |"
         )
     return "\n".join(lines)
-    metric_labels = [
-        ("total", "案例数"),
-        ("provider", "模型模式"),
-        ("category_accuracy", "类别准确率"),
-        ("level_accuracy", "等级准确率"),
-        ("level_accuracy_tolerance1", "等级容差准确率（±1）"),
-        ("clause_hit_rate", "条款命中率"),
-        ("grounded_rate", "可追溯率"),
-        ("hallucination_rate", "幻觉率（无依据输出代理）"),
-        ("high_risk_review_rate", "高风险复核率"),
-        ("unsafe_auto_pass_rate", "不安全自动通过率（Unsafe Auto-Pass Rate）"),
-        ("unsafe_auto_pass_count", "不安全自动通过案例数"),
-        ("needs_review_count", "需人工复核数"),
-        ("completed_count", "自动完成数"),
-        ("avg_confidence", "平均置信度"),
-        ("avg_latency_s", "平均耗时（秒）"),
-    ]
-    lines = [
-        "# 离线评测报告",
-        "",
-        "## 总体指标",
-        "",
-        "| 指标 | 数值 |",
-        "| --- | --- |",
-    ]
-    for key, label in metric_labels:
-        if key in summary:
-            lines.append(f"| {label} | {summary[key]} |")
-    lines.extend(["", "## 场景细分", "", "| 场景 | 案例数 | 类别准确率 | 等级准确率 | 条款命中率 | 复核率 |", "| --- | --- | --- | --- | --- | --- |"])
-    for scenario, value in summary.get("scenario_breakdown", {}).items():
-        lines.append(
-            f"| {scenario} | {value['total']} | {value['category_accuracy']} "
-            f"| {value['level_accuracy']} | {value['clause_hit_rate']} "
-            f"| {value['review_rate']} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## 逐条结果",
-            "",
-            "| 案例 | 场景 | 期望类别 | 预测类别 | 期望等级 | 预测等级 | 条款命中 | 需复核 |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |",
-        ]
-    )
-    for item in results:
-        lines.append(
-            f"| {item['id']} | {item.get('scenario', '')} "
-            f"| {item['expected_category']} | {item['predicted_category']} "
-            f"| {item['expected_level']} | {item['predicted_level']} "
-            f"| {'是' if item['clause_hit'] else '否'} "
-            f"| {'是' if item['review_required'] else '否'} |"
-        )
-    return "\n".join(lines)
 
 
 def main() -> None:
@@ -304,13 +250,21 @@ def main() -> None:
         default="full",
         help="评测变体：qwen/glm/ensemble/plus_risk/plus_rag/full",
     )
-    parser.add_argument("--dataset-version", default="v1")
+    parser.add_argument("--dataset-version", default=None)
+    parser.add_argument("--gate-policy", type=Path, help="执行前登记的指标阈值文件")
+    parser.add_argument("--pricing", type=Path, help="执行前登记的模型单价；缺失时费用为 unknown")
     parser.add_argument(
         "--validate-only",
         action="store_true",
         help="只校验数据集，不调用模型",
     )
     args = parser.parse_args()
+    policy = load_experiment_file(args.gate_policy)
+    pricing = load_experiment_file(args.pricing, pricing=True)
+    if args.limit is not None and args.limit <= 0:
+        parser.error("--limit must be positive")
+    if args.output.exists() and (args.output / "report.json").exists():
+        parser.error("output already contains a report; use a new directory to preserve previous results")
 
     os.environ["PROVIDER_MODE"] = args.provider
 
@@ -330,19 +284,14 @@ def main() -> None:
     variant = pick_variant(args.variant)
     from app.core.config import get_settings
     base_settings = get_settings()
-    settings, providers, rag = build_variant_runtime(
-        base_settings, variant, provider_mode=args.provider
-    )
-    results = [
-        run_evaluation_case(
-            case,
-            variant,
-            settings=settings,
-            providers=providers,
-            rag=rag,
+    with observe_calls() as calls:
+        settings, providers, rag = build_variant_runtime(
+            base_settings, variant, provider_mode=args.provider
         )
-        for case in cases
-    ]
+        results = [
+            run_evaluation_case(case, variant, settings=settings, providers=providers, rag=rag)
+            for case in cases
+        ]
     ablation_summary = None
     ablation_report_path = args.output / "ablation_report.json"
     if ablation_report_path.exists():
@@ -355,8 +304,13 @@ def main() -> None:
         results,
         provider_mode=args.provider,
         ablation_summary=ablation_summary,
+        gate_policy=policy,
+        call_summary=call_statistics(calls.events, pricing),
     )
     summary["provider"] = ",".join(provider.name for provider in providers)
+    summary["gate_policy_digest"] = digest(policy) if policy else None
+    summary["gate_policy"] = policy
+    summary["call_statistics"] = call_statistics(calls.events, pricing)
     summary["variant"] = variant["id"]
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "report.json").write_text(
@@ -382,7 +336,6 @@ def main() -> None:
         "avg_latency_s",
     ):
         print(f"{key}: {summary.get(key)}")
-    failed = [item for item in results if not item["metric_flags"]["category_match"]]
     print(f"\n错误分析：{len(summary['error_analysis'])} 条")
     for row in summary["error_analysis"][:8]:
         print(f"- {row['case_id']} {row['expected']} → {row['predicted']} {','.join(row['flags'])}")

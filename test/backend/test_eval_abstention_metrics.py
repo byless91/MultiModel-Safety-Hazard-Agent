@@ -45,6 +45,14 @@ def test_missing_independent_evidence_and_abstention_show_na(monkeypatch, tmp_pa
     assert summary["independent_evidence_accuracy"] is None
     assert "| 独立证据标签正确率 | N/A |" in markdown
     assert summary["abstention_accuracy"] is None
+    assert summary["clause_hit_rate"] is None
+    assert summary["metric_basis"]["clause_hit_rate"]["denominator"] == 0
+    assert summary["scenario_breakdown"]["其他"]["clause_hit_rate"] is None
+    assert summary["scenario_breakdown"]["其他"]["metric_basis"]["clause_hit_rate"]["denominator"] == 0
+    assert summary["evidence_stats_summary"]["supported_rate"] == summary["system_evidence_support_rate"]
+    assert summary["evidence_stats_summary"]["insufficient_rate"] == 0
+    assert summary["review_and_risk_stats"]["average_risk_score"] is None
+    assert summary["review_and_risk_stats"]["risk_missing_case_count"] == 1
 
 
 def test_workflow_exception_is_recorded_without_exception_secret(monkeypatch):
