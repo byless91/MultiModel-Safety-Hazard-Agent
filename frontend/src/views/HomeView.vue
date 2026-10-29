@@ -47,12 +47,71 @@
           </div>
         </div>
 
+        <details class="intake-meta">
+          <summary>位置与来源（可选，无地图也能手填）</summary>
+          <div class="meta-grid">
+            <label class="field">
+              <span class="field-label">地址</span>
+              <el-input v-model="address" aria-label="地址" :maxlength="512" :disabled="store.hasPendingSubmission"
+                placeholder="例如：幸福路 3 号 2 单元" />
+            </label>
+            <label class="field">
+              <span class="field-label">区划</span>
+              <el-input v-model="district" aria-label="区划" :maxlength="128" :disabled="store.hasPendingSubmission"
+                placeholder="例如：示例区或街道" />
+            </label>
+            <label class="field">
+              <span class="field-label">设施</span>
+              <el-input v-model="facility" aria-label="设施" :maxlength="128" :disabled="store.hasPendingSubmission"
+                placeholder="例如：居民楼、仓库、加油站" />
+            </label>
+            <label class="field">
+              <span class="field-label">场景</span>
+              <el-input v-model="scene" aria-label="场景" :maxlength="128" :disabled="store.hasPendingSubmission"
+                placeholder="例如：楼道、施工现场、林区道路" />
+            </label>
+            <label class="field">
+              <span class="field-label">事件时间</span>
+              <input v-model="eventTime" aria-label="事件时间" type="datetime-local"
+                :disabled="store.hasPendingSubmission" />
+            </label>
+            <label class="field">
+              <span class="field-label">数据来源</span>
+              <select v-model="dataSource" aria-label="数据来源" :disabled="store.hasPendingSubmission">
+                <option value="report">现场上报</option>
+                <option value="public_case">公开案例</option>
+                <option value="simulated">模拟数据</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">纬度</span>
+              <input v-model="latitude" aria-label="纬度" type="number" step="0.000001" min="-90" max="90"
+                :disabled="store.hasPendingSubmission" placeholder="可留空" />
+            </label>
+            <label class="field">
+              <span class="field-label">经度</span>
+              <input v-model="longitude" aria-label="经度" type="number" step="0.000001" min="-180" max="180"
+                :disabled="store.hasPendingSubmission" placeholder="可留空" />
+            </label>
+            <label class="field">
+              <span class="field-label">坐标系</span>
+              <select v-model="coordinateSystem" aria-label="坐标系" :disabled="!hasCoordinates || store.hasPendingSubmission">
+                <option value="wgs84">WGS84</option>
+                <option value="gcj02">GCJ-02（高德/腾讯）</option>
+                <option value="bd09">BD-09（百度）</option>
+              </select>
+            </label>
+          </div>
+          <p v-if="coordinateError" class="field-hint meta-error">{{ coordinateError }}</p>
+          <p class="field-hint">坐标留空时仍可录入；事件时间与录入时间分开保存。</p>
+        </details>
+
         <div class="intake-actions">
           <el-button
             type="primary"
             native-type="submit"
             :loading="busy || working"
-            :disabled="!description.trim() || store.hasPendingSubmission"
+            :disabled="!description.trim() || Boolean(coordinateError) || store.hasPendingSubmission"
           >
             <el-icon><UploadFilled /></el-icon>
             {{ mode === 'manual' ? '创建人工记录' : '生成分类建议' }}
@@ -85,7 +144,7 @@
     <el-alert v-if="error" class="error-alert" :title="error" type="error" :closable="false" show-icon />
     <section v-if="assessment" class="result-panel">
       <div class="result-panel-head">
-        <span class="result-panel-title">{{ assessment.record_mode === 'classification' ? '分类记录' : '研判结果' }}</span>
+        <span class="result-panel-title">{{ assessment.record_mode === 'classification' ? '分类记录' : assessment.record_mode === 'imported' ? '导入记录' : '研判结果' }}</span>
         <span class="result-id">记录号 {{ assessment.id.slice(0, 8) }}</span>
       </div>
       <AssessmentResult
@@ -100,28 +159,60 @@
 
 <script setup lang="ts">
 import { ElMessage, type UploadFile } from 'element-plus'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import AssessmentResult from '../components/AssessmentResult.vue'
 import { useAssessmentStore } from '../stores/assessment'
 import JobProgress from '../components/JobProgress.vue'
 import { useAssessmentSession } from '../composables/useAssessmentSession'
-import type { Assessment, EntryMode } from '../types'
+import type { Assessment, CoordinateSystem, DataSource, EntryMode, RecordMetadata } from '../types'
 
 const store = useAssessmentStore()
 const description = ref('')
 const mode = ref<EntryMode>('classification')
 const fileList = ref<UploadFile[]>([])
+const address = ref(''), district = ref(''), facility = ref(''), scene = ref('')
+const latitude = ref<string | number>(''), longitude = ref<string | number>('')
+const coordinateSystem = ref<CoordinateSystem>('wgs84')
+const dataSource = ref<DataSource>('report')
+const eventTime = ref('')
+const coordinateText = (value: string | number) => String(value ?? '').trim()
+const hasCoordinates = computed(() => Boolean(coordinateText(latitude.value) || coordinateText(longitude.value)))
+const coordinateError = computed(() => {
+  const lat = coordinateText(latitude.value), lng = coordinateText(longitude.value)
+  if (!lat && !lng) return ''
+  if (!lat || !lng) return '经纬度须同时填写或同时留空'
+  if (Number(lat) < -90 || Number(lat) > 90) return '纬度须在 -90 到 90 之间'
+  if (Number(lng) < -180 || Number(lng) > 180) return '经度须在 -180 到 180 之间'
+  return ''
+})
 const session = useAssessmentSession()
 const { assessment, job, busy, working, waiting, notice, error } = session
 
+function metadata(): RecordMetadata {
+  const values: RecordMetadata = {
+    address: address.value.trim() || undefined,
+    district: district.value.trim() || undefined,
+    facility: facility.value.trim() || undefined,
+    scene: scene.value.trim() || undefined,
+    data_source: dataSource.value,
+    event_time: eventTime.value ? new Date(eventTime.value).toISOString() : undefined,
+  }
+  if (hasCoordinates.value) {
+    values.latitude = Number(latitude.value)
+    values.longitude = Number(longitude.value)
+    values.coordinate_system = coordinateSystem.value
+  }
+  return values
+}
+
 async function submit() {
-  if (!description.value.trim()) return
+  if (!description.value.trim() || coordinateError.value) return
   const files = fileList.value
     .map((item) => (item.raw ? item.raw : (item as unknown as File)))
     .filter((item) => item instanceof File)
   await session.run((signal) => store.create(description.value.trim(), files, {
-    wait: false, signal, entryMode: mode.value,
+    wait: false, signal, entryMode: mode.value, metadata: metadata(),
   }))
 }
 
@@ -144,6 +235,9 @@ function resetForm() {
   store.startNewSubmission()
   description.value = ''
   fileList.value = []
+  address.value = ''; district.value = ''; facility.value = ''; scene.value = ''
+  latitude.value = ''; longitude.value = ''; coordinateSystem.value = 'wgs84'
+  dataSource.value = 'report'; eventTime.value = ''
   assessment.value = null
   store.error = ''
 }
@@ -240,6 +334,42 @@ function onExceed() {
 .result-id {
   color: var(--muted);
   font-size: var(--fs-xs);
+}
+
+.intake-meta {
+  padding: var(--s-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+
+.intake-meta summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+
+.meta-grid input:not([type=checkbox]),
+.meta-grid select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 36px;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 8px;
+}
+
+.meta-error {
+  color: var(--danger, #d14343);
 }
 
 @media (max-width: 860px) {

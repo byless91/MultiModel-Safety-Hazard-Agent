@@ -1,5 +1,30 @@
 <template>
   <div v-loading="loading" class="result-wrap">
+    <section v-if="showRecordMeta" class="record-meta" aria-label="位置与来源">
+      <dl>
+        <div><dt>数据来源</dt><dd>{{ dataSourceLabel }}</dd></div>
+        <div><dt>事件时间</dt><dd>{{ assessment.event_time ? formatTime(assessment.event_time) : '未填写' }}</dd></div>
+        <div><dt>录入时间</dt><dd>{{ formatTime(assessment.created_at) }}</dd></div>
+        <div><dt>位置精度</dt><dd>{{ precisionLabel }}</dd></div>
+        <div v-if="assessment.address"><dt>地址</dt><dd>{{ assessment.address }}</dd></div>
+        <div v-if="assessment.district"><dt>区划</dt><dd>{{ assessment.district }}</dd></div>
+        <div v-if="assessment.facility || assessment.scene">
+          <dt>设施 / 场景</dt>
+          <dd>{{ [assessment.facility, assessment.scene].filter(Boolean).join(' · ') }}</dd>
+        </div>
+        <div v-if="assessment.latitude !== null && assessment.latitude !== undefined">
+          <dt>坐标</dt>
+          <dd>{{ assessment.latitude }}, {{ assessment.longitude }} · {{ coordinateSystemLabel }} · {{ coordinateSourceLabel }}</dd>
+        </div>
+        <div v-if="assessment.import_batch_id">
+          <dt>导入批次</dt>
+          <dd>{{ assessment.import_batch_id }} · 外部编号 {{ assessment.source_ref || '未填写' }}</dd>
+        </div>
+      </dl>
+    </section>
+    <p v-if="assessment.record_mode === 'imported'" class="import-note">
+      导入记录：仅保留位置、来源和时间信息，未做 AI 研判。
+    </p>
     <ClassificationPanel v-if="assessment.record_mode === 'classification'" :assessment="assessment"
       :loading="loading" @updated="emit('updated', $event)" @download="onDownload" />
     <el-alert
@@ -246,6 +271,7 @@ import { rectStatusLabel } from '../constants/rectification'
 import HumanReviewPanel from './HumanReviewPanel.vue'
 import ClassificationPanel from './ClassificationPanel.vue'
 import { extractError } from '../utils/errors'
+import { formatTime } from '../utils/format'
 import EvidenceChain from './EvidenceChain.vue'
 import RectificationPanel from './RectificationPanel.vue'
 import DisagreementViz from './DisagreementViz.vue'
@@ -265,6 +291,26 @@ const emit = defineEmits<{
 }>()
 
 const rectLabel = computed(() => rectStatusLabel(props.assessment.rectification_status))
+
+const DATA_SOURCE_LABELS: Record<string, string> = {
+  report: '现场上报', public_case: '公开案例', simulated: '模拟数据',
+}
+const PRECISION_LABELS: Record<string, string> = {
+  coordinate: '坐标级', address: '地址级', district: '区划级', unknown: '未提供',
+}
+const COORDINATE_SYSTEM_LABELS: Record<string, string> = {
+  wgs84: 'WGS84', gcj02: 'GCJ-02', bd09: 'BD-09',
+}
+const COORDINATE_SOURCE_LABELS: Record<string, string> = { manual: '手工填写', import: '导入' }
+
+const hasCoordinates = computed(() => props.assessment.latitude !== null && props.assessment.latitude !== undefined)
+const showRecordMeta = computed(() => props.assessment.record_mode === 'imported'
+  || Boolean(props.assessment.data_source || props.assessment.event_time || props.assessment.address
+    || props.assessment.district || props.assessment.facility || props.assessment.scene) || hasCoordinates.value)
+const dataSourceLabel = computed(() => DATA_SOURCE_LABELS[props.assessment.data_source || ''] || '未标注')
+const precisionLabel = computed(() => PRECISION_LABELS[props.assessment.location_precision || 'unknown'] || '未提供')
+const coordinateSystemLabel = computed(() => COORDINATE_SYSTEM_LABELS[props.assessment.coordinate_system || ''] || '坐标系未标注')
+const coordinateSourceLabel = computed(() => COORDINATE_SOURCE_LABELS[props.assessment.coordinate_source || ''] || '来源未标注')
 
 const answer = ref('')
 const activeTab = ref('action')
@@ -367,6 +413,49 @@ async function onDownload() {
 <style scoped>
 .result-wrap {
   min-height: 120px;
+}
+
+.record-meta {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.record-meta dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.record-meta div {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.record-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.record-meta dd {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.import-note {
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  background: var(--surface-1);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
 }
 
 /* Conclusion: one screen answers what it is, how sure, what next. */

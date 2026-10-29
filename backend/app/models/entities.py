@@ -17,11 +17,26 @@ def utcnow() -> datetime:
 
 class Assessment(Base):
     __tablename__ = "assessments"
+    __table_args__ = (
+        Index("uq_assessments_source_ref", "data_source", "source_ref", unique=True),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
     record_mode: Mapped[str] = mapped_column(String(24), default="assessment", server_default="assessment")
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    district: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    facility: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    scene: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    coordinate_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    coordinate_system: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    data_source: Mapped[str | None] = mapped_column(String(24), nullable=True, index=True)
+    event_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    import_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     classification_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     scene_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     hazard_category: Mapped[str | None] = mapped_column(String(128), nullable=True)

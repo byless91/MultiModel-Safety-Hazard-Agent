@@ -36,6 +36,19 @@ class AssessmentOut(BaseModel):
     description: str
     status: str
     record_mode: str = "assessment"
+    address: str | None = None
+    district: str | None = None
+    facility: str | None = None
+    scene: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    coordinate_source: str | None = None
+    coordinate_system: str | None = None
+    data_source: str | None = None
+    event_time: datetime | None = None
+    source_ref: str | None = None
+    import_batch_id: str | None = None
+    location_precision: Literal["coordinate", "address", "district", "unknown"] = "unknown"
     classification: ClassificationData | None = None
     scene_summary: str | None = None
     hazard_category: str | None = None

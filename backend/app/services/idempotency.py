@@ -14,6 +14,7 @@ from app.models import Assessment, IdempotencyKey
 
 def submission_fingerprint(
     description: str, answer: str, ocr: list[str], files: list[tuple[str, bytes]], *, mode: str = "assessment",
+    location: dict | None = None,
 ) -> str:
     payload = {
         "version": 1, "description": description, "followup_answer": answer, "ocr_texts": ocr,
@@ -21,6 +22,8 @@ def submission_fingerprint(
     }
     if mode != "assessment":
         payload["mode"] = mode
+    if location:
+        payload["location"] = location
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
 

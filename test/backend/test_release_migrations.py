@@ -16,8 +16,9 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from _support.environment import validate_database_url
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
-HEAD = "b27e619ac430"
+HEAD = "d5e2f7a91c04"
 PRE_R3 = "7122c95a212f"
+M3_PARENT = "b27e619ac430"
 AUDIT = json.dumps({"history": [{"decision": "edit", "reviewer": "release-reviewer"}]})
 REPORT = json.dumps({"summary": "人工最终结论", "risk_level": 1}, ensure_ascii=False)
 
@@ -126,6 +127,25 @@ def test_m2_upgrade_preserves_legacy_knowledge_without_approving_it(release_data
         assert row["source"] == "原来源" and row["meta_json"] == '{"owner":"operator"}'
         assert row["review_status"] == "unreviewed" and row["industry"] == "general"
         assert row["content_sha256"] is None and row["series_id"] is None
+    assert_head(engine)
+    command.upgrade(config, "head")
+    assert_head(engine)
+
+
+def test_m3_upgrade_preserves_legacy_records_without_inventing_location(release_database):
+    engine, config = release_database
+    command.upgrade(config, M3_PARENT)
+    insert_legacy_records(engine)
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        row = connection.execute(sa.text(
+            "SELECT * FROM assessments WHERE id='release-assessment'")).mappings().one()
+        assert row["status"] == "confirmed" and row["conclusion"] == "人工最终结论"
+        assert row["human_review_json"] == AUDIT and row["report_json"] == REPORT
+        assert row["address"] is None and row["district"] is None and row["facility"] is None
+        assert row["latitude"] is None and row["longitude"] is None and row["coordinate_system"] is None
+        assert row["data_source"] is None and row["event_time"] is None
+        assert row["source_ref"] is None and row["import_batch_id"] is None
     assert_head(engine)
     command.upgrade(config, "head")
     assert_head(engine)

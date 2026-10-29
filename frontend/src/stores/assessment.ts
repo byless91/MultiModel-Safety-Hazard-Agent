@@ -11,6 +11,7 @@ import type {
   Assessment,
   ClassificationSaveRequest,
   EntryMode,
+  ImportResult,
   JobOut,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
@@ -20,6 +21,7 @@ import type {
   KnowledgeReviewStatus,
   KnowledgeUploadOptions,
   EvidenceItem,
+  RecordMetadata,
   ReviewRequest,
 } from '../types'
 
@@ -41,12 +43,14 @@ export const useAssessmentStore = defineStore('assessment', {
     ),
   },
   actions: {
-    async create(description: string, files: File[], options?: TaskOptions & { entryMode?: EntryMode }): Promise<Assessment> {
+    async create(description: string, files: File[], options?: TaskOptions & { entryMode?: EntryMode; metadata?: RecordMetadata }): Promise<Assessment> {
       if (this.submissionBusy || this.hasPendingSubmission) {
         throw new Error('已有尚未确认的提交，请先查询本次提交或明确新建研判')
       }
       this.activeJob = null
-      this.submissionPayload = { description, files: [...files], mode: options?.entryMode ?? 'assessment' }
+      this.submissionPayload = {
+        description, files: [...files], mode: options?.entryMode ?? 'assessment', metadata: options?.metadata,
+      }
       this.setSubmission(newSubmission())
       return this.runSubmission(() => this.postSubmission(options), true)
     },
@@ -90,6 +94,17 @@ export const useAssessmentStore = defineStore('assessment', {
       const form = new FormData()
       form.append('description', this.submissionPayload.description)
       form.append('mode', this.submissionPayload.mode)
+      const metadata = this.submissionPayload.metadata
+      if (metadata) {
+        for (const key of ['address', 'district', 'facility', 'scene', 'coordinate_system', 'data_source', 'event_time'] as const) {
+          const value = metadata[key]
+          if (value) form.append(key, value)
+        }
+        for (const key of ['latitude', 'longitude'] as const) {
+          const value = metadata[key]
+          if (value !== undefined) form.append(key, String(value))
+        }
+      }
       for (const file of this.submissionPayload.files) form.append('files', file)
       const { data } = await api.post<Assessment | JobOut>('/assessments', form, {
         headers: { 'Idempotency-Key': this.submission.key },
@@ -237,6 +252,10 @@ export const useAssessmentStore = defineStore('assessment', {
       } finally {
         this.loading = false
       }
+    },
+    async importAssessments(rows: unknown[]): Promise<ImportResult> {
+      const { data } = await api.post<ImportResult>('/assessments/import', { rows })
+      return data
     },
     async downloadReport(id: string): Promise<{ filename: string; content: string }> {
       const { data } = await api.get(`/assessments/${id}/export`)

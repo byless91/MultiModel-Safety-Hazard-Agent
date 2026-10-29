@@ -250,6 +250,7 @@ export type AssessmentStatus =
   | 'needs_review'
   | 'awaiting_human_review'
   | 'confirmed'
+  | 'imported'
 
 export type RectificationStatus =
   | 'open'
@@ -269,6 +270,28 @@ export interface RectificationHistoryEntry {
 }
 
 export type EntryMode = 'assessment' | 'classification' | 'manual'
+
+export type DataSource = 'report' | 'public_case' | 'simulated'
+export type CoordinateSystem = 'wgs84' | 'gcj02' | 'bd09'
+
+export interface RecordMetadata {
+  address?: string
+  district?: string
+  facility?: string
+  scene?: string
+  latitude?: number
+  longitude?: number
+  coordinate_system?: CoordinateSystem
+  data_source: DataSource
+  event_time?: string
+}
+
+export interface ImportResult {
+  batch_id: string
+  imported: number
+  duplicates: number[]
+  failures: { row: number; source_ref?: string | null; reason: string }[]
+}
 
 export interface ClassificationData {
   taxonomy_version: string
@@ -302,7 +325,20 @@ export interface Assessment {
   id: string
   description: string
   status: AssessmentStatus
-  record_mode?: 'assessment' | 'classification'
+  record_mode?: 'assessment' | 'classification' | 'imported'
+  address?: string | null
+  district?: string | null
+  facility?: string | null
+  scene?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  coordinate_source?: string | null
+  coordinate_system?: CoordinateSystem | null
+  data_source?: DataSource | null
+  event_time?: string | null
+  source_ref?: string | null
+  import_batch_id?: string | null
+  location_precision?: 'coordinate' | 'address' | 'district' | 'unknown'
   classification?: ClassificationData | null
   scene_summary?: string
   hazard_category?: string

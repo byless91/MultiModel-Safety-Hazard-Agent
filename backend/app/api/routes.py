@@ -49,6 +49,7 @@ from app.schemas.assessment import (
 )
 from app.schemas.classification import CATEGORIES, TAGS, TAXONOMY_VERSION, ClassificationData, ClassificationSaveIn
 from app.schemas.knowledge import INDUSTRIES, Industry, KnowledgeMetadataIn, KnowledgeReviewIn
+from app.schemas.location import ImportResultOut, ImportRowsIn, LocationData, utc_event_time
 from app.services import llm_ledger
 from app.services.assessment_io import apply_state, images_from_db
 from app.services.classification import save_classification
@@ -68,6 +69,7 @@ from app.services.guardrail import (
 )
 from app.services.guardrail.input_guard import MAX_DESCRIPTION_LENGTH
 from app.services.idempotency import find_submission, submission_fingerprint, submission_headers
+from app.services.imports import import_rows
 from app.services.job_runner import (
     enqueue_job,
     find_create_thread_id,
@@ -138,6 +140,16 @@ def parse_json(text: str | None):
         return None
 
 
+def location_precision(item: Assessment) -> str:
+    if item.latitude is not None and item.longitude is not None:
+        return "coordinate"
+    if item.address:
+        return "address"
+    if item.district:
+        return "district"
+    return "unknown"
+
+
 def to_out(item: Assessment) -> AssessmentOut:
     def image_url(image: AssessmentImage) -> str | None:
         try:
@@ -159,6 +171,19 @@ def to_out(item: Assessment) -> AssessmentOut:
         description=item.description,
         status=item.status,
         record_mode=item.record_mode,
+        address=item.address,
+        district=item.district,
+        facility=item.facility,
+        scene=item.scene,
+        latitude=item.latitude,
+        longitude=item.longitude,
+        coordinate_source=item.coordinate_source,
+        coordinate_system=item.coordinate_system,
+        data_source=item.data_source,
+        event_time=utc_event_time(item.event_time),
+        source_ref=item.source_ref,
+        import_batch_id=item.import_batch_id,
+        location_precision=location_precision(item),
         classification=parse_json(item.classification_json),
         scene_summary=item.scene_summary,
         hazard_category=item.hazard_category,
@@ -757,6 +782,15 @@ async def create_assessment(
     response: Response = None,
     db: Session = Depends(get_db),
     mode: Annotated[Literal["assessment", "classification", "manual"], Form()] = "assessment",
+    address: Annotated[str, Form()] = "",
+    district: Annotated[str, Form()] = "",
+    facility: Annotated[str, Form()] = "",
+    scene: Annotated[str, Form()] = "",
+    latitude: Annotated[float | None, Form()] = None,
+    longitude: Annotated[float | None, Form()] = None,
+    coordinate_system: Annotated[Literal["wgs84", "gcj02", "bd09"] | None, Form()] = None,
+    data_source: Annotated[Literal["report", "public_case", "simulated"], Form()] = "report",
+    event_time: Annotated[str, Form()] = "",
 ) -> AssessmentOut | JobOut:
     if idempotency_key and not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
         raise HTTPException(status_code=400, detail="Idempotency-Key 需为 8-128 位字母数字或 -_")
@@ -774,10 +808,27 @@ async def create_assessment(
         )
         staged.append((upload, data))
     ocr_list = _parse_ocr_texts(ocr_texts)
+    try:
+        location = LocationData(
+            address=address, district=district, facility=facility, scene=scene,
+            latitude=latitude, longitude=longitude, coordinate_system=coordinate_system,
+            data_source=data_source, event_time=event_time or None,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors(include_context=False)) from exc
+    location_fields = {
+        "address": location.address, "district": location.district, "facility": location.facility,
+        "scene": location.scene, "latitude": location.latitude, "longitude": location.longitude,
+        "coordinate_system": location.coordinate_system,
+        "event_time": location.event_time.isoformat() if location.event_time else None,
+    }
+    location_meta = {key: value for key, value in location_fields.items() if value not in (None, "")}
+    if location.data_source != "report":
+        location_meta["data_source"] = location.data_source
     fingerprint = submission_fingerprint(description, followup_answer, ocr_list, [
         (_safe_filename(upload.filename or "image.jpg", allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
                         default="image.jpg")[0], data) for upload, data in staged
-    ], mode=mode)
+    ], mode=mode, location=location_meta)
     if idempotency_key:
         replayed = _idempotent_replay(db, idempotency_key, response, fingerprint=fingerprint)
         if replayed is not None:
@@ -794,6 +845,12 @@ async def create_assessment(
         classification_json=None if mode == "assessment" else ClassificationData(
             suggestion_status="manual" if mode == "manual" else "pending",
         ).model_dump_json(),
+        address=location.address or None, district=location.district or None,
+        facility=location.facility or None, scene=location.scene or None,
+        latitude=location.latitude, longitude=location.longitude,
+        coordinate_source="manual" if location.latitude is not None else None,
+        coordinate_system=location.coordinate_system, data_source=location.data_source,
+        event_time=location.event_time,
     )
     upload_root = settings.upload_dir / assessment.id
     written: list[Path] = []
@@ -883,6 +940,16 @@ def _cleanup_uncommitted_uploads(root: Path, written: list[Path]) -> None:
         root.rmdir()  # 只删除空目录
     except OSError:
         pass
+
+
+@router.post(
+    "/assessments/import",
+    response_model=ImportResultOut,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def import_assessments(payload: ImportRowsIn, db: Session = Depends(get_db)) -> ImportResultOut:
+    """Bulk-import records with stable external ids; invalid or duplicate rows are reported, not fatal."""
+    return ImportResultOut(**import_rows(db, payload.rows))
 
 
 @router.get("/assessments/{assessment_id}/job", response_model=JobOut)
