@@ -2,7 +2,7 @@
 
 面向社区网格员、厂区安全员、林区巡查员，在原 Vue/FastAPI 项目上改造的分类与知识助手。M1 首页提供“照片/描述 → 类别与标签建议 → 参考条款 → 人工录入 → 角色审核”，风险等级由人工选填；也可仅人工录入。原 R0–R8 研判及整改记录继续可读。无 API Key 时为明确标识的 Mock 演示，真实现场识别与法规质量仍待验收。
 
-后续统一按[最终改造计划 v2.0](docs/最终改造计划.md)在本项目上增量实施，整合“知识库与分类助手＋行业数据分析”：分类与人工录入 → 多行业知识版本 → 位置/来源与导入 → 管理统计及同类整改对标 → 更新/趋势提醒 → 部署验证。M0、M1、M2 已完成工程验收，下一阶段为 M3；当前交接与备份入口见 [HANDOVER.md](HANDOVER.md)。
+后续统一按[最终改造计划 v2.0](docs/最终改造计划.md)在本项目上增量实施，整合“知识库与分类助手＋行业数据分析”：分类与人工录入 → 多行业知识版本 → 位置/来源与导入 → 管理统计及同类整改对标 → 更新/趋势提醒 → 部署验证。M0、M1、M2、M3 已完成工程验收，下一阶段为 M4；当前交接与备份入口见 [HANDOVER.md](HANDOVER.md)。
 
 按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)完成 R0–R8 工程工作。最终结果、遗留条件和证据见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)，另有[当前架构](CURRENT_ARCHITECTURE.md)、[部署与回退](docs/DEPLOYMENT.md)、[评测索引](docs/evaluation/README.md)。新增或修改的测试统一放在根目录 `test/`；各阶段原始基线保留于 `docs/baselines/`。
 
@@ -191,6 +191,14 @@ jwt 模式使用：
 - 检索只返回已审核且指纹、文本与数据库一致的条款；被替代、停用、未审核或伪造索引条目不会成为研判依据。无结果时明示“未找到已审核的有效条款”。
 - 分类记录的证据快照保存引用时的 `document_id`、版本、条款文本、适用范围与内容 SHA256；后续发布新版本不覆盖旧引用，详情、历史和 Markdown 导出一致展示。
 
+## M3 位置、来源与导入合同
+
+- `POST /api/v1/assessments` 增加可选表单字段：`address`、`district`、`facility`、`scene`、`latitude`、`longitude`、`coordinate_system`（wgs84/gcj02/bd09）、`data_source`（report/public_case/simulated）、`event_time`。地址可手填，无地图 Key 也能录入；经纬度可整体留空，填写时须成对并提供坐标系。
+- `event_time` 以 UTC 保存并返回，与 `created_at` 录入时间分开；前端按本地时区展示。`location_precision` 按坐标/地址/区划/未提供返回，位置缺失时不伪造精度。
+- 坐标来源记录为 `manual`（表单）或 `import`（导入）；`data_source` 默认 `report`，历史记录为 `null`，页面显示“未标注”。
+- `POST /api/v1/assessments/import`（admin）接受 `{"rows": [...]}`，每行须有 `source_ref`、`description`、`data_source`，可选位置字段。按（`data_source`, `source_ref`）去重；返回 `batch_id`、`imported`、重复行号 `duplicates` 和逐行 `failures`（行号、外部编号、原因）。导入记录的 `record_mode` 与 `status` 均为 `imported`，保留批次号和外部编号，不进入 AI 研判、不视为人工确认。
+- 历史页管理员可上传 JSON 文件执行导入并查看失败清单；巡查员/复核员无导入入口。
+
 ## 历史研判与共用能力（R0–R8）
 
 - 多图上传 + 文字描述的多模态研判
@@ -339,7 +347,7 @@ Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样�
 
 ## 下一步
 
-下一阶段只推进[最终改造计划中的 M3](docs/最终改造计划.md)：为原 Assessment 增加位置、区划、设施/场景、坐标来源与坐标系、数据来源及事件时间，并提供可去重、可追溯的导入入口。统计、地图和更新监测按后续阶段依次实施。
+下一阶段只推进[最终改造计划中的 M4](docs/最终改造计划.md)：一张管理页展示已确认记录的地区/类别/时间分布、历史趋势和一套地图，并按类似设施/场景检索其他地点的整改方案及结果。自动地理编码、统计口径和地图展示在这一阶段实施。
 
 ## 浏览器 E2E
 
