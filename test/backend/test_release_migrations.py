@@ -16,7 +16,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from _support.environment import validate_database_url
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
-HEAD = "f04b62a9c310"
+HEAD = "a12f083bcd71"
 PRE_R3 = "7122c95a212f"
 AUDIT = json.dumps({"history": [{"decision": "edit", "reviewer": "release-reviewer"}]})
 REPORT = json.dumps({"summary": "人工最终结论", "risk_level": 1}, ensure_ascii=False)
@@ -86,6 +86,7 @@ def assert_head(engine, *, retained=False):
             assert row["conclusion"] == "人工最终结论" and row["risk_level"] == 1
             assert row["human_review_json"] == AUDIT and row["report_json"] == REPORT
             assert row["followup_used"] == 1 and row["followup_token"] is None
+            assert row["record_mode"] == "assessment" and row["classification_json"] is None
             job = connection.execute(sa.text("SELECT * FROM assessment_jobs WHERE id='release-job'")).mappings().one()
             assert job["status"] == "succeeded" and job["attempt_token"] is None
             key = connection.execute(sa.text("SELECT * FROM idempotency_keys WHERE key='release-key'")).mappings().one()
@@ -96,6 +97,16 @@ def test_empty_database_upgrades_to_release_head(release_database):
     engine, config = release_database
     command.upgrade(config, "head")
     assert_head(engine)
+
+
+def test_m1_upgrade_preserves_r8_records_and_is_repeatable(release_database):
+    engine, config = release_database
+    command.upgrade(config, "f04b62a9c310")
+    insert_legacy_records(engine)
+    command.upgrade(config, "head")
+    assert_head(engine, retained=True)
+    command.upgrade(config, "head")
+    assert_head(engine, retained=True)
     command.upgrade(config, "head")
     assert_head(engine)
 

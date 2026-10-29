@@ -21,6 +21,8 @@ class Assessment(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     description: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    record_mode: Mapped[str] = mapped_column(String(24), default="assessment", server_default="assessment")
+    classification_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     scene_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     hazard_category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     risk_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
