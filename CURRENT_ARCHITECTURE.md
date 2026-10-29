@@ -1,10 +1,12 @@
-# 当前架构（M1 增量改造）
+# 当前架构（M2 增量改造）
 
 更新：2026-10-29。当前范围和下一阶段见 [最终改造计划](docs/最终改造计划.md)；R0–R8 原能力见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)，部署、备份和回退见 [部署说明](docs/DEPLOYMENT.md)。
 
 ## 边界与数据流
 
 M1 主流程是分类与人工录入：原上传/任务设施 → 主 Provider 专用分类请求 → RAG 参考条款 → 人工类别/标签和可选等级 → 原角色审核/审计 → 历史与导出。仅人工录入跳过模型及检索；分类请求不进入风险引擎、融合判级或报告工单生成。分类建议、最终值和体系版本共同保存于原 Assessment，不另建业务记录系统。
+
+M2 在同一知识库上增加版本与发布：知识文档按系列和版本独立保存（来源、版本、适用范围、行业目录、内容 SHA256、审核状态），管理员发布后才进入检索；分类引用的条款以证据快照保存版本、正文和指纹，新版本发布只把旧版本标记为已替代，不改写其内容与历史引用。
 
 以下 LangGraph 数据流保留给历史研判接口及记录。Mock、合成图片和开发法规节选验证工程链路；真实识图、误报控制和法规适用性尚未验收。
 
@@ -40,6 +42,8 @@ SQLAlchemy：SQLite 或 PostgreSQL
 
 `services/knowledge.py` 按章节/条款切片，保留来源、条款、版本、生效时间和标签。演示语料不作为正式证据。镜像将 `resources/knowledge_seed/` 作为只读种子，只在空知识目录离线初始化，已有数据不被镜像替换。
 
+`services/knowledge_versions.py` 管理文档系列与版本：上传须标注行业目录、版本标识、来源和适用范围，未审核版本可删除但已发布/被引用/有后续版本的不能删除。发布需管理员明确确认来源核对，校验 HTTP(S) 来源、非占位版本、适用范围和内容指纹；同系列发布在单一事务内完成，旧有效版本转为已替代并保留审核历史。检索前重新核对数据库中的审核状态、内容指纹和条款原文，索引中的陈旧或伪造条目不会成为证据；检索引擎先按审核状态过滤再取 Top-K，避免未审核切片挤占结果。
+
 `services/rag.py` 支持 FAISS/NumPy。真实 embedding 和 hash 兜底使用隔离空间，语料与查询同步切换；真实缓存保留，恢复探测有冷却时间。结果标记 embedding_space/embedding_fallback，hash 相似度不代表真实语义质量。索引格式不兼容时从缓存重建，知识重建/查询受锁保护。
 
 每项 finding 独立保留事实、位置、模型引用、法规证据和支持状态。未查到法规不会抹掉视觉隐患；不支持或不足的结论进入复核。旧 finding_id 重复、映射不明确时只读提示核查，不批量重写历史报告。Reranker 是可选词面/元数据重排，尚无新数据上的效果提升结论。
@@ -66,7 +70,7 @@ sync 保留同步响应；async 在研判和任务同事务落库后返回 202�
 
 ## 持久化、认证与运行
 
-模型包括 Assessment、AssessmentImage、AssessmentJob、IdempotencyKey、KnowledgeDocument、User、LLMCall。Alembic head 为 `a12f083bcd71`；M1 只给原 Assessment 增加 record_mode/classification_json，旧记录默认 assessment，旧人工结果和审计不重算。启动接管未版本化库并增量升级；任何迁移失败拒绝启动。
+模型包括 Assessment、AssessmentImage、AssessmentJob、IdempotencyKey、KnowledgeDocument、User、LLMCall。Alembic head 为 `b27e619ac430`；M1 只给原 Assessment 增加 record_mode/classification_json，M2 给知识文档增加系列/版本/行业/适用范围/审核状态/内容指纹，旧知识记录保持未审核且不被重写，旧记录默认 assessment，旧人工结果和审计不重算。启动接管未版本化库并增量升级；任何迁移失败拒绝启动。
 
 R3/R4 新增任务 worker/代次/租约、追问预留 token、幂等初始指纹列，允许历史值为 null。人工历史和 AI 快照使用既有 JSON 字段，没有迁移重写存量人工结论。
 
