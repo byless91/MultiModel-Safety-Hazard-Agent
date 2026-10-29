@@ -1,0 +1,123 @@
+"""R8/T21: release migration paths preserve records on SQLite and real PG."""
+
+import json
+import os
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+import sqlalchemy as sa
+from alembic import command
+from alembic.config import Config
+from app.core import db as database
+from sqlalchemy.schema import CreateSchema, DropSchema
+
+from _support.environment import validate_database_url
+
+BACKEND = Path(__file__).resolve().parents[2] / "backend"
+HEAD = "f04b62a9c310"
+PRE_R3 = "7122c95a212f"
+AUDIT = json.dumps({"history": [{"decision": "edit", "reviewer": "release-reviewer"}]})
+REPORT = json.dumps({"summary": "人工最终结论", "risk_level": 1}, ensure_ascii=False)
+
+
+@pytest.fixture(params=["sqlite", "postgres"])
+def release_database(request, tmp_path):
+    admin = None
+    schema = None
+    if request.param == "postgres":
+        raw = os.environ.get("R8_TEST_POSTGRES_URL")
+        if not raw:
+            pytest.skip("set R8_TEST_POSTGRES_URL to a dedicated local PG test database")
+        validate_database_url(raw)
+        admin = sa.create_engine(raw)
+        schema = f"r8_migration_{uuid4().hex}"
+        with admin.begin() as connection:
+            connection.execute(CreateSchema(schema))
+        url = sa.engine.make_url(raw).update_query_dict({"options": f"-csearch_path={schema}"})
+    else:
+        url = sa.engine.make_url(f"sqlite:///{(tmp_path / 'release.db').as_posix()}")
+    engine = sa.create_engine(url)
+    config = Config(str(BACKEND / "alembic.ini"))
+    config.set_main_option("script_location", str(BACKEND / "migrations"))
+    config.set_main_option("sqlalchemy.url", url.render_as_string(hide_password=False).replace("%", "%%"))
+    try:
+        yield engine, config
+    finally:
+        engine.dispose()
+        if admin is not None:
+            with admin.begin() as connection:
+                connection.execute(DropSchema(schema, cascade=True))
+            admin.dispose()
+
+
+def insert_legacy_records(engine):
+    metadata = sa.MetaData()
+    metadata.reflect(engine)
+    now = datetime.now(UTC)
+    with engine.begin() as connection:
+        connection.execute(metadata.tables["assessments"].insert().values(
+            id="release-assessment", description="保留存量人工确认记录", status="confirmed",
+            followup_used=1, confirmed=True, conclusion="人工最终结论", risk_level=1,
+            human_review_json=AUDIT, report_json=REPORT, created_at=now, updated_at=now,
+        ))
+        connection.execute(metadata.tables["assessment_jobs"].insert().values(
+            id="release-job", assessment_id="release-assessment", kind="create", status="succeeded",
+            progress_step="done", created_at=now, updated_at=now,
+        ))
+        connection.execute(metadata.tables["idempotency_keys"].insert().values(
+            key="release-key", assessment_id="release-assessment", created_at=now,
+        ))
+
+
+def assert_head(engine, *, retained=False):
+    inspector = sa.inspect(engine)
+    actual = {name: {column["name"] for column in inspector.get_columns(name)}
+              for name in inspector.get_table_names() if name != "alembic_version"}
+    expected = {name: set(table.columns.keys()) for name, table in database.Base.metadata.tables.items()}
+    assert actual == expected
+    with engine.connect() as connection:
+        assert connection.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one() == HEAD
+        if retained:
+            query = sa.text("SELECT * FROM assessments WHERE id='release-assessment'")
+            row = connection.execute(query).mappings().one()
+            assert row["status"] == "confirmed" and row["confirmed"]
+            assert row["conclusion"] == "人工最终结论" and row["risk_level"] == 1
+            assert row["human_review_json"] == AUDIT and row["report_json"] == REPORT
+            assert row["followup_used"] == 1 and row["followup_token"] is None
+            job = connection.execute(sa.text("SELECT * FROM assessment_jobs WHERE id='release-job'")).mappings().one()
+            assert job["status"] == "succeeded" and job["attempt_token"] is None
+            key = connection.execute(sa.text("SELECT * FROM idempotency_keys WHERE key='release-key'")).mappings().one()
+            assert key["assessment_id"] == "release-assessment" and key["request_hash"] is None
+
+
+def test_empty_database_upgrades_to_release_head(release_database):
+    engine, config = release_database
+    command.upgrade(config, "head")
+    assert_head(engine)
+    command.upgrade(config, "head")
+    assert_head(engine)
+
+
+def test_pre_r3_upgrade_preserves_business_and_audit(release_database):
+    engine, config = release_database
+    command.upgrade(config, PRE_R3)
+    insert_legacy_records(engine)
+    command.upgrade(config, "head")
+    assert_head(engine, retained=True)
+    command.upgrade(config, "head")
+    assert_head(engine, retained=True)
+
+
+def test_unversioned_old_database_is_adopted_by_startup(release_database, monkeypatch):
+    engine, config = release_database
+    command.upgrade(config, PRE_R3)
+    insert_legacy_records(engine)
+    with engine.begin() as connection:
+        connection.execute(sa.text("DROP TABLE alembic_version"))
+    monkeypatch.setattr(database, "engine", engine)
+    database.init_db()
+    assert_head(engine, retained=True)
+    database.init_db()
+    assert_head(engine, retained=True)
