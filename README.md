@@ -1,14 +1,14 @@
 # 多模态基层安全隐患智能研判与处置辅助系统
 
-面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。当前为 MVP 骨架，无 API Key 时使用 Mock 模式即可跑通完整演示链路。
+面向社区网格员、厂区安全员、林区巡查员的“拍照输入、智能研判、自动成文、证据溯源、人机复核”系统。单实例工程 MVP 已完成 R0–R8 回归与交付验收，无 API Key 时可用 Mock 跑通演示；真实现场识别与法规质量仍待验收。
 
-后续完善按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)推进。R0–R7 工程工作已完成，后续从 R8 整体验收与文档同步开始；真实场景评测仍待取得授权数据与独立人工标签。新增或修改的测试统一放在根目录 `test/`。实际测试结果与验证边界见 [R0 实施基线](docs/baselines/r0-2026-10-28.md)、[R1 验证记录](docs/baselines/r1-2026-10-28.md)、[R2 验证记录](docs/baselines/r2-2026-10-28.md)、[R3 验证记录](docs/baselines/r3-2026-10-28.md)、[R4 验证记录](docs/baselines/r4-2026-10-28.md)、[R5 验证记录](docs/baselines/r5-2026-10-28.md)、[R6 验证记录](docs/baselines/r6-2026-10-29.md)、[R7 验证记录](docs/baselines/r7-2026-10-29.md)。
+按[《项目完善执行计划书（2026-10-28）》](docs/项目完善执行计划书-2026-10-28.md)完成 R0–R8 工程工作。最终结果、遗留条件和证据见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)，另有[当前架构](CURRENT_ARCHITECTURE.md)、[部署与回退](docs/DEPLOYMENT.md)、[评测索引](docs/evaluation/README.md)。新增或修改的测试统一放在根目录 `test/`；各阶段原始基线保留于 `docs/baselines/`。
 
 ## 技术栈
 
-- 后端：Python 3.11+、FastAPI、SQLAlchemy、SQLite
+- 后端：Python 3.11+、FastAPI、SQLAlchemy、SQLite / PostgreSQL
 - 智能体：LangGraph StateGraph 条件路由工作流（分析、追问、检索、二次研判、融合研判、证据判定、生成/人工复核），模型失败自动回退 Mock
-- 模型：Qwen2.5-VL / GLM-4V-Flash（OpenAI 兼容 API），Mock 模式无需 Key
+- 模型：Qwen / GLM（模型名可配置，OpenAI 兼容 API），Mock 模式无需 Key
 - 检索：FAISS 或 NumPy 兜底向量检索，可选规则重排 Reranker（`RERANKER_ENABLED`，执行 Vector Top-K → 重排 → Top-N）
 - 前端：Vue 3、TypeScript、Vite、Element Plus、Pinia
 
@@ -21,36 +21,46 @@ backend/
   app/models/     SQLAlchemy 模型
   app/schemas/    Pydantic 输入输出
   app/services/   providers、rag、workflow、report
-  data/knowledge/ 演示知识库
-  tests/          pytest 接口测试
+  data/knowledge/ 本地知识及开发法规节选
+  resources/knowledge_seed/ 镜像只读开发种子
+  migrations/     Alembic 增量迁移
+  tests/          历史 pytest 测试（保留）
 frontend/
   src/views/      页面
   src/components/ 研判结果组件
   src/stores/     Pinia 状态
+test/             新增测试、合成评测数据、隔离 E2E
+docs/baselines/   各阶段实际验收记录
 ```
 
 ## 快速启动
 
 ### 后端
 
-```bash
-cd backend
-cp .env.example .env
-.\.venv\Scripts\python.exe -m pip install -e ".[faiss]"
+需要 Python 3.11+、uv，以及 Node >=22.13 / pnpm 11.21.0。以下为 Windows PowerShell，从仓库根目录开始：
+
+```powershell
+Set-Location backend
+Copy-Item .env.example .env
+uv sync --frozen --extra dev --extra faiss --extra pg
+$env:PROVIDER_MODE = 'mock'
+$env:AUTH_MODE = 'none'
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8001
 ```
 
 注意用 `backend\.venv`，项目根目录下的 `.venv` 是旧环境，不要使用。
 
-也可以不安装 faiss-cpu，只安装基础依赖：`.\.venv\Scripts\python.exe -m pip install -e .`，系统会自动回退到 NumPy 检索。
+不安装 FAISS 时，省略 `--extra faiss`，使用 NumPy 检索。仅演示不开发时可省略 `--extra dev`。不要覆盖已有 `.env`；已有环境先核对配置。
 
 接口文档：`http://localhost:8001/docs`
 
 ### 前端
 
-```bash
-cd frontend
-pnpm install
+另开终端，从仓库根目录执行：
+
+```powershell
+Set-Location frontend
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
@@ -69,24 +79,27 @@ EMBEDDING_MODEL=text-embedding-v3
 
 也支持智谱：配置 `ZHIPU_API_KEY` 与 `ZHIPU_BASE_URL`。
 
-## 部署（B6：Docker 与 PostgreSQL）
+## 部署（Docker 与 PostgreSQL）
+
+完整认证配置、升级备份和回退步骤见[部署说明](docs/DEPLOYMENT.md)。下面是本机 Mock 演示，两种数据库任选其一，不在同一项目名下混用数据卷：
 
 ```powershell
-# 默认（SQLite 单节点）：构建并启动全栈，前端 http://localhost:8080
-docker compose up -d --build
+# 默认 SQLite 单节点；绑定本机，前端 http://localhost:8080
+$env:PROVIDER_MODE = 'mock'
+$env:AUTH_MODE = 'none'
+$env:BACKEND_BIND_HOST = '127.0.0.1'
+$env:FRONTEND_BIND_HOST = '127.0.0.1'
+docker compose -p safety-demo up -d --build --wait --wait-timeout 180
 
 # PostgreSQL 变体（仍限定单实例、单 worker）
-docker compose -f docker-compose.pg.yml up -d --build
-
-# 首次使用 jwt 认证时建管理员（容器内）
-docker compose exec backend python -m app.cli.create_user --username admin --role admin
+docker compose -p safety-pg -f docker-compose.pg.yml up -d --build --wait --wait-timeout 180
 ```
 
 - 后端 lifespan 自动初始化并升级 Alembic 版本（旧库自动纳入版本管理），迁移错误拒绝启动；
 - 默认使用 Mock。新空卷从镜像只读种子离线初始化知识，已有卷不被新版种子覆盖；内置法规节选只供开发验证，正式使用前须人工复核版本与适用性。
 - `DATABASE_URL` 切 `postgresql+psycopg://...` 即用 PG（安装 `.[pg]` extra），CI 有 PG 全量测试矩阵；
 - 当前仅支持一个后端实例、一个 Uvicorn worker（`--workers 1`）。任务认领已原子化，但本地 SQLite checkpoint、上传目录和检索索引尚不支持多副本；PG 不改变这一限制。异步 worker 启动时通过 checkpoint 旁的 OS 锁拒绝重复启动；部署时保持同一数据目录，禁止通过分离 checkpoint 路径绕开此限制。
-- `/api/v1/live` 检查基础存活，`/health` 保留元信息；部署应检查 `/api/v1/ready`（数据库、迁移版本、知识/索引、持久存储和 worker），未就绪返回 503。两套 Compose 已使用此健康依赖，迁移失败拒绝启动。
+- `/api/v1/live` 检查基础存活，`/api/v1/health` 保留元信息；部署应检查 `/api/v1/ready`（数据库、迁移版本、知识/索引、持久存储和 worker），未就绪返回 503。两套 Compose 已使用此健康依赖。
 
 ## 质量保障（R6：版本化评测回归门禁）
 
@@ -151,7 +164,7 @@ jwt 模式使用：
 - 进程内 worker 串行消费任务，`progress_step` 逐步推进（分析→检索→研判→证据校验→生成），前端已内置轮询与进度提示；
 - 追问走 LangGraph checkpointer 断点恢复（`interrupt`/`Command(resume)`），**不再重新调用视觉模型**；进程重启后可从 checkpoint 恢复线程；
 - 人工复核结论会回写图线程状态；
-- 启动时自动清扫超时僵尸任务（`JOB_STALE_MINUTES`）。
+- 启动及运行时检查执行代次与租约；心跳续租、条件认领和迟到回写保护防止旧执行覆盖新任务。`JOB_STALE_MINUTES` 只承担兼容旧任务的清扫阈值。
 
 ### 幂等与去重
 
@@ -165,9 +178,9 @@ jwt 模式使用：
 - 多图上传 + 文字描述的多模态研判
 - Mock 模式全链路演示：解析、检索、分级、成文
 - 信息不足时追问，最多可追问 2 轮
-- 置信度分级：>=0.8 自动完成，否则转人工复核
+- 结合置信度、分歧、风险、模型/证据防护决定完成或人工复核；高置信度不能覆盖异常复核条件
 - 依据溯源：每条结论展示来源、原文、版本与相关度
-- LangGraph 工作流：解析、追问、检索、研判、证据检查、生成六节点编排
+- LangGraph 工作流：分析、追问、检索、refine、融合研判、证据、生成/人工复核八节点
 - 模型失败回退：真实模型调用异常时自动降级到 Mock 分析并标记
 - 整改工单、简报、结论导出
 - 知识库管理页：上传文档、内容预览、删除、一键切片重建
@@ -196,11 +209,13 @@ pnpm --dir frontend build
 自 B2 起所有表结构变更走 Alembic，不再手写 ALTER：
 
 ```powershell
+# 以下迁移命令在 backend 目录执行
+Set-Location backend
 # 模型改动后生成增量迁移（自动 diff 模型与库结构）
-.\backend\.venv\Scripts\python.exe -m alembic revision --autogenerate -m "add jobs table"
+.\.venv\Scripts\python.exe -m alembic revision --autogenerate -m "describe schema change"
 
 # 部署/升级时执行
-.\backend\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
 - 连接串与应用一致：读取 `backend/.env` 或 `DATABASE_URL` 环境变量，无需在 `alembic.ini` 里单独配置
@@ -287,7 +302,7 @@ Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样�
 
 当前 Mock 模式 30 条评测（B5 基线，2026-10-24，移除置信度 mock 特判后）：类别准确率 100%，等级容差准确率 100%，高风险复核率 100%，条款命中率 63.3%（B5 条文感知分块 + 向量归一化后由 40% 提升），人工复核率 100%（诚实数字：演示加成已移除，复核阈值不再被隐性抬高）。
 
-### 真实模型评测（B5 基线，2026-10-24 实跑）
+### 历史 B5 真实模型文本批次（归档自述，非本轮验收）
 
 单轮 30 条、Qwen-VL + GLM-V 双模型并行（`scripts/evaluate.py --provider auto`）：
 
@@ -302,7 +317,7 @@ Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样�
 | 人工复核率 | — | 1.0 |
 | 平均耗时（秒/案例） | 18.2 | 17.2 |
 
-变化说明：条款命中率显著提升来自 B5 的条文感知分块与向量 L2 归一化；类别准确率下降是模型行为漂移（在线模型版本变化）与检索结果变化的综合结果，属诚实基线——此后指标变化均可归因到具体批次（评测门禁见计划书 B6）。结果落在 `backend/data/eval/report.json`，正式基线同步至 `docs/evaluation/`。
+以上为历史记录引用，原报告位于 `backend/data/eval/report.json` 与 `docs/evaluation/`，不是 R8 重跑结果。历史上对条款分块、模型漂移的解释没有构成本轮受控因果实验；不能据此证明当前真实图片质量或与 schema 2 比较提升。
 
 ## 下一步
 
@@ -312,7 +327,7 @@ Reranker 历史脚本 `scripts/evaluate_reranker.py` 保留。过去 30 条样�
 
 ## 浏览器 E2E
 
-以 Mock 模式启动后端（8001）与前端（5173）后运行：
+历史面板冒烟需要预先启动后端（8001）和前端（5173），会向该实例写入记录，只能用于专用测试实例：
 
 ```powershell
 node scripts\verify_e2e.mjs

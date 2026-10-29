@@ -24,16 +24,22 @@
 
 R1/T03 起，历史 `test_async_second_followup_falls_back_to_full_rerun` 要求完成后仍可追问，与新状态合同冲突，在根目录插件中标记为严格预期失败（xfail，意外通过会使运行失败）。历史文件未改动；正确的 409 行为由 `test/backend/test_review_state_guards.py` 显式回归。该项必须在结果中单独报告，不能计入通过数。
 
+R6/T16 起，历史 `test_safe_ground_truth_is_not_silently_auto_passed` 要求转人工后不计误报，同样标记为 strict xfail；替代合同在 `test/backend/test_eval_detection_metrics.py`。最终报告中两项均不计通过数。
+
 测试在应用导入前固定 Mock，清空真实模型 Key，并将数据库、上传、知识库副本、向量缓存、checkpoint 和临时目录设置到 `test/.artifacts/`。真实 httpx HTTP 传输被阻止；`httpx.MockTransport` 与 FastAPI TestClient 可以使用。
 
 普通 `DATABASE_URL` 不作为新入口的数据库来源。只有显式提供 `TEST_DATABASE_URL` 才可覆盖默认测试库：
 
 - SQLite 必须是 `test/.artifacts/` 内的绝对文件路径，禁止 URI 查询参数。
 - PG 限定 `postgresql+psycopg`、本机地址、以 `test_` 开头或 `_test` 结尾的专用数据库名；必须事先创建专用测试库。
-- PG CI 已接入这一参数。本地 R0 尚未执行 PG 运行验证。
+- PG CI 已接入这一参数；R8 已完成本地 PG 运行验证，见 [最终记录](../docs/baselines/r8-2026-10-29.md)。
 - 不要把生产库改名后交给测试；显式测试库内的数据仍会被历史测试创建或清理。
 
 历史 `backend/tests/conftest.py` 未修改，仍会操作其原有固定测试文件名。推荐统一使用上述入口，以便在其导入前缓存隔离配置；不要把任何业务数据放进历史 `test.db` 或 `langgraph-test.db`。
+
+运行 PG 矩阵时，创建本机专用测试库后设置 `TEST_DATABASE_URL`，另把 `R3_TEST_POSTGRES_URL`、`R4_TEST_POSTGRES_URL`、`R8_TEST_POSTGRES_URL` 指向该专用库，分别启用独立 schema 的认领/幂等/发布迁移用例。未设置时这些条件用例跳过。不得指向业务库；全量套件会创建/清理测试数据。CI PG 任务已设置全部四个入口。
+
+R8 新增 `test/backend/test_release_migrations.py`：SQLite/PG 各三条路径（空库、R3 前旧库、未版本化旧库），验证到 head、重复执行和人工结果/审计/任务/幂等保留。历史 SQLite 专用迁移测试在 PG 模式跳过，由此矩阵补足。
 
 所有运行产物均忽略提交。保留运行目录便于排查；本轮不提供自动递归清理命令。
 
@@ -51,6 +57,33 @@ pnpm --dir frontend test --reporter=default --reporter=json --outputFile=../test
 
 Vitest 同时发现 `frontend/src/**/*.spec.ts` 和 `test/frontend/**/*.spec.ts`，新测试依赖复用前端的 node_modules。仅在测试模式开放外部测试目录；类型检查和 ESLint 包含新目录。生产构建仍从前端应用入口出发，不包含测试 fixture。
 
+若 Corepack 离线不能启动 pnpm，在已安装依赖的 frontend 目录可直接执行本地 CLI：
+
+```powershell
+node node_modules/vitest/vitest.mjs run
+node ../test/frontend/lint.mjs
+node node_modules/vue-tsc/bin/vue-tsc.js --noEmit
+node node_modules/vue-tsc/bin/vue-tsc.js --noEmit -p ../test/frontend/tsconfig.json
+node node_modules/vite/bin/vite.js build
+```
+
+## 浏览器、容器与评测
+
+仓库根目录运行以下隔离浏览器回归，Windows 使用已安装 Edge，Linux 需先安装 Playwright Chromium。默认 Python 为 backend/.venv，可设置 PYTHON 覆盖：
+
+```powershell
+node test/e2e/human-review.mjs
+node test/e2e/async-resume.mjs
+node test/e2e/assessment-lifecycle.mjs
+node test/e2e/submission-recovery.mjs
+node test/e2e/auth_modes.mjs
+.\backend\.venv\Scripts\python.exe scripts/check_eval_baseline.py
+```
+
+这些入口自建隔离后端，固定 Mock 并清除模型 Key。认证/幂等和旧部署入口仍沿用 r4/r5 产物文件名，每轮验收应核对修改时间并保存独立摘要；R7 浏览器产物目录自带 UUID。容器验收命令见 [部署说明](../docs/DEPLOYMENT.md)，合成集与真实标签边界见 [评测索引](../docs/evaluation/README.md)。
+
+两分钟恢复 E2E 使用浏览器虚拟时钟推进本地等待窗口，并暂停测试 worker；不等于真实模型运行两分钟的稳定性或费用验证。
+
 ## 记录实施基线
 
 先生成后端两份 JUnit 和前端 JSON 报告，再运行：
@@ -64,5 +97,7 @@ Vitest 同时发现 `frontend/src/**/*.spec.ts` 和 `test/frontend/**/*.spec.ts`
 记录内容包括 Git 修订、工作区是否有改动、`backend/app` 和 `frontend/src` 源文件指纹、测试数量、现有评测集哈希和覆盖摘要。记录器不导入应用设置，不读取 `.env`、API Key、数据库密码。
 
 新阶段如需新基线，使用 `--output docs/baselines/<新名称>.json`，保留旧文件。报告产物留在 `test/.artifacts/reports/`，不提交运行时数据库或原始日志。
+
+记录器初始 scope 字段来自 R0 模板；后续阶段必须按实际 PG/容器/浏览器证据补充范围，不能只改标题。R8 采用独立 reports/r8-final 目录，并将原始产物摘要及校验值汇总到新基线，保留旧阶段文件。
 
 R0 的缺陷回归设计见 [R0 实施基线与回归清单](../docs/baselines/r0-2026-10-28.md)。

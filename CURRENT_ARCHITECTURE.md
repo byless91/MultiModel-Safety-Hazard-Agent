@@ -1,177 +1,92 @@
-# CURRENT_ARCHITECTURE（V2 P0 快照）
+# 当前架构（R8 工程交付快照）
 
-> 本文档是 V2 改造任务书 Phase 0 要求交付的架构说明，随 P0 边界规则完善后更新。
-> 更新日期：2026-09-10
+更新：2026-10-29。实现与验收范围见 [R8 验收记录](docs/baselines/r8-2026-10-29.md)；部署、备份和回退见 [部署说明](docs/DEPLOYMENT.md)。历史 V2/B 系列任务书保留用于追溯。
 
-## 项目定位
+## 边界与数据流
 
-面向基层安全巡查的多模态安全隐患智能研判与人机协同闭环系统：
-
-```text
-多模态感知
-    ↓
-Qwen-VL + GLM-V 双模型交叉验证
-    ↓
-Disagreement / 一致性分析
-    ↓
-Risk Engine 风险规则计算
-    ↓
-RAG 法规证据检索
-    ↓
-Evidence Judge 证据校验
-    ↓
-自动完成 / 人工复核
-    ↓
-整改工单、整改照片复查、人工确认
-```
-
-核心原则：模型负责看，规则负责算，知识库负责证，人负责最终把关。
-
-## 总体架构
+系统辅助基层巡查识别隐患、提供证据并完成复核整改。模型提取事实，规则计算风险，知识库提供材料，人工决定最终结论。Mock、合成图片和开发法规节选验证工程链路；真实识图、误报控制和法规适用性尚未验收。
 
 ```text
-Vue 3 前端
-    ↓ /api/v1
-FastAPI
-    ↓
-LangGraph StateGraph（有 LangGraph 时）
-    ↓
-Input Guard → MultiModel Analysis → Risk Engine → RAG → Evidence Judge → Human Review
+Vue 3 / Pinia / 页面任务会话
+                ↓ /api/v1（nginx 或 Vite 代理）
+FastAPI：认证、角色、输入校验、幂等、审计、有效结论
+                ↓
+同步执行 / 数据库任务队列 + 单进程 worker
+                ↓
+LangGraph：analyze → info → retrieve → refine → judge → evidence
+                        ↘追问暂停                    ↘ generate / human_review
+                ↓
+SQLAlchemy：SQLite 或 PostgreSQL
+本地文件：上传 / 知识及向量缓存 / SQLite checkpoint
+                ↓
+人工复核 → 整改照片与 AI 比对 → 人工验证 → 关闭 → 导出
 ```
 
-未安装 LangGraph 时，`services/workflow.py` 自动退回同构的函数式流程，两者共享节点实现。
+只支持一个后端实例、一个 Uvicorn worker。PG 替换业务数据库，不替换本地 checkpoint、文件和索引，不能据此部署多 worker。缺少 LangGraph 时存在共享节点的函数式降级流程；断点恢复依赖 LangGraph/checkpointer。
 
-## LangGraph 节点
+## 模型、规则与防护
 
-图文件：`backend/app/services/langgraph_flow.py`
+- `services/providers/` 统一 analyze/complete/embed/compare 接口，接入 Qwen、GLM 的兼容 HTTP。配置模型名与服务返回模型标识分别记录；auto 无 Key 时仍是 Mock。
+- 双模型并行分析记录独立状态、延迟和错误，明确 full/partial/fallback。全部失败的 Mock 兜底、解析失败等异常触发人工复核。
+- HTTP 入口统一申请单进程并发名额，覆盖分析、refine、compare、embedding 和重试；退避及解析不占名额，排队超时不发送请求。
+- 标准化、事实/位置去重、分歧分析和 Ensemble Judge 先于风险及证据判定。稳定、不透明的 finding_id 区分同类不同位置隐患。
+- Risk Engine 使用 risk-engine-v1；模型不能指定规则得分。空 finding、未知类别或证据不足不能单凭高置信度自动通过。
+- 文本/OCR/知识作为外部数据处理，实施长度、注入、图片格式和大小检查，并校验结构化输出及证据。这不构成消除 Prompt Injection 的保证。
+- 真实调用落 llm_calls 台账，关联 request/assessment、用途、Prompt、tokens、重试和错误。日预算是入口软阈值，没有并发预算预留或分布式账本。
 
-| 节点 | 职责 |
-| ---- | ---- |
-| analyze | 并行调用全部真实 Provider，标记 full/partial/fallback，标准化并做分歧初检 |
-| info | 低置信且可追问时输出追问问题 |
-| retrieve | 按场景标签与语义检索知识库 |
-| refine | 真实模型模式下用最终证据二次研判 |
-| judge | Ensemble Judge + Risk Engine + 结构化最终结论 |
-| evidence | Evidence Judge 与证据链回写 |
-| generate / human_review | 按复核条件路由到完成或人工复核 |
+## 知识与逐项证据
 
-条件边：
+`services/knowledge.py` 按章节/条款切片，保留来源、条款、版本、生效时间和标签。演示语料不作为正式证据。镜像将 `resources/knowledge_seed/` 作为只读种子，只在空知识目录离线初始化，已有数据不被镜像替换。
 
-- `info → finish/retrieve`
-- `evidence → generate/human_review`
+`services/rag.py` 支持 FAISS/NumPy。真实 embedding 和 hash 兜底使用隔离空间，语料与查询同步切换；真实缓存保留，恢复探测有冷却时间。结果标记 embedding_space/embedding_fallback，hash 相似度不代表真实语义质量。索引格式不兼容时从缓存重建，知识重建/查询受锁保护。
 
-## Provider 抽象与真实双模型
+每项 finding 独立保留事实、位置、模型引用、法规证据和支持状态。未查到法规不会抹掉视觉隐患；不支持或不足的结论进入复核。旧 finding_id 重复、映射不明确时只读提示核查，不批量重写历史报告。Reranker 是可选词面/元数据重排，尚无新数据上的效果提升结论。
 
-目录：`backend/app/services/providers/`
+## 状态、人工结论与整改
 
-- `base.py`：统一 `analyze/complete/embed/compare` 接口与超时/不可用异常
-- `http.py`：OpenAI 兼容 HTTP 实现，接入重试、指数退避、JSON 解析、外部文本数据标签
-- `qwen.py` / `zhipu.py`：DashScope 与智谱 BigModel 两套配置
-- `factory.py`：按 `.env` 同时构建 Qwen 与 GLM，缺 Key 时自动 Mock
-- `mock.py`：确定性 Mock，`hash_embed` 作为嵌入兜底
+研判状态包括 pending、needs_more_info、awaiting_human_review、completed、needs_review、confirmed、failed；任务状态与整改状态独立。
 
-并行入口：`ensemble/analyzer.py:run_parallel_analysis`
+- 只有 needs_more_info 可追问，活动任务、已完成或定稿记录拒绝覆盖。
+- reviewer/admin 可批准、拒绝和修订类别、1–3 整数等级、非空结论；拒绝必须有意见。JWT 操作人取认证身份。
+- human_review 保存首次复核前 AI 快照及追加历史，相同审批可幂等重放。详情、工单、导出读取同一有效结果，不冒充重新计算 AI 风险因子。
+- 整改状态为 open / assigned / rectifying / pending_verification / verified / closed，允许受控退回/重开。照片成对比对和 rectification-assessment-v1 完成度仅辅助判断，必须人工 verified 才能 closed。
+- inspector 可提交研判及整改照片；复核和整改状态流转由 reviewer/admin 执行；知识及用户管理需要 admin。none/token 无个人角色身份保证，前端标识兼容模式。
 
-```text
-同一图片 + 文字 + OCR + RAG 证据
-    ↓ 线程池
-Qwen-VL             GLM-V
-    ↓                   ↓
-latency/status/error_type/retry_count 独立记录
-    ↓
-full / partial / fallback 明确标记
-```
+## 异步、幂等与页面恢复
 
-两个模型全部失败时进入 `mock_fallback`，任何 Mock 都由下游强制人工复核。
+sync 保留同步响应；async 在研判和任务同事务落库后返回 202，由单进程 worker 串行消费。
 
-## 统一结构化 Schema
+- 条件 UPDATE 原子认领任务，worker_id、attempt_token、lease_expires_at 隔离执行代次。运行时心跳、监测及进程锁处理失联，旧执行迟到不能回写新代次。
+- 追问在接受时预留次数及 followup_token，失败/恢复按代次释放。checkpoint 恢复已暂停线程，通常不重跑原视觉分析。
+- Idempotency-Key 绑定初始文字/OCR/图片指纹；相同内容复用原记录/任务，不同内容 409。GET /assessment-submissions/{key} 只查询；无指纹旧映射可查，但拒绝不明确的 POST 重放。
+- 前端 sessionStorage 只保留恢复元信息，响应丢失后先查原 key，刷新不自动重传照片或重新调用模型。
+- useAssessmentSession 按页面和记录持有任务、定时器和 AbortController。刷新、历史入口、路由换 id 查询记录与最新任务；离开停止本地轮询。两分钟是本地等待窗口，继续查询不重建任务，终态停止轮询。
 
-- `providers/schemas.py`：`ModelAnalysis` / `HazardFinding` / `HazardLocation`
-- Mock 与真实输出统一经过 `normalize_analysis` 校验、夹紧、补默认值
-- 真实 Provider 的 `rule` / `rule_score` 不再进入工作流，防止模型直接控制风险规则
+## 持久化、认证与运行
 
-## 结果标准化、分歧与 Ensemble Judge
+模型包括 Assessment、AssessmentImage、AssessmentJob、IdempotencyKey、KnowledgeDocument、User、LLMCall。Alembic head 为 `f04b62a9c310`，启动接管未版本化库并增量升级；任何迁移失败拒绝启动。
 
-- `ensemble/standardize.py`：类别规范化、字段收敛、按“类别+位置+事实”保留不同隐患
-- `ensemble/disagreement.py`：类别一致性、严重度差、关键事实冲突、agreement_score
-- `ensemble/judge.py`：聚合双模型结果，`FinalFinding` 保留每个模型的 finding 追踪
+R3/R4 新增任务 worker/代次/租约、追问预留 token、幂等初始指纹列，允许历史值为 null。人工历史和 AI 快照使用既有 JSON 字段，没有迁移重写存量人工结论。
 
-## Risk Engine
+认证支持 none、静态 token、JWT。token 缺凭证，JWT 使用默认/占位/过短密钥时拒绝启动。图片 URL 签名与凭证/密钥关联；nginx 代理 `/api` 和 `/uploads`。管理员通过容器内 `python -m app.cli.create_user` 初始化。
 
-目录：`backend/app/services/risk_engine/`
+| 入口 | 含义 |
+|---|---|
+| /api/v1/live | 进程存活 |
+| /api/v1/health | Provider/auth 元信息，不能代替就绪 |
+| /api/v1/ready | DB、迁移 head、非演示知识/持久切片、索引、可写目录、适用异步 worker；异常 503 |
+| /metrics | Prometheus 指标，按部署网络策略限制可见范围 |
+| /api/v1/admin/llm-usage | 管理员调用台账汇总 |
+| /api/v1/evaluation/reports | 评测归档，不代表单条研判完整分布式 Trace |
 
-- 规则版本：`RISK_RULE_VERSION=risk-engine-v1`
-- 按类别基础分 + 人员暴露关键词 + 立即危险关键词 + 严重度提示计算 0-100
-- 未知类别/缺失严重度强制建议复核
-- 没有任何隐患输出时默认 `20/low + review_suggestion=True`，不会自动通过
+## 评测与验收
 
-## 三层 Guardrail
+- 当前工程集：test/evaluation/cases.jsonl，r6-synthetic-v1、schema 2.0，12 案例引用 10 张合成 PNG，8 隐患/4 负例，独立人工标签为 0。
+- 历史源码文本集 60 条，无图片/明确负例/独立证据标签；旧归档有 30 条批次。各批次样本数不能互相替代。
+- FP/FN、拒判、流程拦截分开统计；证据自评和独立标签正确率分开，缺标签为 N/A。当前聚合为案例存在性和主类别，尚非逐项定位成绩。
+- 报告保留数据/配置/Prompt/规则/模型/源码摘要，不同口径禁止比较；缺指标或分母使门禁失败。Mock 门禁只比较 R6 工程基线。
+- 新增测试统一在 test/；新旧后端分进程隔离，离线单测禁止真实 HTTP。本轮 SQLite/PG、容器、浏览器实测数及产物摘要见 R8 验收记录。
 
-目录：`backend/app/services/guardrail/`
+## 尚未支持或验收
 
-- Input Guard：文本长度、注入正则、图片魔数/大小、OCR 文本逐条检测
-- Model Guard：字段校验 + 绝对化“安全”结论识别（`unsolicited_safety_verdict`）
-- Evidence Guard：复用 Evidence Judge 判断证据是否支持结论
-
-外部内容一律作为数据标签传入：
-
-```text
-<USER_DESCRIPTION> ... </USER_DESCRIPTION>
-<OCR_CONTENT> ... </OCR_CONTENT>
-<RAG_EVIDENCE> ... </RAG_EVIDENCE>
-```
-
-API 已支持可选表单字段 `ocr_texts`（JSON 字符串数组），注入内容直接 400 拒绝。
-
-## RAG 与知识库
-
-- `services/rag.py`：FAISS 可选，NumPy fallback
-- `services/knowledge.py`：章节/条款感知分块，保存 `document/article/source/version/effective_date/tags`
-- 演示数据（`is_demo` / demo 版本）不作为法规证据
-- 管理员上传文档自动重建索引，知识库正文注入检测失败时拒绝入库
-
-## Evidence Judge 与证据链
-
-- 视觉事实与法规证据分开计算
-- 输出 `supported / support_score / evidence_ids / unsupported_claims`
-- “没有查到法规”不等于“没有安全隐患”，不足时 `needs_human_review=True`
-
-## Human-in-the-loop
-
-`services/human_review.py` 聚合以下触发：
-
-```text
-disagreement / ensemble_judge / risk_engine / risk_model_conflict
-image_quality / negated_claim / evidence_judge / model_guard
-model_safety_verdict / low_confidence / fallback
-```
-
-其中 `negated_claim` 是新增规则：模型无 finding 且输入/OCR 宣称“安全、无隐患”时，禁止自动通过。
-
-## 数据库与 API
-
-- SQLite + SQLAlchemy：`Assessment / AssessmentImage / KnowledgeDocument`
-- 状态：`pending / needs_more_info / awaiting_human_review / completed / needs_review / confirmed / failed`
-- `backend/app/api/routes.py` 保留 `/assessments` 系列接口
-- `/system/provider` 暴露 Provider 元数据，不暴露 Key
-- 可选 `API_BEARER_TOKEN` 中间件
-
-## 测试
-
-运行：
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider --basetemp=.pytest-tmp
-```
-
-覆盖：Provider 抽象、并行调用、OCR 透传、Schema、标准化、分歧、Ensemble Judge、Risk Engine、Guardrail、Evidence RAG/Judge、Human Review、LangGraph 条件路由、API。
-
-## 已知缺口（P1/P2 或安全残余风险）
-
-- Prompt Injection 无法声称“彻底解决”，当前依靠数据标签 + 注入检测 + 强制人工复核兜底
-- Reranker 已实现（词面/元数据规则重排，`RERANKER_ENABLED` 可选；30 条评测中命中率无可测量提升，故保留开关不强制）
-- 评测管线已支持场景细分、高风险复核率、Unsafe Auto-Pass Rate、`--limit` 与 `report.md` 人工可读报告；消融评测已支持 A-F 六变体（模型组合/风险引擎/RAG 可开关）并输出 `ablation_report.md`；真实评测集放大仍待做
-- 前端已有证据链面板（视觉事实→模型交叉→风险→法规→判定）、模型 A/B 对比（含失败/降级/单模型标记）、分歧可视化（一致性仪表、逐类对比、冲突标记）、风险引擎解释面板（因子权重、触发规则、证据使用）、法规证据面板（来源/条款/版本/采用状态）与可选 bbox 隐患定位（仅绘制可靠坐标，缺失时明确不绘制）；AI Trace 视图仍未做
-- 整改闭环已实现六态状态机、前后照片成对对比与独立 AI 完成度规则评估（`rectification-assessment-v1`）；未经历人工确认（`verified`）不能关闭，研判确认接口记录复核人/意见/时间
-- Docker、正式 trace 接口、README 与真实评测结果同步未完成
+真实现场图片质量、独立法规正确率、真实模型多批次稳定性和成本；组织级数据隔离；多副本/多 worker；分布式预算；法规自动更新审核；完整分布式 Trace；真实移动设备触摸验收。前端主 JS 仍有 >500 kB 构建警告，优化需另设可测目标。外部条件见 [真实验收清单](test/evaluation/real-acceptance-status.json)。

@@ -1,0 +1,455 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-29T15:48:21.734714+08:00",
+  "git_revision": "f14d470a558f7e59aa5dd766b25b6fa5c66acd1d",
+  "worktree_dirty": true,
+  "product_source_sha256": "1ebafdeeaec5d0d5752aae2e373ab97f45b8ffa6a0ad875012596063e69b1776",
+  "scope": "Windows Python 3.13/Edge; isolated SQLite and PostgreSQL 16; fresh Docker Python 3.11 images; Linux GitHub CI verified on f14d470",
+  "offline_configuration": {
+    "provider_mode": "mock",
+    "auth_mode": "none",
+    "workflow_mode": "sync",
+    "real_api_keys": "cleared",
+    "database": "isolated SQLite",
+    "real_http": "blocked",
+    "test_artifacts": "test/.artifacts/"
+  },
+  "backend_new": {
+    "tests": 379,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 379
+  },
+  "backend_legacy": {
+    "tests": 335,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2,
+    "passed": 333,
+    "strict_xfailed": 2
+  },
+  "frontend_combined": {
+    "tests": 83,
+    "passed": 83,
+    "failures": 0,
+    "skipped": 0
+  },
+  "evaluation_dataset": {
+    "sha256": "a0c5193f38011fa95387702c3785b33b4c640eb57fc7fd7e93f949165b795d5d",
+    "cases": 60,
+    "image_cases": 0,
+    "safe_negative_cases": 0,
+    "evidence_labeled_cases": 0,
+    "source_type_counts": {
+      "curated": 60
+    },
+    "category_counts": {
+      "占用疏散通道": 9,
+      "消防器材失效": 16,
+      "电气线路隐患": 14,
+      "危险化学品存储不规范": 3,
+      "公共区域安全隐患": 13,
+      "野外用火风险": 5
+    }
+  },
+  "not_validated": [
+    "Authorized field-image quality and false-positive control",
+    "Independent human legal-evidence correctness",
+    "Real-model multi-batch latency, reliability and cost",
+    "Physical mobile-device touch input",
+    "Production backup restoration and traffic switching",
+    "Multiple instances/workers and organization-level isolation (unsupported)"
+  ],
+  "stage": "R8/T21 engineering complete; real-scene acceptance pending",
+  "postgres": {
+    "environment": {
+      "database_backend": "postgresql",
+      "provider_mode": "mock"
+    },
+    "backend_new": {
+      "tests": 379,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 379
+    },
+    "backend_legacy": {
+      "tests": 333,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 5,
+      "passed": 328
+    },
+    "legacy_skip_breakdown": {
+      "strict_xfailed": 2,
+      "sqlite_specific_test_skipped": 2,
+      "sqlite_migration_module_collection_skipped": 1
+    },
+    "conditional_pg_inputs_enabled": [
+      "R3_TEST_POSTGRES_URL",
+      "R4_TEST_POSTGRES_URL",
+      "R8_TEST_POSTGRES_URL"
+    ]
+  },
+  "release_migrations": {
+    "summary": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 6
+    },
+    "head": "f04b62a9c310",
+    "from_version": "7122c95a212f",
+    "paths": [
+      "empty",
+      "versioned_pre_R3",
+      "unversioned_pre_R3"
+    ],
+    "dialects": [
+      "sqlite",
+      "postgresql"
+    ],
+    "reentrant": true,
+    "human_result_audit_job_idempotency_preserved": true
+  },
+  "static_checks": {
+    "ruff": "passed: backend and test",
+    "mypy": "passed: 15 configured core/provider files",
+    "eslint": "passed",
+    "vue_tsc_app_and_root_tests": "passed",
+    "vite_production_build": "passed",
+    "compose_both_configurations": "passed",
+    "main_js_kb": 1347.2,
+    "main_js_gzip_kb": 433.53,
+    "known_build_warning": "chunk >500 kB"
+  },
+  "docker_images": {
+    "safety-r8-backend:test": "sha256:f792e3b4e1f0e5a79f42e60d5cd3abb47ed093638a96730e8079fad34f880d3f",
+    "safety-r8-frontend:test": "sha256:36b5d49c96916b16cbc2ed10482cf4a320b0954c6b30626bcaa632c0a3394896"
+  },
+  "runtime_evidence": {
+    "test/.artifacts/reports/r8-final/compose-sqlite.json": {
+      "sha256": "9a0b092f0cfb4ca242b06b658b446a6c6572fc18475a05aaa6c5a137f84c7f63",
+      "modified_at": "2026-10-29T15:39:53.561653+08:00",
+      "result": {
+        "passed": true,
+        "variant": "sqlite",
+        "provider": "mock",
+        "fresh_volumes": true,
+        "ready_dependency": true,
+        "submit_query_review_export": true,
+        "signed_image_proxy": true,
+        "restart_preserves_assessment_image_user_knowledge": true,
+        "corpus_loss_returns_503": true,
+        "liveness_survives_dependency_failure": true,
+        "migration_failure_propagates": true
+      }
+    },
+    "test/.artifacts/reports/r8-final/compose-pg.json": {
+      "sha256": "54dbc235bfab3107c6eb0acce1bf362e77812fb1d8aa59518b392044aa5084a2",
+      "modified_at": "2026-10-29T15:40:53.369913+08:00",
+      "result": {
+        "passed": true,
+        "variant": "pg",
+        "provider": "mock",
+        "fresh_volumes": true,
+        "ready_dependency": true,
+        "submit_query_review_export": true,
+        "signed_image_proxy": true,
+        "restart_preserves_assessment_image_user_knowledge": true,
+        "corpus_loss_returns_503": true,
+        "liveness_survives_dependency_failure": true,
+        "migration_failure_propagates": true
+      }
+    },
+    "test/.artifacts/reports/r8-final/container-bootstrap.json": {
+      "sha256": "e02ed84ef6c028e56e7acd4ecf4254661a17a9fe45ea933b2875cf32790e7100",
+      "modified_at": "2026-10-29T15:41:06.278382+08:00",
+      "result": {
+        "passed": true,
+        "image": "safety-r8-backend:test",
+        "fresh_volume": true,
+        "provider": "mock",
+        "seed_readonly": true,
+        "seed_scope": "development_excerpt/unreviewed",
+        "operator_cli_login": true,
+        "container_recreated": true,
+        "knowledge_and_users_preserved": true,
+        "knowledge_snapshot_sha256": "b1eeb521316a5ac5825e3716d522e9bf13fd122a37cfe68b8c58d27ca4e340b0"
+      }
+    },
+    "test/.artifacts/reports/r8-final/cloud-ci.json": {
+      "sha256": "3ef06c24c11d8f2aba81a74795a97401ca18f6cf742059fc4bc994955dba02e5",
+      "modified_at": "2026-10-29T15:49:43.309395+08:00",
+      "result": {
+        "commit": "f14d470a558f7e59aa5dd766b25b6fa5c66acd1d",
+        "run_id": 40837231154,
+        "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "Compose 业务闭环（pg / Mock）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324767993"
+          },
+          {
+            "name": "后端依赖安全审计",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768203"
+          },
+          {
+            "name": "后端（ruff / mypy / pytest）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768244"
+          },
+          {
+            "name": "前端（eslint / vue-tsc / build）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768264"
+          },
+          {
+            "name": "图片研判与整改浏览器闭环（Mock）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768279"
+          },
+          {
+            "name": "后端（PostgreSQL 矩阵）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768320"
+          },
+          {
+            "name": "Compose 业务闭环（sqlite / Mock）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768322"
+          },
+          {
+            "name": "评测回归门禁（mock）",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/byless91/MultiModel-Safety-Hazard-Agent/actions/runs/40837231154/job/123324768360"
+          }
+        ]
+      }
+    },
+    "test/.artifacts/reports/r4-e2e.json": {
+      "sha256": "0b09168bfaf68668a15961c749b4afc3859196ee34f3bea87716a04df49bde56",
+      "modified_at": "2026-10-29T15:37:58.302776+08:00",
+      "result": {
+        "passed": true,
+        "browser": "Edge headless",
+        "provider": "mock",
+        "initial_post_responses_lost": 1,
+        "create_post_count": 1,
+        "reloaded": true,
+        "counts": {
+          "assessments": 1,
+          "assessment_jobs": 1,
+          "idempotency_keys": 1
+        },
+        "recovered_assessment_id": "3d0c2303-278f-4982-bbfe-7e227630c1d5",
+        "recovered_job_id": "b1992b61-1203-4557-8fa3-ff621de2673d",
+        "screenshot": "test/.artifacts/reports/r4-submission-recovery.png"
+      }
+    },
+    "test/.artifacts/reports/r5-auth-browser.json": {
+      "sha256": "f1f4e2512092a86d104b554082368bd39d81a23c03bfca0c3f62459aeafded88",
+      "modified_at": "2026-10-29T15:38:12.301197+08:00",
+      "result": {
+        "passed": true,
+        "results": [
+          {
+            "mode": "none",
+            "passed": true,
+            "requests": 2
+          },
+          {
+            "mode": "token",
+            "passed": true,
+            "requests": 6
+          },
+          {
+            "mode": "jwt",
+            "passed": true,
+            "requests": 6
+          }
+        ],
+        "static_401_preserves_credential": true,
+        "no_static_password_login_or_user_probe": true,
+        "jwt_reload": true
+      }
+    },
+    "test/.artifacts/reports/r7-human-review-e7040c8b-429e-47cd-8979-f75a37e57922/result.json": {
+      "sha256": "2c5e4169c4819091810acf9207b7669a3be137cdec0a78c3b47a90f4b6559e75",
+      "modified_at": "2026-10-29T15:37:11.584376+08:00",
+      "result": {
+        "passed": true,
+        "provider": "mock",
+        "browser": "Edge headless",
+        "approved_id": "d4f55256-a417-4a32-aa88-247db96c3613",
+        "revised_id": "2feb0b6d-2013-4591-af42-e30b686ec046",
+        "approve_post_count": 1,
+        "rejection_requires_note": true,
+        "revision_history_count": 2,
+        "export_consistent": true,
+        "inspector_ui_hidden_and_api_403": true,
+        "mobile_viewport_emulated": true
+      }
+    },
+    "test/.artifacts/reports/r7-async-resume-416332ff-51f4-471b-9eb5-30281e017906/result.json": {
+      "sha256": "413406a00a4e111fc1fdd859ee509ef3fb5b0dbac7fb541b476f53c4993db2ae",
+      "modified_at": "2026-10-29T15:37:27.970604+08:00",
+      "result": {
+        "passed": true,
+        "refreshed_real_running_job": true,
+        "virtual_local_wait_ms": 120100,
+        "server_kept_running": true,
+        "temporary_network_failure_recovered": true,
+        "terminal_polling_stopped": true,
+        "reused_route_id_updated": true,
+        "left_page_stopped_queries": true,
+        "failed_record_visible": true,
+        "real_model_calls": 0
+      }
+    },
+    "test/.artifacts/reports/r7-assessment-lifecycle-52bd82c0-645d-4f8b-b3e7-a3e59a82c926/result.json": {
+      "sha256": "d5ec1af1c8a7456eeea4f23c93a93e7bb33dcdb9efeb6ddeaabb11d8db18c366",
+      "modified_at": "2026-10-29T15:37:51.590919+08:00",
+      "result": {
+        "passed": true,
+        "provider": "mock",
+        "synthetic_image_fixtures": true,
+        "assessment_id": "e49300f5-5988-4450-a87f-ffd2deb40332",
+        "statuses": [
+          "needs_more_info",
+          "awaiting_human_review",
+          "confirmed",
+          "rectifying",
+          "pending_verification",
+          "verified",
+          "closed"
+        ],
+        "role_separation": [
+          "inspector-submit-and-upload",
+          "reviewer-approve-and-verify",
+          "admin-close"
+        ],
+        "followup_job_id": "1676ccf0-6f7c-45ca-bb5a-50cb518d455b",
+        "followup_used": 1,
+        "human_review_events": 1,
+        "rectification_history": [
+          {
+            "action": "开始整改",
+            "from_status": "open",
+            "to_status": "rectifying",
+            "note": "开始整改",
+            "by": "browser-reviewer",
+            "created_at": "2026-10-29T07:37:45.621786+00:00"
+          },
+          {
+            "action": "提交整改照片并 AI 比对",
+            "from_status": "rectifying",
+            "to_status": "pending_verification",
+            "note": "已完成清理和移除杂物，通道恢复畅通，隐患已消除",
+            "by": "browser-inspector",
+            "created_at": "2026-10-29T07:37:47.562978+00:00"
+          },
+          {
+            "action": "人工确认整改完成",
+            "from_status": "pending_verification",
+            "to_status": "verified",
+            "note": "",
+            "by": "browser-reviewer",
+            "created_at": "2026-10-29T07:37:48.955292+00:00"
+          },
+          {
+            "action": "关闭工单",
+            "from_status": "verified",
+            "to_status": "closed",
+            "note": "",
+            "by": "browser-admin",
+            "created_at": "2026-10-29T07:37:50.426785+00:00"
+          }
+        ],
+        "failed_close_preserved_state": true,
+        "downloaded_report_consistent": true,
+        "mobile_viewport_emulated": true,
+        "real_model_calls": 0
+      }
+    }
+  },
+  "evaluation_current": {
+    "dataset": {
+      "sha256": "418038637fabe21926bb08724f08e36cb4848d6734d74139719909bd21feb974",
+      "cases": 12,
+      "image_cases": 12,
+      "safe_negative_cases": 4,
+      "evidence_labeled_cases": 1,
+      "source_type_counts": {
+        "synthetic": 12
+      },
+      "category_counts": {
+        "占用疏散通道": 4,
+        "无隐患": 4,
+        "电气线路隐患": 1,
+        "公共区域安全隐患": 1,
+        "野外用火风险": 1,
+        "危险化学品存储不规范": 1
+      }
+    },
+    "gate": "passed against docs/evaluation/r6-v2/reports/evaluation_report.json",
+    "report_path": "test/.artifacts/evaluation/r6-gate-h4qiqv6y/report.json",
+    "report_sha256": "3739d95a00dc68f3c5991a3c195bb59e65741d3a39320395f90e44c4a3352fa4",
+    "report_schema_version": "2.0",
+    "metrics_schema_version": "2.0",
+    "evaluation_mode": "mock",
+    "real_model_calls_this_stage": 0,
+    "real_field_images": 0,
+    "independent_human_labels": 0
+  },
+  "evidence_files": {
+    "test/.artifacts/reports/r8-final/backend-new.xml": "0612b1cd8435477d4c7d76ce0bf39ff64a222226cf7c01afe8c08e8646028466",
+    "test/.artifacts/reports/r8-final/backend-legacy.xml": "05847563494eb6a37f89fb26480b6cf5ccfc184af06985e3cf0ee293d188aece",
+    "test/.artifacts/reports/r8-final/frontend.json": "813c9741d367a10b1ba13c65646b4d5bd6a9a96df9033129c31c8352815b282a",
+    "test/.artifacts/reports/r8-final/postgres/backend-new.xml": "729d824121f0e222a4bb7f456e9f91ecab0c76d2c2d7df55df0aa295690401f7",
+    "test/.artifacts/reports/r8-final/postgres/backend-legacy.xml": "6ebb807cf0c1e737e980db0908a080deaeb8f1bf7ced8a44c076a6e5adc0ec6e",
+    "test/.artifacts/reports/r8-final/migrations/backend-new.xml": "006dc060e22b22b36418b917f39922a853ea0a0de306bfc4187576a486eea0fd"
+  },
+  "release_input_sha256": {
+    "backend/migrations/env.py": "e2adcd5c9a5d6694007cabe7ab8b7c414c884f40e3e83827b592c812ea6dc96d",
+    "backend/migrations/README": "31595cf53626af9ed16e15c44fa43183209cc163fbc3ebcb904b22ac436a8884",
+    "backend/migrations/script.py.mako": "d38920781b4d31ae1c0a71bc09f41c2ade8feab9e5a087e3f30cb4bbf0c1c9d3",
+    "backend/migrations/versions/20261024_673175f7eda4_baseline_schema.py": "859f02b7976b56cda51a2f19f95878119d5238f0ca886a582aec8dcaccce8abb",
+    "backend/migrations/versions/20261024_7122c95a212f_add_llm_calls_ledger_table.py": "4bd90381efa730df0df06783442e88a0162c14ec7749291329aec4ac2213609e",
+    "backend/migrations/versions/20261024_87dc5356c5fd_add_assessment_jobs_table.py": "238aa64f5efcf4bcf4f3f6f771af4f7306d3b4834a7472bb033410342b4a82ab",
+    "backend/migrations/versions/20261024_d6b3c739463f_add_idempotency_keys_table.py": "c4629d284c9e102ab1714fa908eb854efa688e8c9fc476fc651a8efcfe0a472f",
+    "backend/migrations/versions/20261024_f3c44fa1f422_add_users_table_and_audit_columns.py": "32154fdbecd57d8727e2592fb6dc495ec12685e9d56065d5a48abd2f42bad3ec",
+    "backend/migrations/versions/20261028_c21a7db8e401_job_execution_leases.py": "415c4cbc2da357ae42de0dc6716eb3d6fffb7b4d1a6851870efa5cb85fdbd09c",
+    "backend/migrations/versions/20261028_e9c31a57db02_followup_reservations.py": "3521712643aa4e1d82f9afe911c69513b37c61d3352649c8f3c9d367a03cc08d",
+    "backend/migrations/versions/20261028_f04b62a9c310_submission_fingerprints.py": "1548688ae9883cc42999ad28d4b1a324ec73aa6f7d671c3e36e25f3a5a7c0866",
+    "backend/resources/knowledge_seed/README.md": "c8915b16375196b08727613deb834b6fb2b5c4ff3114171c98d2de9d549c22ce",
+    "backend/resources/knowledge_seed/source_raw/01_消防法_第二十八条.txt": "d5c32098a329971b59140653ccf3a9c8fcfb6a6ac7608571bb03036a16867fb1",
+    "backend/resources/knowledge_seed/source_raw/02_安全生产法_第四十一条.txt": "4a25eae455001d3ed792ae9e131f1fe600927aa344d12fa5d73e4829846d5a48",
+    "backend/resources/knowledge_seed/source_raw/03_森林防火条例_第二十五条.txt": "d94e3d73b953b39af82048137bede9f4c898051fd14447d177bdb773f7e1e903",
+    "backend/resources/knowledge_seed/source_raw/sources.md": "4916d03f7661102906a6114c084db8fe7044883b9e3e0f1002845b9b7cdd011e",
+    "backend/Dockerfile": "08b9825b91c220e34b2eb6375faefcc9369d6f235d531c8fba9ed3fd71d261ab",
+    "backend/uv.lock": "4dac6103a17e8f6022fa1831205e148a47dc3a26e3856a2653165db998bd9527",
+    "backend/pyproject.toml": "97a9b8c4f22db34acd42d55ec36de59228053d88050cc763d6dfee79a997894a",
+    "frontend/Dockerfile": "fe96e897a90c6ad460d0cfc52d3c6c721fc70ef74726e9a787618b1371c63710",
+    "frontend/pnpm-lock.yaml": "78ee440fa43f42100f79968ffffffe27705fc9993e3b544b5d96bb7300300324",
+    "frontend/nginx.conf": "4d2b6057fb06189abd562646e33828bf3112b9b806a4dc33e803dc497c531f3d",
+    "docker-compose.yml": "db5400396f7ee2a038759ab6d9ea038ae4a8fed9a7cfe1f8a5a02e2189df9a45",
+    "docker-compose.pg.yml": "3b6ec8259ff67c38aa3488bc872175ac219e6deceed86973600d316f908e43d5",
+    ".github/workflows/ci.yml": "2123ef7afafb52cfdc26ce8731831754c24838530856814b0824806a8c89a998",
+    "test/backend/test_release_migrations.py": "1cd248739c7cbc3ce3417aa25d6338777a31ec4eaa760e71d39bfe8260280ce7"
+  },
+  "provenance_note": "Pre-documentation commit and dirty flag are intentional. Product digest matches unchanged R7 business code; test/deployment inputs and all fresh R8 results are recorded separately. Ignored raw artifacts remain local; portable summaries are embedded here."
+}
