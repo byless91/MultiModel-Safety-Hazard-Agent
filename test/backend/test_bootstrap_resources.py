@@ -104,6 +104,54 @@ def test_operator_write_during_initialization_wins(fresh_settings, monkeypatch):
     assert [path.name for path in fresh_settings.knowledge_dir.iterdir()] == ["operator.txt"]
 
 
+def test_transient_windows_publish_error_retries_atomic_rename(fresh_settings, monkeypatch):
+    original = Path.rename
+    calls = []
+
+    def transient(path, target):
+        calls.append(path)
+        if len(calls) == 1:
+            error = PermissionError("temporary Windows handle")
+            error.winerror = 5
+            raise error
+        return original(path, target)
+
+    monkeypatch.setattr(Path, "rename", transient)
+    assert bootstrap.bootstrap_knowledge(fresh_settings)
+    assert len(calls) >= 2
+    assert (fresh_settings.knowledge_dir / ".bootstrap.json").is_file()
+
+
+def test_persistent_windows_publish_error_remains_a_failure(fresh_settings, monkeypatch):
+    calls = []
+
+    def denied(path, target):
+        calls.append(path)
+        error = PermissionError("persistent permission error")
+        error.winerror = 5
+        raise error
+
+    monkeypatch.setattr(Path, "rename", denied)
+    monkeypatch.setattr(bootstrap.time, "sleep", lambda delay: None)
+    with pytest.raises(PermissionError):
+        bootstrap.bootstrap_knowledge(fresh_settings)
+    assert len(calls) == 5
+    assert not fresh_settings.knowledge_dir.exists()
+
+
+def test_operator_data_created_during_windows_retry_is_preserved(fresh_settings, monkeypatch):
+    def operator_write(path, target):
+        target.mkdir()
+        (target / "operator.txt").write_text("operator knowledge", encoding="utf-8")
+        error = PermissionError("Windows handle")
+        error.winerror = 32
+        raise error
+
+    monkeypatch.setattr(Path, "rename", operator_write)
+    assert not bootstrap.bootstrap_knowledge(fresh_settings)
+    assert (fresh_settings.knowledge_dir / "operator.txt").read_text(encoding="utf-8") == "operator knowledge"
+
+
 def test_packaged_cli_creates_login_user_without_http_auth_and_bootstrap_preserves_it(
     review_client, fresh_settings, monkeypatch, capsys,
 ):

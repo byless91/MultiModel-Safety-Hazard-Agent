@@ -239,7 +239,8 @@ def execute_job(job_id: str, attempt_token: str) -> None:
                     progress=progress,
                     thread_id=job.thread_id,
                     use_checkpointer=True,
-                    entry_mode=payload.get("entry_mode", "assessment"),
+                    **({"entry_mode": payload["entry_mode"]} if payload.get("entry_mode", "assessment")
+                       != "assessment" else {}),
                 )
             else:
                 from app.services.langgraph_flow import resume_workflow

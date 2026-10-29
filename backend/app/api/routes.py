@@ -842,7 +842,7 @@ async def create_assessment(
                 followup_answer=followup_answer or None,
                 followup_used=0,
                 ocr_texts=ocr_list,
-                entry_mode=mode,
+                **({"entry_mode": mode} if mode != "assessment" else {}),
             )
         finally:
             llm_ledger.current_assessment_id.reset(ctx_token)

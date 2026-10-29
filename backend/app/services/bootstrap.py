@@ -4,6 +4,7 @@ import json
 import logging
 import shutil
 import tempfile
+import time
 from pathlib import Path
 
 from app.core.config import Settings
@@ -42,11 +43,18 @@ def bootstrap_knowledge(settings: Settings) -> bool:
             if any(target.iterdir()):
                 return False
             target.rmdir()  # Empty target only; never recursively remove user knowledge.
-        try:
-            staged.rename(target)
-        except OSError:
-            if target.is_dir() and any(target.iterdir()):
-                return False
-            raise
+        for attempt in range(5):
+            try:
+                staged.rename(target)
+                break
+            except OSError as exc:
+                if target.is_dir() and any(target.iterdir()):
+                    return False
+                # Windows may briefly retain a deleted empty directory handle.
+                # Retry only the atomic rename, never copy over user data or change ACLs.
+                if isinstance(exc, PermissionError) and getattr(exc, "winerror", None) in {5, 32} and attempt < 4:
+                    time.sleep(0.05 * (attempt + 1))
+                    continue
+                raise
     logger.warning("已离线初始化开发法规节选 %d 片；正式使用前须人工核验来源、版本和适用性", len(records))
     return True
