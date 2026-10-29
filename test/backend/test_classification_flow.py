@@ -1,6 +1,7 @@
 """M1: images, failure, human values, roles, idempotency and task persistence."""
 
 import base64
+import hashlib
 import json
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ import pytest
 from app.api import routes
 from app.core.db import SessionLocal
 from app.core.security import create_access_token
-from app.models import Assessment, AssessmentJob, LLMCall, User
+from app.models import Assessment, AssessmentJob, KnowledgeDocument, LLMCall, User
 from app.prompts import CLASSIFICATION_PROMPT_VERSION, PROMPT_VERSION
 from app.services import classification, job_runner
 from app.services.providers import ImageInput, QwenProvider, ZhipuProvider
@@ -33,7 +34,12 @@ class Classifier:
 
 
 class Retrieval:
+    def __init__(self, record=None):
+        self.record = record
+
     def search(self, *args, **kwargs):
+        if self.record:
+            return [self.record]
         return [
             {"id": "article-1", "document": "测试规范", "article": "第1条", "version": "test-1",
              "source": "https://example.test/law", "text": "测试条款"},
@@ -44,10 +50,22 @@ class Retrieval:
 @pytest.fixture
 def client(review_client, monkeypatch):
     provider = Classifier()
+    identity = str(uuid4())
+    digest = hashlib.sha256("测试条款".encode()).hexdigest()
+    with SessionLocal() as db:
+        db.add(KnowledgeDocument(id=identity, title="测试规范", version="test-1", content_text="测试条款",
+                                 source="https://example.test/law", content_sha256=digest, industry="fire",
+                                 applicability="仅测试", series_id=identity, review_status="approved"))
+        db.commit()
+    record = {"id": f"doc-{identity}-chunk-0", "document_id": identity, "content_sha256": digest,
+              "review_status": "approved", "text": "测试条款", "version": "test-1"}
     monkeypatch.setattr(routes.settings, "workflow_mode", "sync")
     monkeypatch.setattr(classification, "get_provider", lambda: provider)
-    monkeypatch.setattr(classification, "get_rag", Retrieval)
-    return review_client, provider
+    monkeypatch.setattr(classification, "get_rag", lambda: Retrieval(record))
+    yield review_client, provider
+    with SessionLocal() as db:
+        db.delete(db.get(KnowledgeDocument, identity))
+        db.commit()
 
 
 def create(client, mode="classification", key=None):

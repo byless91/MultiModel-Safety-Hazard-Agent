@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import ValidationError
 from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -47,6 +48,7 @@ from app.schemas.assessment import (
     UserCreateIn,
 )
 from app.schemas.classification import CATEGORIES, TAGS, TAXONOMY_VERSION, ClassificationData, ClassificationSaveIn
+from app.schemas.knowledge import INDUSTRIES, Industry, KnowledgeMetadataIn, KnowledgeReviewIn
 from app.services import llm_ledger
 from app.services.assessment_io import apply_state, images_from_db
 from app.services.classification import save_classification
@@ -71,7 +73,15 @@ from app.services.job_runner import (
     find_create_thread_id,
     get_job_runner,
 )
-from app.services.knowledge import rebuild_knowledge
+from app.services.knowledge import document_to_records, rebuild_knowledge
+from app.services.knowledge_versions import (
+    create_document_version,
+    document_out,
+    document_record,
+    ensure_deletable,
+    review_document,
+    search_approved_knowledge,
+)
 from app.services.model_inputs import require_model_text
 from app.services.providers import ImageInput, get_provider, get_providers
 from app.services.rag import get_rag
@@ -1204,6 +1214,11 @@ def _export_content(item: Assessment) -> str:
         for entry in parse_json(item.evidence_json) or []:
             lines.append(f"- {entry.get('document', '')} {entry.get('article', '')} / {entry.get('version', '')} "
                          f"/ {entry.get('source', '')}：{entry.get('text', '')}")
+            if entry.get("document_id"):
+                lines.append(f"  - 版本记录：{entry['document_id']}；"
+                             f"内容 SHA256：{entry.get('content_sha256', '未保存')}；"
+                             f"行业：{entry.get('industry', '未归类')}；"
+                             f"适用范围：{entry.get('applicability', '未注明')}")
         lines.extend(["", *data.warnings])
         return "\n".join(lines)
     effective = effective_result(item)
@@ -1249,7 +1264,17 @@ async def upload_knowledge_document(
     source: Annotated[str, Form()] = "user-upload",
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-) -> KnowledgeDocument:
+    version: Annotated[str, Form()] = "unversioned",
+    industry: Annotated[Industry, Form()] = "general",
+    applicability: Annotated[str, Form()] = "",
+    is_demo: Annotated[bool, Form()] = False,
+    supersedes_id: Annotated[str | None, Form()] = None,
+) -> DocumentOut:
+    try:
+        metadata = KnowledgeMetadataIn(title=title, source=source, version=version, industry=industry,
+                                       applicability=applicability, is_demo=is_demo, supersedes_id=supersedes_id)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors(include_context=False)) from exc
     data = await _read_upload_limited(
         file,
         max_bytes=settings.max_document_bytes,
@@ -1268,40 +1293,46 @@ async def upload_knowledge_document(
     # 知识库文档只做注入防护，不套用用户描述的 2000 字限制；
     # 文件大小上限由 MAX_DOCUMENT_BYTES 控制。
     _reject_text(text, max_length=None)
-    doc = KnowledgeDocument(
-        title=title or original_name,
-        source=source,
-        status="parsed",
-        content_text=text.strip(),
-        meta_json=json.dumps(
-            {"filename": original_name, "source_format": suffix.lstrip(".")},
-            ensure_ascii=False,
-        ),
-    )
-    db.add(doc)
-    db.commit()
-    db.refresh(doc)
+    doc = create_document_version(db, metadata, text, original_name, suffix)
+    _index_document(doc, db)
+    return document_out(doc)
+
+
+def _index_document(doc: KnowledgeDocument, db: Session) -> None:
     try:
         rebuild_knowledge(db=db)
         doc.status = "indexed"
-    except Exception as exc:
+        meta = parse_json(doc.meta_json) or {}
+        meta.pop("index_error", None)
+        doc.meta_json = json.dumps(meta)
+    except Exception:
         doc.status = "index_error"
         doc.meta_json = json.dumps(
             {
                 **(parse_json(doc.meta_json) or {}),
-                "index_error": str(exc)[:200],
+                "index_error": "索引重建失败，请管理员重试",
             },
             ensure_ascii=False,
         )
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    return doc
 
 
 @router.get("/knowledge/documents", response_model=list[DocumentOut])
-def list_knowledge_documents(db: Session = Depends(get_db)) -> list[KnowledgeDocument]:
-    return list(db.scalars(select(KnowledgeDocument).order_by(KnowledgeDocument.created_at.desc())).all())
+def list_knowledge_documents(
+    db: Session = Depends(get_db), industry: Industry | None = None,
+    review_status: Literal["unreviewed", "approved", "rejected", "superseded", "retired"] | None = None,
+    series_id: str | None = None,
+) -> list[DocumentOut]:
+    query = select(KnowledgeDocument)
+    if industry:
+        query = query.where(KnowledgeDocument.industry == industry)
+    if review_status:
+        query = query.where(KnowledgeDocument.review_status == review_status)
+    if series_id:
+        query = query.where(KnowledgeDocument.series_id == series_id)
+    return [document_out(doc) for doc in db.scalars(query.order_by(KnowledgeDocument.created_at.desc())).all()]
 
 
 @router.get("/knowledge/documents/{document_id}")
@@ -1310,14 +1341,52 @@ def get_knowledge_document(document_id: str, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="知识文档不存在")
     return {
-        "id": item.id,
-        "title": item.title,
-        "source": item.source,
-        "version": item.version,
-        "status": item.status,
+        **document_out(item).model_dump(),
         "content": (item.content_text or "")[:3000],
-        "created_at": item.created_at,
+        "content_truncated": len(item.content_text or "") > 3000,
     }
+
+
+@router.get("/knowledge/catalog")
+def knowledge_catalog() -> dict:
+    return {"industries": [{"value": value, "label": label} for value, label in INDUSTRIES.items()]}
+
+
+@router.get("/knowledge/documents/{document_id}/articles")
+def knowledge_articles(
+    document_id: str, offset: int = Query(default=0, ge=0), limit: int = Query(default=30, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict:
+    item = db.get(KnowledgeDocument, document_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="知识文档不存在")
+    records = document_to_records(document_record(item))
+    return {"items": records[offset:offset + limit], "total": len(records), "offset": offset, "limit": limit}
+
+
+@router.get("/knowledge/search")
+def search_knowledge(query: str = Query(min_length=1, max_length=2000), industry: Industry | None = None) -> dict:
+    _reject_text(query)
+    try:
+        items = search_approved_knowledge(query, industry=industry)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="知识检索失败，请管理员检查索引后重试") from exc
+    notice = "条款适用性仍需结合现场核对" if items else "未找到已审核的有效条款，请核对行业或补充资料"
+    return {"items": items, "notice": notice}
+
+
+@router.post("/knowledge/documents/{document_id}/review", response_model=DocumentOut,
+             dependencies=[Depends(require_roles("admin"))])
+def review_knowledge_document(
+    document_id: str, payload: KnowledgeReviewIn, request: Request, db: Session = Depends(get_db),
+) -> DocumentOut:
+    item = db.get(KnowledgeDocument, document_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="知识文档不存在")
+    user = get_request_user(request)
+    if review_document(db, item, payload, user.username if user else "", user.id if user else None):
+        _index_document(item, db)
+    return document_out(item)
 
 
 @router.delete(
@@ -1329,6 +1398,7 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
     item = db.get(KnowledgeDocument, document_id)
     if not item:
         raise HTTPException(status_code=404, detail="知识文档不存在")
+    ensure_deletable(db, item)
     db.delete(item)
     db.commit()
     try:

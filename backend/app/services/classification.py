@@ -12,8 +12,9 @@ from app.models import Assessment, AssessmentJob
 from app.models.entities import utcnow
 from app.schemas.classification import CATEGORIES, TAGS, ClassificationData, ClassificationSaveIn
 from app.services import llm_ledger
+from app.services.knowledge_versions import search_approved_knowledge
 from app.services.providers import ImageInput, get_provider
-from app.services.rag import get_rag, is_regulatory_evidence, retrieval_as_evidence
+from app.services.rag import get_rag, retrieval_as_evidence
 
 
 def run_classification(
@@ -62,12 +63,12 @@ def run_classification(
             progress("retrieve")
         try:
             query = " ".join([description, data.suggested_category or "", *data.suggested_tags])
-            rows = (rag or get_rag()).search(query, top_k=5, include_demo=False)
-            evidence = retrieval_as_evidence([row for row in rows if is_regulatory_evidence(row)])
+            rows = search_approved_knowledge(query, rag=rag or get_rag())
+            evidence = retrieval_as_evidence(rows)
         except Exception:
             data.warnings.append("条款检索失败，请到知识库核对依据")
     if not evidence:
-        data.warnings.append("未检索到可追溯条款；当前材料不能作为法规适用依据")
+        data.warnings.append("未找到已审核的有效条款；请核对行业或补充资料，当前材料不能作为法规适用依据")
     data.warnings.append("检索条款仅供核对，相似度不代表条款适用性")
     return {
         "status": "awaiting_human_review", "classification": data.model_dump(),

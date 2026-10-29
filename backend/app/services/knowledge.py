@@ -246,7 +246,11 @@ def document_to_records(
                 "version": str(doc.get("version") or "user-upload"),
                 "collected_at": str(doc.get("collected_at") or ""),
                 "tags": tags,
-                "is_demo": False,
+                "is_demo": bool(doc.get("is_demo")),
+                **{key: doc.get(key) for key in (
+                    "industry", "applicability", "review_status", "content_sha256", "series_id", "supersedes_id",
+                )},
+                "document_id": doc.get("id"),
             }
         )
     return records
@@ -259,29 +263,10 @@ def rebuild_knowledge(db=None) -> dict:
         from sqlalchemy import select
 
         from app.models import KnowledgeDocument
+        from app.services.knowledge_versions import document_record
 
         for doc in db.scalars(select(KnowledgeDocument)).all():
-            meta: dict[str, Any] = {}
-            if doc.meta_json:
-                try:
-                    parsed = json.loads(doc.meta_json)
-                    if isinstance(parsed, dict):
-                        meta = parsed
-                except json.JSONDecodeError:
-                    pass
-            records.extend(
-                document_to_records(
-                    {
-                        "id": doc.id,
-                        "title": doc.title,
-                        "document": doc.title,
-                        "source": doc.source or "用户上传",
-                        "version": doc.version or "user-upload",
-                        "content_text": doc.content_text or "",
-                        "tags": meta.get("tags") if isinstance(meta.get("tags"), list) else [],
-                    }
-                )
-            )
+            records.extend(document_to_records(document_record(doc)))
     write_records(records, settings.knowledge_dir / "chunks")
     rag = get_rag()
     rag.load()

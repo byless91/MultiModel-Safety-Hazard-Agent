@@ -208,6 +208,9 @@ class RAGService:
                 "scene": item.get("scene") or "",
                 "effective_date": item.get("effective_date") or "",
                 "is_demo": is_demo_chunk(item),
+                **{key: item.get(key) for key in (
+                    "document_id", "industry", "applicability", "review_status", "content_sha256", "series_id",
+                )},
             }
             for item in chunks
         ]
@@ -408,6 +411,8 @@ class RAGService:
         *,
         include_demo: bool = False,
         reranker_enabled: bool | None = None,
+        approved_only: bool = False,
+        industry: str | None = None,
     ) -> list[dict]:
         with self._lock:
             if not self.texts or top_k <= 0:
@@ -418,6 +423,8 @@ class RAGService:
                 tags=tags,
                 include_demo=include_demo,
                 reranker_enabled=reranker_enabled,
+                approved_only=approved_only,
+                industry=industry,
             )
 
     def _search_locked(
@@ -428,6 +435,8 @@ class RAGService:
         tags: list[str] | None,
         include_demo: bool,
         reranker_enabled: bool | None,
+        approved_only: bool,
+        industry: str | None,
     ) -> list[dict]:
         use_reranker = (
             self.settings.reranker_enabled
@@ -441,6 +450,8 @@ class RAGService:
             max(top_k * 4, 200 if tags else 0),
             len(self.texts),
         )
+        if approved_only or industry:
+            candidate_window = len(self.texts)
         query_vector = self._query_vector(query)
 
         if self._index is not None:
@@ -457,6 +468,10 @@ class RAGService:
             if not include_demo and self.metas[index].get("is_demo"):
                 continue
             meta = self.metas[index]
+            if approved_only and (meta.get("review_status") != "approved" or not meta.get("document_id")):
+                continue
+            if industry and meta.get("industry") != industry:
+                continue
             if tags and not (set(tags) & set(meta.get("tags", []))):
                 continue
             item_id = str(meta.get("id") or index)
@@ -525,6 +540,10 @@ def retrieval_as_evidence(retrieval: list[dict]) -> list[dict]:
             "is_demo": bool(item.get("is_demo") or is_demo_chunk(item)),
             "embedding_space": item.get("embedding_space", ""),
             "embedding_fallback": bool(item.get("embedding_fallback")),
+            **{key: item.get(key) for key in (
+                "document_id", "industry", "applicability", "review_status", "review_status_at_retrieval",
+                "content_sha256", "series_id",
+            )},
         }
         for item in retrieval
     ]
