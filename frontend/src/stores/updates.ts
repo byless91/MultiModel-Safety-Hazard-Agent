@@ -3,6 +3,9 @@ import { defineStore } from 'pinia'
 import { api } from '../api/client'
 import type {
   KnowledgeIndustry,
+  KnowledgePack,
+  KnowledgePackImportResult,
+  KnowledgePackStatus,
   KnowledgeSourceItem,
   TrendAlertItem,
   TrendReport,
@@ -12,6 +15,7 @@ export const useUpdatesStore = defineStore('updates', {
   state: () => ({
     sources: [] as KnowledgeSourceItem[],
     trend: null as TrendReport | null,
+    packStatus: null as KnowledgePackStatus | null,
     sourcesLoading: false,
     trendBusy: false,
   }),
@@ -63,6 +67,19 @@ export const useUpdatesStore = defineStore('updates', {
         this.trend.alerts = this.trend.alerts.map(item => item.id === id ? data : item)
         this.trend.false_positive_count = this.trend.alerts.filter(item => item.status === 'false_positive').length
       }
+      return data
+    },
+    async loadPackStatus(): Promise<void> {
+      const { data } = await api.get<KnowledgePackStatus>('/knowledge/pack/status')
+      this.packStatus = data
+    },
+    async exportPack(): Promise<KnowledgePack> {
+      const { data } = await api.get<KnowledgePack>('/knowledge/pack/export')
+      return data
+    },
+    async importPack(pack: unknown): Promise<KnowledgePackImportResult> {
+      const { data } = await api.post<KnowledgePackImportResult>('/knowledge/pack/import', pack)
+      await this.loadPackStatus()
       return data
     },
   },

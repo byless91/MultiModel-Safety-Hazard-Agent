@@ -38,6 +38,7 @@ beforeEach(() => {
   apiMock.get.mockImplementation(async (url: string) => {
     if (url === '/knowledge/catalog') return { data: { industries } }
     if (url === '/knowledge/sources') return { data: [] }
+    if (url === '/knowledge/pack/status') return { data: { last_sync: null } }
     if (url === '/knowledge/documents') return { data: [serverDoc] }
     if (url.endsWith('/articles')) return { data: { items: [{ id: 'chunk-1', article: '第一条', version: 'v1', text: '第一条 测试条款' }], offset: 0, limit: 30, total: 1 } }
     if (url === '/knowledge/search') return { data: { items: [], notice: '未找到已审核的有效条款' } }
@@ -209,5 +210,41 @@ describe('M5 authoritative source reminders', () => {
     await flushPromises()
     expect(apiMock.post).toHaveBeenCalledWith('/knowledge/sources/source-1/ack')
     expect(wrapper.text()).not.toContain('内容已变化，请上传并人工审核新版本')
+  })
+})
+
+describe('M6 knowledge pack sync', () => {
+  it('shows the local pack version and imports a verified pack with counts', async () => {
+    apiMock.get.mockImplementation(async (url: string) => {
+      if (url === '/knowledge/catalog') return { data: { industries } }
+      if (url === '/knowledge/sources') return { data: [] }
+      if (url === '/knowledge/pack/status') return { data: { last_sync: {
+        pack_version: 'M6-PACK-1', manifest_sha256: 'a'.repeat(64), imported: 2, skipped: 0,
+        superseded: 0, failed: 0, imported_by: 'admin', imported_at: '2026-10-30T01:00:00Z',
+      } } }
+      if (url === '/knowledge/documents') return { data: [] }
+      return { data: {} }
+    })
+    const wrapper = await page()
+    expect(wrapper.text()).toContain('M6-PACK-1')
+    expect(wrapper.text()).toContain('最后同步')
+    apiMock.post.mockResolvedValueOnce({ data: {
+      pack_version: 'M6-PACK-2', manifest_sha256: 'b'.repeat(64), imported: 1, skipped: 0,
+      superseded: 1, failed: 0, failures: [], indexed: true,
+    } })
+    const file = new File([JSON.stringify({
+      format: 'safety-knowledge-pack-v1', pack_version: 'M6-PACK-2',
+      documents: [], manifest: { document_count: 0, documents_sha256: 'b'.repeat(64) },
+    })], 'pack.json', { type: 'application/json' })
+    const input = wrapper.get('input[aria-label="导入知识包文件"]')
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await flushPromises()
+    expect(apiMock.post).toHaveBeenCalledWith('/knowledge/pack/import', expect.objectContaining({
+      pack_version: 'M6-PACK-2',
+    }))
+    expect(wrapper.text()).toContain('导入 1')
+    expect(wrapper.text()).toContain('替代 1')
+    expect(wrapper.text()).toContain('已重建')
   })
 })

@@ -744,3 +744,39 @@ export interface TrendReport {
   alerts: TrendAlertItem[]
   false_positive_count: number
 }
+
+export interface KnowledgePack {
+  format: string
+  pack_version: string
+  created_at: string
+  review_policy: string
+  documents: Record<string, unknown>[]
+  manifest: { document_count: number; documents_sha256: string }
+}
+
+export interface KnowledgePackImportResult {
+  pack_version: string
+  manifest_sha256: string
+  imported: number
+  skipped: number
+  superseded: number
+  failed: number
+  failures: { index: number; title: string; reason: string }[]
+  indexed: boolean
+  index_error?: string | null
+}
+
+export interface KnowledgePackSync {
+  pack_version: string
+  manifest_sha256: string
+  imported: number
+  skipped: number
+  superseded: number
+  failed: number
+  imported_by?: string | null
+  imported_at: string
+}
+
+export interface KnowledgePackStatus {
+  last_sync: KnowledgePackSync | null
+}

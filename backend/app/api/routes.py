@@ -59,6 +59,7 @@ from app.schemas.assessment import (
 )
 from app.schemas.classification import CATEGORIES, TAGS, TAXONOMY_VERSION, ClassificationData, ClassificationSaveIn
 from app.schemas.knowledge import INDUSTRIES, Industry, KnowledgeMetadataIn, KnowledgeReviewIn
+from app.schemas.knowledge_packs import PackImportResultOut, PackStatusOut
 from app.schemas.location import ImportResultOut, ImportRowsIn, LocationData, utc_event_time
 from app.schemas.updates import AlertOut, AlertReviewIn, SourceIn, SourceOut, TrendReportOut
 from app.services import llm_ledger
@@ -88,6 +89,7 @@ from app.services.job_runner import (
     get_job_runner,
 )
 from app.services.knowledge import document_to_records, rebuild_knowledge
+from app.services.knowledge_packs import export_pack, import_pack, pack_status
 from app.services.knowledge_sources import (
     acknowledge_source,
     check_source,
@@ -1487,6 +1489,45 @@ def remove_knowledge_source(source_id: str, db: Session = Depends(get_db)) -> Re
     return Response(status_code=204)
 
 
+@router.get(
+    "/knowledge/pack/export",
+    dependencies=[Depends(require_roles("admin"))],
+)
+def export_knowledge_pack(db: Session = Depends(get_db)) -> dict:
+    return export_pack(db)
+
+
+@router.post(
+    "/knowledge/pack/import",
+    response_model=PackImportResultOut,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def import_knowledge_pack(
+    payload: dict, request: Request, db: Session = Depends(get_db),
+) -> PackImportResultOut:
+    user = get_request_user(request)
+    result = import_pack(db, payload, user.username if user else None)
+    indexed = False
+    index_error = None
+    if result["imported"] or result["superseded"]:
+        try:
+            rebuild_knowledge(db=db)
+            _refresh_indexed_document_statuses(db)
+            indexed = True
+        except Exception:
+            index_error = "索引重建失败，请管理员重试"
+    return PackImportResultOut(**result, indexed=indexed, index_error=index_error)
+
+
+@router.get(
+    "/knowledge/pack/status",
+    response_model=PackStatusOut,
+    dependencies=[Depends(require_roles("admin"))],
+)
+def knowledge_pack_status(db: Session = Depends(get_db)) -> PackStatusOut:
+    return PackStatusOut(last_sync=pack_status(db))
+
+
 @router.post(
     "/knowledge/documents",
     response_model=DocumentOut,
@@ -1530,6 +1571,18 @@ async def upload_knowledge_document(
     doc = create_document_version(db, metadata, text, original_name, suffix)
     _index_document(doc, db)
     return document_out(doc)
+
+
+def _refresh_indexed_document_statuses(db: Session) -> None:
+    indexed = {meta["document_id"] for meta in get_rag().metas if meta.get("document_id")}
+    if not indexed:
+        return
+    for doc in db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(indexed))).all():
+        doc.status = "indexed"
+        meta = parse_json(doc.meta_json) or {}
+        meta.pop("index_error", None)
+        doc.meta_json = json.dumps(meta)
+    db.commit()
 
 
 def _index_document(doc: KnowledgeDocument, db: Session) -> None:
@@ -1647,14 +1700,7 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
 )
 def rebuild_knowledge_endpoint(db: Session = Depends(get_db)):
     result = rebuild_knowledge(db=db)
-    indexed = {meta["document_id"] for meta in get_rag().metas if meta.get("document_id")}
-    if indexed:
-        for doc in db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(indexed))).all():
-            doc.status = "indexed"
-            meta = parse_json(doc.meta_json) or {}
-            meta.pop("index_error", None)
-            doc.meta_json = json.dumps(meta)
-        db.commit()
+    _refresh_indexed_document_statuses(db)
     return {
         "chunks": result["chunks"],
         "records": result["records"],

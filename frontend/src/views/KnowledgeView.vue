@@ -126,6 +126,33 @@
         </el-table-column>
       </el-table>
     </el-card>
+    <el-card v-if="auth.canManageKnowledge" class="source-card">
+      <h2>知识包同步</h2>
+      <p class="hint">仅导出已审核发布的最新版本；导入前校验清单和内容指纹，导入不会改写历史引用。</p>
+      <p class="pack-sync">
+        本地知识包版本：{{ updates.packStatus?.last_sync?.pack_version || '尚未导入知识包' }}
+        <span v-if="updates.packStatus?.last_sync"> · 最后同步 {{ formatTime(updates.packStatus.last_sync.imported_at) }}</span>
+      </p>
+      <div class="doc-actions">
+        <el-button :loading="packBusy" @click="exportPack">导出知识包</el-button>
+        <label class="pack-import">导入知识包
+          <input type="file" accept=".json,application/json" aria-label="导入知识包文件" @change="onPackFile" />
+        </label>
+      </div>
+      <div v-if="packResult" class="import-result" role="status">
+        <p>
+          批次 {{ packResult.pack_version }}：导入 {{ packResult.imported }}，跳过 {{ packResult.skipped }}，
+          替代 {{ packResult.superseded }}，失败 {{ packResult.failed }}；索引
+          {{ packResult.indexed ? '已重建' : packResult.index_error || '未重建' }}。
+        </p>
+        <ul v-if="packResult.failures.length">
+          <li v-for="failure in packResult.failures" :key="failure.index">
+            第 {{ failure.index }} 条（{{ failure.title }}）：{{ failure.reason }}
+          </li>
+        </ul>
+      </div>
+      <p v-if="packError" class="source-error" role="alert">{{ packError }}</p>
+    </el-card>
     <el-card v-if="preview || detailLoading" class="detail-card">
       <section ref="detailSection" v-loading="detailLoading" tabindex="-1" aria-label="文档版本详情">
         <template v-if="preview">
@@ -185,7 +212,8 @@ import { useAssessmentStore } from '../stores/assessment'
 import { useAuthStore } from '../stores/auth'
 import { useUpdatesStore } from '../stores/updates'
 import type { EvidenceItem, KnowledgeArticlePage, KnowledgeDocument, KnowledgeDocumentDetail,
-  KnowledgeIndustry, KnowledgeReviewRequest, KnowledgeReviewStatus, KnowledgeSourceItem } from '../types'
+  KnowledgeIndustry, KnowledgePackImportResult, KnowledgeReviewRequest, KnowledgeReviewStatus,
+  KnowledgeSourceItem } from '../types'
 import { extractError } from '../utils/errors'
 import { formatTime } from '../utils/format'
 
@@ -211,6 +239,7 @@ const sourceUrl = computed(() => /^https?:\/\//i.test(preview.value?.source || '
 const sourceName = ref(''), sourceLink = ref(''), sourceIndustry = ref<KnowledgeIndustry>('general')
 const sourceSaving = ref(false), checkingSource = ref(''), sourceError = ref('')
 const pendingSources = computed(() => updates.sources.filter(item => item.pending))
+const packBusy = ref(false), packResult = ref<KnowledgePackImportResult | null>(null), packError = ref('')
 let listSequence = 0, detailSequence = 0, searchSequence = 0
 onUnmounted(() => { listSequence++; detailSequence++; searchSequence++ })
 onMounted(initialize)
@@ -221,7 +250,10 @@ async function initialize() {
     industries.value = result.data.industries
   } catch (err) { error.value = extractError(err) }
   await load()
-  if (auth.canManageKnowledge) await loadSources()
+  if (auth.canManageKnowledge) {
+    await loadSources()
+    await loadPackStatus()
+  }
 }
 function industryName(value?: string | null) { return industries.value.find(item => item.value === value)?.label || '未归类 / 通用' }
 function sourceStatus(item: KnowledgeSourceItem) {
@@ -264,6 +296,47 @@ async function ackSource(id: string) {
 async function removeSource(id: string) {
   sourceError.value = ''
   try { await updates.deleteSource(id) } catch (err) { sourceError.value = extractError(err) }
+}
+async function loadPackStatus() {
+  packError.value = ''
+  try { await updates.loadPackStatus() } catch (err) { packError.value = extractError(err) }
+}
+async function exportPack() {
+  if (packBusy.value) return
+  packBusy.value = true
+  packError.value = ''
+  try {
+    const pack = await updates.exportPack()
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `knowledge-pack-${pack.pack_version}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('知识包已导出')
+  } catch (err) { packError.value = extractError(err) }
+  finally { packBusy.value = false }
+}
+async function onPackFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || packBusy.value) return
+  packError.value = ''
+  packResult.value = null
+  packBusy.value = true
+  try {
+    const parsed: unknown = JSON.parse(await file.text())
+    packResult.value = await updates.importPack(parsed)
+    if (packResult.value.index_error) ElMessage.warning(packResult.value.index_error)
+    else ElMessage.success('知识包已导入')
+    clearSearch()
+    await load()
+  } catch (err) { packError.value = extractError(err) }
+  finally {
+    packBusy.value = false
+    input.value = ''
+  }
 }
 async function load() {
   const sequence = ++listSequence
@@ -389,6 +462,12 @@ input:not([type=checkbox]), select, textarea { box-sizing: border-box; width: 10
 .source-error { color: var(--danger, #d14343); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .pending-alert { margin-bottom: var(--s-2); }
 .pending-tag { margin-left: var(--s-2); }
+.pack-sync { color: var(--text-strong); overflow-wrap: anywhere; }
+.pack-import { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
+.pack-import input { font: inherit; }
+.import-result { margin-top: var(--s-3); padding: var(--s-3); border: 1px solid var(--border); border-radius: var(--r-control); }
+.import-result p { margin: 0 0 var(--s-2); }
+.import-result ul { margin: 0; padding-left: 24px; overflow-wrap: anywhere; }
 summary { cursor: pointer; font-weight: 600; }
 .article-list, .search-results ol { padding-left: 24px; }
 .article-list li, .search-results li { margin-block: var(--s-3); }

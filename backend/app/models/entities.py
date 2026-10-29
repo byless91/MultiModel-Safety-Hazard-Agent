@@ -235,3 +235,19 @@ class TrendAlert(Base):
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class KnowledgePackImport(Base):
+    """One verified knowledge-pack import; the latest row is the local sync marker."""
+
+    __tablename__ = "knowledge_pack_imports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    pack_version: Mapped[str] = mapped_column(String(32))
+    manifest_sha256: Mapped[str] = mapped_column(String(64))
+    imported: Mapped[int] = mapped_column(Integer, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, default=0)
+    superseded: Mapped[int] = mapped_column(Integer, default=0)
+    failed: Mapped[int] = mapped_column(Integer, default=0)
+    imported_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
