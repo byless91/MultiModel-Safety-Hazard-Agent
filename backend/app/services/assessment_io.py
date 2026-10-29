@@ -34,6 +34,8 @@ def images_from_db(
 def apply_state(assessment: Assessment, state: dict, db: Session) -> None:
     """把 workflow 终态写回 assessment 行（JSON 列序列化）。"""
     assessment.status = state.get("status", "completed")
+    if "classification" in state:
+        assessment.classification_json = json.dumps(state["classification"], ensure_ascii=False)
     assessment.scene_summary = state.get("scene_summary")
     assessment.hazard_category = state.get("hazard_category")
     assessment.risk_level = state.get("risk_level")

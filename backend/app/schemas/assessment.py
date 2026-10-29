@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.schemas.classification import ClassificationData
+
 
 class JobOut(BaseModel):
     """异步研判任务状态（B3/WP1.1，async 模式）。"""
@@ -33,6 +35,8 @@ class AssessmentOut(BaseModel):
     id: str
     description: str
     status: str
+    record_mode: str = "assessment"
+    classification: ClassificationData | None = None
     scene_summary: str | None = None
     hazard_category: str | None = None
     risk_level: int | None = None

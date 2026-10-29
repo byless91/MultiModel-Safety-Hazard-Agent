@@ -120,6 +120,19 @@ class MockProvider(BaseProvider):
     vision_model = "mock-vision"
     last_retry_count = 0
 
+    def classify(
+        self, images: list[ImageInput], text: str, *, ocr_texts: list[str] | None = None,
+    ) -> dict[str, Any]:
+        joined = " ".join([text, *(ocr_texts or [])])
+        matches = [(sum(keyword in joined for keyword in rule["keywords"]), rule) for rule in RULE_TEMPLATES]
+        hits, rule = max(matches, key=lambda item: item[0])
+        return {
+            "category": rule["category"] if hits else None,
+            "tags": ["待现场核实"] if hits else [],
+            "scene_summary": text[:300],
+            "uncertainties": ["Mock 演示仅匹配文字，未分析图片内容；不能用于真实分类质量验收"],
+        }
+
     def analyze(
         self,
         images: list[ImageInput],

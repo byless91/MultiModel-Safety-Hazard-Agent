@@ -37,6 +37,11 @@ class BaseProvider:
     text_model = ""
     embedding_model = ""
 
+    def classify(
+        self, images: list[ImageInput], text: str, *, ocr_texts: list[str] | None = None,
+    ) -> dict[str, Any]:
+        raise NotImplementedError
+
     def analyze(
         self,
         images: list[ImageInput],

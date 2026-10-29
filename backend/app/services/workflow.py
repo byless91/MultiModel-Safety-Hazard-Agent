@@ -39,10 +39,16 @@ def run_workflow(
     progress: ProgressCallback | None = None,
     thread_id: str | None = None,
     use_checkpointer: bool = False,
+    entry_mode: str = "assessment",
 ) -> dict[str, Any]:
     started = time.perf_counter()
     try:
-        if HAS_LANGGRAPH:
+        if entry_mode in {"classification", "manual"}:
+            from app.services.classification import run_classification
+
+            state = run_classification(description, images, ocr_texts=ocr_texts, manual=entry_mode == "manual",
+                                       rag=rag, provider=providers[0] if providers else None, progress=progress)
+        elif HAS_LANGGRAPH:
             state = run_langgraph(
                 description,
                 images,

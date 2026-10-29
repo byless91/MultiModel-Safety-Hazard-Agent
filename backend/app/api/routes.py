@@ -4,7 +4,7 @@ import re
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
@@ -46,8 +46,10 @@ from app.schemas.assessment import (
     UserAdminOut,
     UserCreateIn,
 )
+from app.schemas.classification import CATEGORIES, TAGS, TAXONOMY_VERSION, ClassificationData, ClassificationSaveIn
 from app.services import llm_ledger
 from app.services.assessment_io import apply_state, images_from_db
+from app.services.classification import save_classification
 from app.services.document_converter import (
     LEGACY_SUFFIX_HINTS,
     PLAIN_SUFFIXES,
@@ -146,6 +148,8 @@ def to_out(item: Assessment) -> AssessmentOut:
         id=item.id,
         description=item.description,
         status=item.status,
+        record_mode=item.record_mode,
+        classification=parse_json(item.classification_json),
         scene_summary=item.scene_summary,
         hazard_category=item.hazard_category,
         risk_level=item.risk_level,
@@ -742,6 +746,7 @@ async def create_assessment(
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     response: Response = None,
     db: Session = Depends(get_db),
+    mode: Annotated[Literal["assessment", "classification", "manual"], Form()] = "assessment",
 ) -> AssessmentOut | JobOut:
     if idempotency_key and not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
         raise HTTPException(status_code=400, detail="Idempotency-Key 需为 8-128 位字母数字或 -_")
@@ -762,7 +767,7 @@ async def create_assessment(
     fingerprint = submission_fingerprint(description, followup_answer, ocr_list, [
         (_safe_filename(upload.filename or "image.jpg", allowed_suffixes=ALLOWED_IMAGE_SUFFIXES,
                         default="image.jpg")[0], data) for upload, data in staged
-    ])
+    ], mode=mode)
     if idempotency_key:
         replayed = _idempotent_replay(db, idempotency_key, response, fingerprint=fingerprint)
         if replayed is not None:
@@ -770,9 +775,16 @@ async def create_assessment(
     _reject_ocr_texts(ocr_list)
     _reject_uploaded_input(description, [data for _, data in staged])
     _reject_text(followup_answer)
-    _check_token_budget()
+    if mode != "manual":
+        _check_token_budget()
 
-    assessment = Assessment(id=str(uuid4()), description=description)
+    assessment = Assessment(
+        id=str(uuid4()), description=description,
+        record_mode="assessment" if mode == "assessment" else "classification",
+        classification_json=None if mode == "assessment" else ClassificationData(
+            suggestion_status="manual" if mode == "manual" else "pending",
+        ).model_dump_json(),
+    )
     upload_root = settings.upload_dir / assessment.id
     written: list[Path] = []
     images: list[ImageInput] = []
@@ -799,7 +811,8 @@ async def create_assessment(
             ))
             images.append(ImageInput(filename=original_name, path=target, mime_type=sniffed_mime))
         if settings.workflow_mode == "async":
-            job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list, answer=followup_answer or None)
+            job = enqueue_job(db, assessment.id, "create", ocr_texts=ocr_list, answer=followup_answer or None,
+                              entry_mode=mode)
         # assessment、图片元数据、幂等键和初始 job 只能一起提交。
         db.commit()
     except Exception as exc:
@@ -829,6 +842,7 @@ async def create_assessment(
                 followup_answer=followup_answer or None,
                 followup_used=0,
                 ocr_texts=ocr_list,
+                entry_mode=mode,
             )
         finally:
             llm_ledger.current_assessment_id.reset(ctx_token)
@@ -984,7 +998,7 @@ def confirm_assessment(
     if not apply_human_review(item, db, payload, reviewer_name, user.id if user else None):
         return to_out(item)
     human_review = parse_json(item.human_review_json) or {}
-    if settings.workflow_mode == "async":
+    if settings.workflow_mode == "async" and item.record_mode != "classification":
         # 人工复核结论回写图线程状态（checkpointer），保持图状态与业务记录一致
         from app.services.langgraph_flow import append_thread_state
 
@@ -1160,7 +1174,38 @@ def transition_rectification_status(
     return to_out(item)
 
 
+@router.get("/classification/taxonomy")
+def classification_taxonomy() -> dict:
+    return {"version": TAXONOMY_VERSION, "categories": CATEGORIES, "tags": TAGS}
+
+
+@router.post("/assessments/{assessment_id}/classification", response_model=AssessmentOut)
+def update_classification(
+    assessment_id: str, payload: ClassificationSaveIn, request: Request, db: Session = Depends(get_db),
+) -> AssessmentOut:
+    item = db.get(Assessment, assessment_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    user = get_request_user(request)
+    save_classification(item, db, payload, user.username if user else "", user.id if user else None)
+    return to_out(item)
+
+
 def _export_content(item: Assessment) -> str:
+    if item.record_mode == "classification":
+        data = ClassificationData.model_validate_json(item.classification_json or "{}")
+        lines = ["# 隐患分类记录", "", f"- 状态：{item.status}",
+                 f"- 分类体系：{data.taxonomy_version}", f"- AI 建议类别：{data.suggested_category or '未知'}",
+                 f"- AI 建议标签：{'、'.join(data.suggested_tags) or '无'}",
+                 f"- 人工类别：{item.hazard_category or '待录入'}", f"- 人工标签：{'、'.join(data.final_tags) or '无'}",
+                 f"- 风险等级：{str(item.risk_level) + ' 级' if item.risk_level else '未分级'}",
+                 f"- 人工审核：{'已确认' if item.confirmed else '未确认'}", "", "## 现场描述", item.description,
+                 "", "## 人工备注", item.conclusion or "无", "", "## 参考条款（适用性待人工核对）"]
+        for entry in parse_json(item.evidence_json) or []:
+            lines.append(f"- {entry.get('document', '')} {entry.get('article', '')} / {entry.get('version', '')} "
+                         f"/ {entry.get('source', '')}：{entry.get('text', '')}")
+        lines.extend(["", *data.warnings])
+        return "\n".join(lines)
     effective = effective_result(item)
     report = effective["report"] or {}
     work_order = report.get("work_order", {}) or {}

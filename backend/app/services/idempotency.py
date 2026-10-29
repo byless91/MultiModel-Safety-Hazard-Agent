@@ -12,11 +12,15 @@ from app.core.config import get_settings
 from app.models import Assessment, IdempotencyKey
 
 
-def submission_fingerprint(description: str, answer: str, ocr: list[str], files: list[tuple[str, bytes]]) -> str:
+def submission_fingerprint(
+    description: str, answer: str, ocr: list[str], files: list[tuple[str, bytes]], *, mode: str = "assessment",
+) -> str:
     payload = {
         "version": 1, "description": description, "followup_answer": answer, "ocr_texts": ocr,
         "files": [{"filename": name, "sha256": hashlib.sha256(content).hexdigest()} for name, content in files],
     }
+    if mode != "assessment":
+        payload["mode"] = mode
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(canonical).hexdigest()
 

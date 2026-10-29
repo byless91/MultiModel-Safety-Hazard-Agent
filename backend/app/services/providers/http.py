@@ -24,7 +24,8 @@ from typing import Any
 import httpx
 
 from app.core.logging import mask_secrets
-from app.prompts import COMPARE_PROMPT, GUARD_STATEMENT, PROMPT_VERSION, VISION_PROMPT
+from app.prompts import CLASSIFICATION_PROMPT, COMPARE_PROMPT, GUARD_STATEMENT, PROMPT_VERSION, VISION_PROMPT
+from app.schemas.classification import CATEGORIES, TAGS
 from app.services.guardrail.input_guard import build_external_text
 from app.services.llm_concurrency import http_gate
 from app.services.llm_ledger import mark_parse_failed, record_call
@@ -277,6 +278,27 @@ class OpenAICompatibleProvider(BaseProvider):
         output["parse_failed"] = bool(result.get("parse_failed"))
         output["response_model"] = result_meta.data.get("model")
         return output
+
+    def classify(
+        self, images: list[ImageInput], text: str, *, ocr_texts: list[str] | None = None,
+    ) -> dict[str, Any]:
+        content = [{"type": "text", "text": build_external_text(text, ocr_texts=ocr_texts)}]
+        content.extend(self._image_content(image) for image in images)
+        payload = {
+            "model": self.vision_model,
+            "messages": [
+                {"role": "system", "content": f"{CLASSIFICATION_PROMPT}\n{GUARD_STATEMENT}\n"
+                 f"候选类别：{json.dumps(CATEGORIES, ensure_ascii=False)}\n"
+                 f"候选标签：{json.dumps(TAGS, ensure_ascii=False)}"},
+                {"role": "user", "content": content},
+            ],
+            "temperature": 0.2,
+        }
+        result_meta = self._post("/chat/completions", payload)
+        result = self._parse_json(result_meta.data["choices"][0]["message"]["content"])
+        if result.get("parse_failed"):
+            mark_parse_failed(result_meta.ledger_id)
+        return result
 
     def complete(self, system: str, user: str) -> dict[str, Any]:
         payload = {

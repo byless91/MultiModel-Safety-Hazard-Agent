@@ -41,12 +41,13 @@ def enqueue_job(
     ocr_texts: list[str] | None = None,
     thread_id: str | None = None,
     reservation_token: str | None = None,
+    entry_mode: str = "assessment",
 ) -> AssessmentJob:
     job = AssessmentJob(
         assessment_id=assessment_id,
         kind=kind,
         answer=answer,
-        payload_json=json.dumps({"ocr_texts": ocr_texts or []}, ensure_ascii=False)
+        payload_json=json.dumps({"ocr_texts": ocr_texts or [], "entry_mode": entry_mode}, ensure_ascii=False)
         if kind == "create"
         else json.dumps({"followup_reservation": reservation_token}) if reservation_token else None,
         thread_id=thread_id,
@@ -238,6 +239,7 @@ def execute_job(job_id: str, attempt_token: str) -> None:
                     progress=progress,
                     thread_id=job.thread_id,
                     use_checkpointer=True,
+                    entry_mode=payload.get("entry_mode", "assessment"),
                 )
             else:
                 from app.services.langgraph_flow import resume_workflow

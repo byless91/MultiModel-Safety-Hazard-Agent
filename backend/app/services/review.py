@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models import Assessment, AssessmentJob
 from app.models.entities import utcnow
 from app.schemas.assessment import ConfirmIn
+from app.schemas.classification import ClassificationData
 from app.services.report import build_reviewed_report, human_summary
 
 REVIEWABLE_STATUSES = {"completed", "awaiting_human_review", "needs_review"}
@@ -66,6 +67,8 @@ def effective_result(item: Assessment) -> dict:
     """Read old edited records consistently, without rewriting their history."""
     original = read_object(item.report_json)
     review = read_object(item.human_review_json)
+    if item.record_mode == "classification":
+        return {"report": None, "conclusion": item.conclusion, "human_review": review or None}
     resolution = review.get("resolution")
     conclusion = item.conclusion
     if not isinstance(resolution, dict):
@@ -95,6 +98,13 @@ def apply_human_review(
     """Append one event with a compare-and-swap write; False means read-only replay."""
     if confirmation_is_replay(item, db, payload, reviewer):
         return False
+    is_classification = item.record_mode == "classification"
+    if is_classification:
+        if payload.edits:
+            raise HTTPException(status_code=422, detail="分类记录请先保存人工录入，再进行审核")
+        data = ClassificationData.model_validate_json(item.classification_json or "{}")
+        if payload.confirmed and (not item.hazard_category or data.revision == 0):
+            raise HTTPException(status_code=409, detail="请先保存人工类别和标签，不能直接批准 AI 建议")
     old_json = item.human_review_json
     review = deepcopy(read_object(old_json, strict=True))
     history = review.setdefault("history", [])
@@ -122,7 +132,9 @@ def apply_human_review(
         "identity_source": "authenticated" if reviewer_id else "client",
         "note": payload.note or "", "edits": payload.edits, "resolved_at": utcnow().isoformat(),
     }
-    history.append({"event_id": uuid4().hex, **resolution, "before": before, "after": after})
+    snapshot_extra = {"tags": data.final_tags} if is_classification else {}
+    history.append({"event_id": uuid4().hex, **resolution,
+                    "before": {**before, **snapshot_extra}, "after": {**after, **snapshot_extra}})
     review["resolution"] = resolution
     # Build the same effective report used for both new and legacy read paths.
     original_report = read_object(item.report_json)
@@ -130,7 +142,7 @@ def apply_human_review(
         evidence = json.loads(item.evidence_json or "[]")
     except json.JSONDecodeError:
         evidence = []
-    report = build_reviewed_report(
+    report = None if is_classification else build_reviewed_report(
         original_report, category=after["hazard_category"], level=after["risk_level"],
         conclusion=after["conclusion"], confidence=item.confidence,
         evidence=evidence if isinstance(evidence, list) else [], confirmed=payload.confirmed,
@@ -144,7 +156,7 @@ def apply_human_review(
             Assessment.status == item.status, Assessment.confirmed.is_(False), ~active,
         ).values(
             **after, human_review_json=json.dumps(review, ensure_ascii=False),
-            report_json=json.dumps(report, ensure_ascii=False),
+            report_json=json.dumps(report, ensure_ascii=False) if report else None,
             confirmed_by_id=reviewer_id if payload.confirmed else None,
             confirmed_by_name=(reviewer or None) if payload.confirmed else None,
         ).execution_options(synchronize_session=False)

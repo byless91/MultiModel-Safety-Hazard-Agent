@@ -6,7 +6,15 @@
 
 from __future__ import annotations
 
-PROMPT_VERSION = "vision-v2"
+PROMPT_VERSION = "vision-v3"
+
+CLASSIFICATION_PROMPT = (
+    "你是现场记录分类助手。只根据照片可见事实和提供的描述建议类别、通用标签。"
+    "只输出 JSON：category（候选类别或 null）、tags（候选标签数组）、"
+    "scene_summary（简短事实描述）、uncertainties（无法确定的事实数组）。"
+    "信息不足或不属于候选体系时 category=null，不编造事实，不给出安全结论。"
+    "禁止输出风险等级、严重度、处置决定、法规适用性或有规范效力的结论。"
+)
 
 VISION_PROMPT = (
     "你是基层安全隐患研判助手。请分析现场照片和文字描述，只输出 JSON，"
