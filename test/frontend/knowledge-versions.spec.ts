@@ -141,4 +141,21 @@ describe('M2 original knowledge page', () => {
     expect(wrapper.text()).toContain('新的消防筛选结果')
     expect(wrapper.text()).not.toContain('过期的林区结果')
   })
+
+  it('refreshes index status after rebuilding without discarding an unfinished review note', async () => {
+    serverDoc.status = 'index_error'
+    const wrapper = await page()
+    await detail(wrapper)
+    await wrapper.get('[aria-label="审核意见"]').setValue('正在核对，请保留备注')
+    expect(wrapper.text()).toContain('构建失败，请重试')
+    apiMock.post.mockImplementationOnce(async () => {
+      serverDoc = { ...serverDoc, status: 'indexed' }
+      return { data: { records: 1, chunks: 1, embedding_fallback: false } }
+    })
+    await buttons(wrapper, '重新构建索引').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('索引：已构建')
+    expect(wrapper.text()).not.toContain('构建失败，请重试')
+    expect((wrapper.get('[aria-label="审核意见"]').element as HTMLTextAreaElement).value).toBe('正在核对，请保留备注')
+  })
 })

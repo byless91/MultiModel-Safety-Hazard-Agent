@@ -134,6 +134,7 @@ def test_new_version_keeps_old_document_and_record_citations_unchanged(knowledge
 def test_stale_index_cannot_return_a_retired_version(knowledge_client, monkeypatch):
     client, upload = knowledge_client
     doc = publish(client, upload()).json()
+    original_rebuild = routes.rebuild_knowledge
     assert search(client)["items"]
     def offline(**kwargs):
         raise RuntimeError("index offline")
@@ -141,6 +142,11 @@ def test_stale_index_cannot_return_a_retired_version(knowledge_client, monkeypat
     response = publish(client, doc, decision="retire", source_checked=False)
     assert response.status_code == 200 and response.json()["status"] == "index_error"
     assert response.json()["review_status"] == "retired"
+    assert search(client)["items"] == []
+    monkeypatch.setattr(routes, "rebuild_knowledge", original_rebuild)
+    assert client.post("/api/v1/knowledge/rebuild").status_code == 200
+    refreshed = client.get(f"/api/v1/knowledge/documents/{doc['id']}").json()
+    assert refreshed["status"] == "indexed" and refreshed["review_status"] == "retired"
     assert search(client)["items"] == []
 
 

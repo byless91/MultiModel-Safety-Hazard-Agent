@@ -1413,6 +1413,14 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
 )
 def rebuild_knowledge_endpoint(db: Session = Depends(get_db)):
     result = rebuild_knowledge(db=db)
+    indexed = {meta["document_id"] for meta in get_rag().metas if meta.get("document_id")}
+    if indexed:
+        for doc in db.scalars(select(KnowledgeDocument).where(KnowledgeDocument.id.in_(indexed))).all():
+            doc.status = "indexed"
+            meta = parse_json(doc.meta_json) or {}
+            meta.pop("index_error", None)
+            doc.meta_json = json.dumps(meta)
+        db.commit()
     return {
         "chunks": result["chunks"],
         "records": result["records"],

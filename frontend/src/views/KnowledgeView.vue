@@ -242,7 +242,14 @@ async function remove(id: string) {
   catch (err) { error.value = extractError(err) }
 }
 async function rebuild() {
-  try { await store.rebuildKnowledge(); clearSearch(); ElMessage.success('索引已重新构建'); await load() }
+  try {
+    await store.rebuildKnowledge(); clearSearch(); ElMessage.success('索引已重新构建'); await load()
+    const id = preview.value?.id
+    if (id) {
+      const updated = await store.getDocument(id)
+      if (preview.value?.id === id) preview.value = { ...preview.value, status: updated.status }
+    }
+  }
   catch (err) { error.value = extractError(err) }
 }
 async function search() {
