@@ -21,6 +21,8 @@ export const useAuthStore = defineStore('auth', {
     bootstrapPending: null as Promise<void> | null,
   }),
   getters: {
+    canManageKnowledge: (state): boolean => state.authMode === 'none'
+      || state.credentialValid && (state.authMode === 'token' || state.authMode === 'jwt' && state.user?.role === 'admin'),
     isLoggedIn: (state) => Boolean(state.token) && state.credentialValid && state.authMode !== 'none',
     canReview: (state): boolean => state.authMode === 'none'
       || state.credentialValid && (state.authMode === 'token'

@@ -188,6 +188,7 @@ jobs:
           node test/e2e/async-resume.mjs
           node test/e2e/assessment-lifecycle.mjs
           node test/e2e/classification.mjs
+          node test/e2e/knowledge-versions.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -195,6 +196,7 @@ jobs:
           path: |
             test/.artifacts/reports/r7-*/
             test/.artifacts/reports/m1-classification-*/
+            test/.artifacts/reports/m2-knowledge-*/
             test/.artifacts/reports/r8-final/viewport-layout.json
 
   pip-audit:

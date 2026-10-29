@@ -14,6 +14,12 @@ import type {
   JobOut,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
+  KnowledgeArticlePage,
+  KnowledgeIndustry,
+  KnowledgeReviewRequest,
+  KnowledgeReviewStatus,
+  KnowledgeUploadOptions,
+  EvidenceItem,
   ReviewRequest,
 } from '../types'
 
@@ -316,6 +322,7 @@ export const useAssessmentStore = defineStore('assessment', {
       file: File,
       title: string,
       source: string,
+      options?: KnowledgeUploadOptions,
     ): Promise<KnowledgeDocument> {
       this.loading = true
       try {
@@ -323,6 +330,9 @@ export const useAssessmentStore = defineStore('assessment', {
         form.append('file', file)
         form.append('title', title)
         form.append('source', source)
+        for (const [key, value] of Object.entries(options || {})) {
+          if (value !== undefined) form.append(key, String(value))
+        }
         const { data } = await api.post<KnowledgeDocument>(
           '/knowledge/documents',
           form,
@@ -335,14 +345,33 @@ export const useAssessmentStore = defineStore('assessment', {
         this.loading = false
       }
     },
-    async listDocuments(): Promise<KnowledgeDocument[]> {
-      const { data } = await api.get<KnowledgeDocument[]>('/knowledge/documents')
+    async listDocuments(filters?: { industry?: KnowledgeIndustry; review_status?: KnowledgeReviewStatus; series_id?: string }): Promise<KnowledgeDocument[]> {
+      const { data } = await api.get<KnowledgeDocument[]>('/knowledge/documents', filters ? { params: filters } : undefined)
       return data
     },
     async getDocument(id: string): Promise<KnowledgeDocumentDetail> {
       const { data } = await api.get<KnowledgeDocumentDetail>(
         `/knowledge/documents/${id}`,
       )
+      return data
+    },
+    async getArticles(id: string, offset = 0): Promise<KnowledgeArticlePage> {
+      const { data } = await api.get<KnowledgeArticlePage>(`/knowledge/documents/${id}/articles`, { params: { offset, limit: 30 } })
+      return data
+    },
+    async reviewDocument(id: string, payload: KnowledgeReviewRequest): Promise<KnowledgeDocument> {
+      const key = `knowledge:${id}`
+      if (this.reviewPending[key]) throw new Error('此文档正在保存审核结果，请等待完成')
+      this.reviewPending[key] = true
+      try {
+        const { data } = await api.post<KnowledgeDocument>(`/knowledge/documents/${id}/review`, payload)
+        return data
+      } finally {
+        delete this.reviewPending[key]
+      }
+    },
+    async searchKnowledge(query: string, industry?: KnowledgeIndustry): Promise<{ items: EvidenceItem[]; notice: string }> {
+      const { data } = await api.get('/knowledge/search', { params: { query, industry } })
       return data
     },
     async deleteDocument(id: string): Promise<void> {

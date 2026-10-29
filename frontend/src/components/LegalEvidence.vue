@@ -41,7 +41,12 @@
           </span>
           <span v-if="item.risk_type">类型 {{ item.risk_type }}</span>
           <span v-if="item.scene">场景 {{ item.scene }}</span>
+          <span v-if="item.review_status_at_retrieval === 'approved'">引用时已审核</span>
         </div>
+        <p v-if="item.applicability" class="legal-source-line">适用范围：{{ item.applicability }}</p>
+        <p v-if="item.document_id" class="legal-source-line">
+          版本记录 {{ item.document_id }} · 内容 SHA256 {{ item.content_sha256 || '历史未保存' }}
+        </p>
         <p class="legal-text">{{ item.text || item.snippet }}</p>
         <div v-if="item.tags?.length" class="legal-tags">
           <el-tag v-for="tag in item.tags" :key="tag" size="small" type="info">
@@ -85,6 +90,7 @@ const usedCount = computed(
 
 function statusLabel(item: EvidenceItem) {
   if (item.is_demo) return '演示数据'
+  if (item.review_status_at_retrieval === 'approved') return '已审核版本 · 适用性待核对'
   if (props.assessment.record_mode === 'classification') return '待核对适用性'
   if (item.id && usedIds.value.has(item.id)) return '已采用为证据'
   return '检索未采用'

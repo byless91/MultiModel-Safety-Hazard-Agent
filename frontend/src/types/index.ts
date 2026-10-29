@@ -11,6 +11,13 @@ export interface AssessmentImage {
 }
 
 export interface EvidenceItem {
+  document_id?: string | null
+  industry?: string | null
+  applicability?: string | null
+  review_status?: string | null
+  review_status_at_retrieval?: string | null
+  content_sha256?: string | null
+  series_id?: string | null
   id?: string
   source: string
   document?: string
@@ -378,10 +385,42 @@ export interface KnowledgeDocument {
   version?: string
   status: string
   created_at: string
+  industry?: KnowledgeIndustry
+  applicability?: string
+  review_status?: KnowledgeReviewStatus
+  series_id?: string | null
+  supersedes_id?: string | null
+  content_sha256?: string | null
+  revision?: number
+  is_demo?: boolean
+  review_history?: { action: string; actor?: string; at: string; note: string; version?: string }[]
+}
+
+export type KnowledgeIndustry = 'general' | 'fire' | 'production' | 'community' | 'forest'
+export type KnowledgeReviewStatus = 'unreviewed' | 'approved' | 'rejected' | 'superseded' | 'retired'
+export interface KnowledgeUploadOptions {
+  version: string
+  industry: KnowledgeIndustry
+  applicability: string
+  is_demo: boolean
+  supersedes_id?: string
+}
+export interface KnowledgeReviewRequest {
+  decision: 'approve' | 'reject' | 'retire'
+  note: string
+  revision: number
+  source_checked: boolean
+}
+export interface KnowledgeArticlePage {
+  items: Omit<EvidenceItem, 'score'>[]
+  total: number
+  offset: number
+  limit: number
 }
 
 export interface KnowledgeDocumentDetail extends KnowledgeDocument {
   content: string
+  content_truncated?: boolean
 }
 
 export interface EvaluationMetrics {
