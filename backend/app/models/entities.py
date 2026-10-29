@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -153,6 +153,11 @@ class LLMCall(Base):
 
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"
+    __table_args__ = (
+        Index("uq_knowledge_series_version", "series_id", "version", unique=True),
+        Index("uq_knowledge_active_series", "series_id", unique=True,
+              sqlite_where=text("review_status = 'approved'"), postgresql_where=text("review_status = 'approved'")),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     title: Mapped[str] = mapped_column(String(255))
@@ -161,4 +166,11 @@ class KnowledgeDocument(Base):
     status: Mapped[str] = mapped_column(String(32), default="parsed")
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     meta_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    industry: Mapped[str] = mapped_column(String(24), default="general", server_default="general")
+    applicability: Mapped[str] = mapped_column(Text, default="", server_default="")
+    review_status: Mapped[str] = mapped_column(String(24), default="unreviewed", server_default="unreviewed")
+    series_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    supersedes_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

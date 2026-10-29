@@ -16,7 +16,7 @@ from sqlalchemy.schema import CreateSchema, DropSchema
 from _support.environment import validate_database_url
 
 BACKEND = Path(__file__).resolve().parents[2] / "backend"
-HEAD = "a12f083bcd71"
+HEAD = "b27e619ac430"
 PRE_R3 = "7122c95a212f"
 AUDIT = json.dumps({"history": [{"decision": "edit", "reviewer": "release-reviewer"}]})
 REPORT = json.dumps({"summary": "人工最终结论", "risk_level": 1}, ensure_ascii=False)
@@ -107,6 +107,26 @@ def test_m1_upgrade_preserves_r8_records_and_is_repeatable(release_database):
     assert_head(engine, retained=True)
     command.upgrade(config, "head")
     assert_head(engine, retained=True)
+
+
+def test_m2_upgrade_preserves_legacy_knowledge_without_approving_it(release_database):
+    engine, config = release_database
+    command.upgrade(config, "a12f083bcd71")
+    with engine.begin() as connection:
+        connection.execute(sa.text(
+            "INSERT INTO knowledge_documents (id,title,source,version,status,content_text,meta_json,created_at) "
+            "VALUES (:id,:title,:source,:version,:status,:body,:meta,:created)"
+        ), {"id": "old-law", "title": "原文档", "source": "原来源", "version": "旧版本",
+            "status": "indexed", "body": "旧条款原文", "meta": '{"owner":"operator"}', "created": datetime.now(UTC)})
+    command.upgrade(config, "head")
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        row = connection.execute(sa.text("SELECT * FROM knowledge_documents WHERE id='old-law'")).mappings().one()
+        assert row["content_text"] == "旧条款原文" and row["version"] == "旧版本"
+        assert row["source"] == "原来源" and row["meta_json"] == '{"owner":"operator"}'
+        assert row["review_status"] == "unreviewed" and row["industry"] == "general"
+        assert row["content_sha256"] is None and row["series_id"] is None
+    assert_head(engine)
     command.upgrade(config, "head")
     assert_head(engine)
 

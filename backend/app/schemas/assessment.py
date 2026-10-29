@@ -180,6 +180,15 @@ class DocumentOut(BaseModel):
     source: str | None = None
     version: str | None = None
     status: str
+    industry: str = "general"
+    applicability: str = ""
+    review_status: str = "unreviewed"
+    series_id: str | None = None
+    supersedes_id: str | None = None
+    content_sha256: str | None = None
+    revision: int = 0
+    is_demo: bool = False
+    review_history: list[dict[str, Any]] = Field(default_factory=list)
     created_at: datetime
 
     model_config = {"from_attributes": True}
