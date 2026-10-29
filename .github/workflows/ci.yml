@@ -42,7 +42,7 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.21.0  # package.json 在子目录，action 读不到 packageManager，显式指定
       - uses: actions/setup-node@v4
@@ -166,7 +166,7 @@ jobs:
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --frozen --extra dev --extra faiss
         working-directory: backend
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.21.0
       - uses: actions/setup-node@v4
