@@ -48,6 +48,12 @@ afterEach(() => {
 })
 
 describe('R7 task recovery sessions', () => {
+  it('does not offer a no-op task recovery button without a loaded record', () => {
+    const wrapper = shallowMount(JobProgress, { props: { assessment: null, job: null,
+      busy: false, working: false, waiting: true, notice: '' } })
+    wrappers.push(wrapper)
+    expect(wrapper.find('.job-progress').exists()).toBe(false)
+  })
   it('recovers queued/running jobs and stops on succeeded + needs_more_info', async () => {
     jobs.a.status = 'queued'
     const { value } = session()

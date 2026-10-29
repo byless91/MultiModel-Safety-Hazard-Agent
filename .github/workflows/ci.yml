@@ -150,6 +150,45 @@ jobs:
           name: compose-${{ matrix.variant }}
           path: test/.artifacts/reports/r5-compose-*.json
 
+  browser-e2e:
+    name: 图片研判与整改浏览器闭环（Mock）
+    runs-on: ubuntu-latest
+    env:
+      PYTHON: ${{ github.workspace }}/backend/.venv/bin/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen --extra dev --extra faiss
+        working-directory: backend
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - name: 安装测试浏览器
+        run: node frontend/node_modules/playwright-core/cli.js install chromium --with-deps
+      - name: 复核操作、长任务恢复和三角色整改闭环
+        run: |
+          node test/e2e/human-review.mjs
+          node test/e2e/async-resume.mjs
+          node test/e2e/assessment-lifecycle.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: r7-browser-evidence
+          path: test/.artifacts/reports/r7-*/
+
   pip-audit:
     name: 后端依赖安全审计
     runs-on: ubuntu-latest

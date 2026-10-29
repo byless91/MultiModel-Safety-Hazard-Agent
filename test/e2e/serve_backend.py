@@ -27,6 +27,9 @@ def main():
     # Never accept a caller's real or shared test database for this browser run.
     os.environ.pop("TEST_DATABASE_URL", None)
     environment = create_environment()
+    # A clean checkout has no generated chunks. Use only packaged development
+    # seeds, initialized by lifespan, rather than a developer's uploaded corpus.
+    environment.overrides["KNOWLEDGE_DIR"] = str(environment.directory / "browser-knowledge")
     environment.activate()
     os.environ["WORKFLOW_MODE"] = "async"
     os.environ["AUTH_MODE"] = args.auth_mode
@@ -52,7 +55,8 @@ def main():
 
         workflow.run_workflow = controlled_workflow
     state_file.parent.mkdir(parents=True, exist_ok=True)
-    state_file.write_text(json.dumps({"database_url": environment.overrides["DATABASE_URL"]}), encoding="utf-8")
+    state_file.write_text(json.dumps({"database_url": environment.overrides["DATABASE_URL"],
+                                      "knowledge_dir": environment.overrides["KNOWLEDGE_DIR"]}), encoding="utf-8")
     import uvicorn
 
     uvicorn.run("app.main:app", host="127.0.0.1", port=args.port, log_level="warning")

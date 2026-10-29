@@ -226,6 +226,11 @@
         <span class="disclaimer">{{ report.disclaimer }}</span>
       </footer>
     </template>
+    <p v-else class="report-empty">
+      {{ assessment.status === 'failed' ? '本次研判未生成报告，失败原因见上方任务状态。原记录已保留。'
+        : assessment.status === 'pending' || assessment.status === 'processing' ? '报告生成中，可从上方查看任务状态。'
+          : '当前记录暂无报告，可重新查询记录。' }}
+    </p>
   </div>
 </template>
 
@@ -445,7 +450,7 @@ async function onDownload() {
 }
 
 .plain-summary dd.next-step {
-  color: var(--brand-dark);
+  color: var(--text-strong);
   font-weight: 600;
 }
 

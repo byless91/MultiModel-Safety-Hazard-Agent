@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-29T15:22:09.686741+08:00",
+  "git_revision": "c393d2ca81faf355f17abdefc6c83b855dd2f2ae",
+  "worktree_dirty": true,
+  "product_source_sha256": "1ebafdeeaec5d0d5752aae2e373ab97f45b8ffa6a0ad875012596063e69b1776",
+  "scope": "Local SQLite/Mock; actual Windows Edge headless, isolated JWT roles, emulated 390px viewport",
+  "offline_configuration": {
+    "provider_mode": "mock",
+    "auth_mode": "none",
+    "workflow_mode": "sync",
+    "real_api_keys": "cleared",
+    "database": "isolated SQLite",
+    "real_http": "blocked",
+    "test_artifacts": "test/.artifacts/"
+  },
+  "backend_new": {
+    "tests": 373,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 3,
+    "passed": 370
+  },
+  "backend_legacy": {
+    "tests": 335,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2,
+    "passed": 333
+  },
+  "frontend_combined": {
+    "tests": 83,
+    "passed": 83,
+    "failures": 0,
+    "skipped": 0
+  },
+  "evaluation_dataset": {
+    "sha256": "a0c5193f38011fa95387702c3785b33b4c640eb57fc7fd7e93f949165b795d5d",
+    "cases": 60,
+    "image_cases": 0,
+    "safe_negative_cases": 0,
+    "evidence_labeled_cases": 0,
+    "source_type_counts": {
+      "curated": 60
+    },
+    "category_counts": {
+      "占用疏散通道": 9,
+      "消防器材失效": 16,
+      "电气线路隐患": 14,
+      "危险化学品存储不规范": 3,
+      "公共区域安全隐患": 13,
+      "野外用火风险": 5
+    }
+  },
+  "not_validated": [
+    "Real model or field-image quality",
+    "Independent legal evidence correctness",
+    "Physical mobile devices or touch input",
+    "Cloud Linux Chromium CI execution"
+  ],
+  "stage": "R7/T18-T20 engineering complete",
+  "added_frontend_tests": {
+    "T18": 20,
+    "T19": 14,
+    "T20_final_state_regression": 1,
+    "total": 35
+  },
+  "browser_evidence": {
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b": {
+      "passed": true,
+      "provider": "mock",
+      "browser": "Edge headless",
+      "approved_id": "ef98cddb-3978-478a-a69b-f07a940c1dfe",
+      "revised_id": "7149df57-640b-46d9-bf38-1f981b6ac1bc",
+      "approve_post_count": 1,
+      "rejection_requires_note": true,
+      "revision_history_count": 2,
+      "export_consistent": true,
+      "inspector_ui_hidden_and_api_403": true,
+      "mobile_viewport_emulated": true
+    },
+    "test/.artifacts/reports/r7-async-resume-2d02c4a2-ec5f-4956-a8a1-5233da857a02": {
+      "passed": true,
+      "refreshed_real_running_job": true,
+      "virtual_local_wait_ms": 120100,
+      "server_kept_running": true,
+      "temporary_network_failure_recovered": true,
+      "terminal_polling_stopped": true,
+      "reused_route_id_updated": true,
+      "left_page_stopped_queries": true,
+      "failed_record_visible": true,
+      "real_model_calls": 0
+    },
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7": {
+      "passed": true,
+      "provider": "mock",
+      "synthetic_image_fixtures": true,
+      "assessment_id": "618cefa6-fbd4-46da-8008-e32e85576933",
+      "statuses": [
+        "needs_more_info",
+        "awaiting_human_review",
+        "confirmed",
+        "rectifying",
+        "pending_verification",
+        "verified",
+        "closed"
+      ],
+      "role_separation": [
+        "inspector-submit-and-upload",
+        "reviewer-approve-and-verify",
+        "admin-close"
+      ],
+      "followup_job_id": "3177c1ed-5046-4b92-a8db-aed6131ac9d5",
+      "followup_used": 1,
+      "human_review_events": 1,
+      "rectification_history": [
+        {
+          "action": "开始整改",
+          "from_status": "open",
+          "to_status": "rectifying",
+          "note": "开始整改",
+          "by": "browser-reviewer",
+          "created_at": "2026-10-29T07:17:45.509843+00:00"
+        },
+        {
+          "action": "提交整改照片并 AI 比对",
+          "from_status": "rectifying",
+          "to_status": "pending_verification",
+          "note": "已完成清理和移除杂物，通道恢复畅通，隐患已消除",
+          "by": "browser-inspector",
+          "created_at": "2026-10-29T07:17:46.147295+00:00"
+        },
+        {
+          "action": "人工确认整改完成",
+          "from_status": "pending_verification",
+          "to_status": "verified",
+          "note": "",
+          "by": "browser-reviewer",
+          "created_at": "2026-10-29T07:17:47.417338+00:00"
+        },
+        {
+          "action": "关闭工单",
+          "from_status": "verified",
+          "to_status": "closed",
+          "note": "",
+          "by": "browser-admin",
+          "created_at": "2026-10-29T07:17:48.098541+00:00"
+        }
+      ],
+      "failed_close_preserved_state": true,
+      "downloaded_report_consistent": true,
+      "mobile_viewport_emulated": true,
+      "real_model_calls": 0
+    },
+    "test/.artifacts/reports/r4-e2e.json": {
+      "passed": true,
+      "browser": "Edge headless",
+      "provider": "mock",
+      "initial_post_responses_lost": 1,
+      "create_post_count": 1,
+      "reloaded": true,
+      "counts": {
+        "assessments": 1,
+        "assessment_jobs": 1,
+        "idempotency_keys": 1
+      },
+      "recovered_assessment_id": "66c70556-87e4-42df-bd95-559d2cc6cc35",
+      "recovered_job_id": "d5c14d11-6005-4b28-9a7b-680e4197c4e6",
+      "screenshot": "test/.artifacts/reports/r4-submission-recovery.png"
+    }
+  },
+  "artifacts_sha256": {
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b/after-desktop.png": "f01ac1660ec7fc60902e6d1836eb24520d1e07c6c5ba67891fb8bf12af728431",
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b/after-mobile.png": "151642aae88c3202e7cea9a01c54ce9001041beb16069060358982093476b8fc",
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b/edit-desktop.png": "46e11bf9d7e105421f7a8f73651c7c79a1d59864a16f7516f88797a21f864080",
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b/edit-mobile.png": "65c0b93f9f80730e322c69ad7b3e5f8230c7c261796ba5afffadac8fc6e65bcc",
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b/result.json": "d42d12c62a4f1120b2514f68075d5ce8f5faa60920f47e121a5fb747007237c8",
+    "test/.artifacts/reports/r7-human-review-413425bb-dfb7-47ef-b36b-ce045cd53a5b/server.json": "bd7d359b26a2ea4da8f578509f29ce620de13a5b10aff1703142644d6055d5a4",
+    "test/.artifacts/reports/r7-async-resume-2d02c4a2-ec5f-4956-a8a1-5233da857a02/failed-desktop.png": "f06083bfdc6d0471f9995706620090cdbf8d709da74250fdb5e368bc96e059d5",
+    "test/.artifacts/reports/r7-async-resume-2d02c4a2-ec5f-4956-a8a1-5233da857a02/result.json": "413406a00a4e111fc1fdd859ee509ef3fb5b0dbac7fb541b476f53c4993db2ae",
+    "test/.artifacts/reports/r7-async-resume-2d02c4a2-ec5f-4956-a8a1-5233da857a02/server.json": "d2f4186ddf6e4ccae27001f69c43bbb6a370acb7b9f2edb98b8044f8912c6ae9",
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7/closed-desktop.png": "5ddc387271421ccfec602a7f9f6eb94e52d7b8bccc10efb281cf180525fe6a50",
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7/closed-mobile-dark.png": "2a0d5dbac0af593aef3b2cc1f5ea7662e4a71b0d8d277e4b9b37f394f75cf0e2",
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7/closed-mobile.png": "eed17472e22f432334412de3c0de7a59689c62ddd11d562757c4f31f681c2c36",
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7/downloaded-report.md": "60faea2a3a8caca6c2b8b7387bb199c98fa1d9896ff79293ca62b4ef6b3b9a7d",
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7/result.json": "f78f426b1951b48295514652c75f6fb81f6f2ac67957b9ffded854cce2254094",
+    "test/.artifacts/reports/r7-assessment-lifecycle-5880cbfc-f684-40c7-8caa-4fe8c3b334c7/server.json": "670de6255a70c445ec6c6a3cbebc648326bc9bc05dc9b8a3c2cc98fdad7eb54e",
+    "test/.artifacts/reports/r4-e2e.json": "0b9c56faa4f4a01141fb2f37a4740dc913f6f9f42a444d7896ae5b409f3ea0ad",
+    "test/.artifacts/reports/r7-final/backend-new.xml": "6d8e77329190fb524b7df080a051ea34419a647e80e71c973e73baecf977a99d",
+    "test/.artifacts/reports/r7-final/backend-legacy.xml": "a60eb6bc251b2634948c5fda112984c2302305894b41e822f3670422419dfe1a",
+    "test/.artifacts/reports/r7-final/frontend.json": "53f992c6a85f9d026d1f39b911a1d8644f8b86fe1431cb1ad3c7721839ce252a"
+  },
+  "checks": {
+    "eslint": "passed",
+    "production_and_test_typescript": "passed",
+    "vite_build": "passed",
+    "ruff_backend_test": "passed",
+    "mypy_configured_files": 15,
+    "r6_mock_gate": "passed",
+    "ci_yaml_parse": "passed"
+  },
+  "bundle_note": "Existing large-chunk warning remains; final JS 1347.20 kB, gzip 433.53 kB",
+  "knowledge_fixture": "Fresh test directory bootstrapped from backend/resources/knowledge_seed; development excerpts, unreviewed",
+  "not_revalidated_in_R7": [
+    "Docker/PG deployment stacks; retain R5 evidence, rerun full matrix in R8"
+  ]
+}

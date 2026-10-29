@@ -1,8 +1,9 @@
 <template>
-  <section v-if="job || waiting || pending || assessment?.status === 'failed'" class="job-progress"
+  <section v-if="assessment && (job || waiting || pending || assessment.status === 'failed')" class="job-progress"
     role="status" aria-live="polite">
     <h2>{{ title }}</h2>
-    <p v-if="job">{{ steps[job.progress_step] || job.progress_step }}</p>
+    <p v-if="job && working && !waiting">{{ steps[job.progress_step] || '正在处理研判任务' }}</p>
+    <p v-else-if="job?.status === 'succeeded' && assessment">当前状态：{{ statuses[assessment.status] || '记录已更新' }}</p>
     <p v-if="notice">{{ notice }}</p>
     <p v-if="job?.status === 'failed'">{{ job.error || '任务执行失败，原记录已保留。' }}</p>
     <div class="job-links">
@@ -29,6 +30,9 @@ const title = computed(() => props.job?.status === 'failed' || props.assessment?
 const steps: Record<string, string> = { queued: '等待执行', analyze: '多模型分析中', retrieve: '法规检索中',
   refine: '证据二次研判中', judge: '融合研判中', evidence: '证据校验中', generate: '生成报告中',
   needs_more_info: '等待补充信息', done: '处理已结束', completed: '处理已结束' }
+const statuses: Record<string, string> = { pending: '研判进行中', processing: '研判进行中',
+  needs_more_info: '需要补充现场信息', completed: '自动研判完成', awaiting_human_review: '待人工复核',
+  needs_review: '待重新复核', confirmed: '已人工定稿', failed: '任务失败' }
 </script>
 
 <style scoped>
@@ -36,5 +40,6 @@ const steps: Record<string, string> = { queued: '等待执行', analyze: '多模
   border-radius: var(--r-card); background: var(--panel); overflow-wrap: anywhere; }
 h2 { font-size: var(--fs-md); margin: 0 0 var(--s-2); }
 .job-links { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); }
+.job-links a { color: var(--brand); text-underline-offset: 3px; }
 .job-hint { color: var(--muted); font-size: var(--fs-sm); }
 </style>

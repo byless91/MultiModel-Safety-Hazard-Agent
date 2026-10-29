@@ -54,6 +54,13 @@ try {
     const conclusion = '人工核实为灭火器失效，按二级限期更换并复查。'
     await page.getByLabel('人工结论', { exact: true }).fill(conclusion)
     await page.locator('.review-form textarea').last().fill('已核对设备日期，修订类别和等级')
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.screenshot({ path: path.join(app.directory, 'edit-desktop.png'), fullPage: true })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.evaluate(() => window.scrollTo(0, 0))
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    await page.screenshot({ path: path.join(app.directory, 'edit-mobile.png'), fullPage: true })
+    await page.setViewportSize({ width: 1280, height: 900 })
     await page.getByRole('button', { name: '保存修订并定稿', exact: true }).click()
     await page.getByText('已人工定稿。需要重新研判时，请新建关联记录。').waitFor()
     saved = await (await app.request('GET', `/assessments/${editable.id}`, app.admin)).json()
