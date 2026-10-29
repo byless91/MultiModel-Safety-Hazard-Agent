@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -37,10 +37,25 @@ def document_record(item: KnowledgeDocument) -> dict:
     }
 
 
+def _lock_document(db: Session, identity: str) -> None:
+    """A no-op UPDATE reserves the row on both SQLite and PostgreSQL."""
+    try:
+        result = db.execute(update(KnowledgeDocument).where(KnowledgeDocument.id == identity).values(
+            series_id=KnowledgeDocument.series_id,
+        ).execution_options(synchronize_session=False))
+    except OperationalError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="文档正在被更新，请刷新后重试") from exc
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="原文档版本已不存在")
+
+
 def create_document_version(db: Session, data: KnowledgeMetadataIn, body: str, filename: str, suffix: str):
     identity = str(uuid4())
     series = identity
     if data.supersedes_id:
+        _lock_document(db, data.supersedes_id)
         previous = db.get(KnowledgeDocument, data.supersedes_id)
         if previous is None:
             raise HTTPException(status_code=404, detail="原文档版本不存在")
@@ -94,8 +109,7 @@ def review_document(db: Session, item: KnowledgeDocument, payload: KnowledgeRevi
             raise HTTPException(status_code=422, detail="演示或开发资料不能发布为有效条款")
     series = item.series_id or item.id
     try:
-        # Every version in the same series locks the same root on PostgreSQL.
-        db.execute(select(KnowledgeDocument.id).where(KnowledgeDocument.id == series).with_for_update())
+        _lock_document(db, series)
         if payload.decision == "approve":
             older = db.scalars(select(KnowledgeDocument).where(
                 KnowledgeDocument.series_id == series, KnowledgeDocument.review_status == "approved",
@@ -136,15 +150,23 @@ def review_document(db: Session, item: KnowledgeDocument, payload: KnowledgeRevi
     except HTTPException:
         db.rollback()
         raise
+    db.expire_all()
     db.refresh(item)
     return True
 
 
-def ensure_deletable(db: Session, item: KnowledgeDocument) -> None:
-    referenced = db.scalar(select(Assessment.id).where(Assessment.evidence_json.contains(item.id)).limit(1))
-    child = db.scalar(select(KnowledgeDocument.id).where(KnowledgeDocument.supersedes_id == item.id).limit(1))
-    if item.review_status != "unreviewed" or referenced or child:
+def delete_document_version(db: Session, item: KnowledgeDocument) -> None:
+    _lock_document(db, item.id)
+    referenced = select(Assessment.id).where(Assessment.evidence_json.contains(item.id)).exists()
+    child = select(KnowledgeDocument.id).where(KnowledgeDocument.supersedes_id == item.id).exists()
+    deleted = db.execute(delete(KnowledgeDocument).where(
+        KnowledgeDocument.id == item.id, KnowledgeDocument.review_status == "unreviewed",
+        KnowledgeDocument.review_json == item.review_json, ~referenced, ~child,
+    ).execution_options(synchronize_session=False))
+    if deleted.rowcount != 1:
+        db.rollback()
         raise HTTPException(status_code=409, detail="已审核、已被引用或有后续版本的文档不能删除；请停用有效版本")
+    db.commit()
 
 
 def search_approved_knowledge(query: str, *, industry: str | None = None, rag=None) -> list[dict]:

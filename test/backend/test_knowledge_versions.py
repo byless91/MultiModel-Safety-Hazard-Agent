@@ -12,8 +12,9 @@ from app.core.db import SessionLocal
 from app.core.security import create_access_token
 from app.models import Assessment, KnowledgeDocument, User
 from app.schemas.knowledge import KnowledgeMetadataIn, KnowledgeReviewIn
-from app.services.knowledge_versions import search_approved_knowledge
+from app.services.knowledge_versions import delete_document_version, search_approved_knowledge
 from app.services.rag import RAGService
+from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
@@ -208,3 +209,19 @@ def test_many_unreviewed_chunks_cannot_crowd_out_the_approved_industry():
     rag._query_vector = lambda query: np.array([[1]], dtype=np.float32)
     results = rag.search("查询", top_k=1, approved_only=True, industry="forest")
     assert [row["id"] for row in results] == ["approved"]
+
+
+@pytest.mark.parametrize("change", ["publish", "child"])
+def test_stale_delete_cannot_erase_a_published_version_or_version_parent(knowledge_client, change):
+    client, upload = knowledge_client
+    doc = upload()
+    with SessionLocal() as stale:
+        item = stale.get(KnowledgeDocument, doc["id"])
+        if change == "publish":
+            assert publish(client, doc).status_code == 200
+        else:
+            upload(version="v2", parent=doc)
+        with pytest.raises(HTTPException) as error:
+            delete_document_version(stale, item)
+        assert error.value.status_code == 409
+    assert client.get(f"/api/v1/knowledge/documents/{doc['id']}").status_code == 200

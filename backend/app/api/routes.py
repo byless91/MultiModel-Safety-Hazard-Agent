@@ -76,9 +76,9 @@ from app.services.job_runner import (
 from app.services.knowledge import document_to_records, rebuild_knowledge
 from app.services.knowledge_versions import (
     create_document_version,
+    delete_document_version,
     document_out,
     document_record,
-    ensure_deletable,
     review_document,
     search_approved_knowledge,
 )
@@ -1398,9 +1398,7 @@ def delete_knowledge_document(document_id: str, db: Session = Depends(get_db)) -
     item = db.get(KnowledgeDocument, document_id)
     if not item:
         raise HTTPException(status_code=404, detail="知识文档不存在")
-    ensure_deletable(db, item)
-    db.delete(item)
-    db.commit()
+    delete_document_version(db, item)
     try:
         rebuild_knowledge(db=db)
     except Exception:
