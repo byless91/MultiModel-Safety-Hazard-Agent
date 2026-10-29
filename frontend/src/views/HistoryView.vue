@@ -32,10 +32,16 @@
           <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="220" show-overflow-tooltip />
-        <el-table-column prop="hazard_category" label="隐患类别" min-width="150" />
+        <el-table-column label="人工类别 / 历史类别" min-width="170">
+          <template #default="{ row }">{{ row.hazard_category || '待人工录入' }}</template>
+        </el-table-column>
+        <el-table-column label="人工标签" min-width="150">
+          <template #default="{ row }">{{ row.classification?.final_tags.join('、') || '—' }}</template>
+        </el-table-column>
         <el-table-column label="等级" width="90" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.risk_level" :type="levelType(row.risk_level)">{{ levelLabel(row.risk_level) }}</el-tag>
+            <span v-else>未分级</span>
           </template>
         </el-table-column>
         <el-table-column label="置信度" width="100" align="center">

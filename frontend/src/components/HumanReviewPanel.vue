@@ -13,7 +13,7 @@
         <el-radio-group v-model="action" aria-label="复核方式">
           <el-radio-button value="approve">批准定稿</el-radio-button>
           <el-radio-button value="reject">拒绝当前结论</el-radio-button>
-          <el-radio-button value="edit">修订并定稿</el-radio-button>
+          <el-radio-button v-if="!isClassification" value="edit">修订并定稿</el-radio-button>
         </el-radio-group>
         <div v-if="action === 'edit'" class="edit-fields">
           <div class="review-field">
@@ -48,11 +48,16 @@
       </fieldset>
     </form>
     <p v-else-if="!assessment.confirmed && !auth.canReview" class="review-hint">当前账号可查看结果，请复核员或管理员处理。</p>
+    <p v-else-if="!assessment.confirmed && isClassification && !assessment.hazard_category" class="review-hint">请先保存人工录入后再审核。</p>
     <p v-else-if="!assessment.confirmed && !reviewable" class="review-hint">请等待研判结束后再复核。</p>
 
     <details v-if="original" class="original-result">
-      <summary>AI 原始结论与规则结果</summary>
-      <template v-if="original.available">
+      <summary>{{ isClassification ? 'AI 原始分类建议' : 'AI 原始结论与规则结果' }}</summary>
+      <template v-if="original.available && isClassification">
+        <p>建议类别：{{ original.classification?.suggested_category || '未知' }}；
+          建议标签：{{ original.classification?.suggested_tags.join('、') || '无' }}</p>
+      </template>
+      <template v-else-if="original.available">
         <p>{{ snapshotText(original) }}</p>
         <p class="preserve-text">{{ original.conclusion || '原始结论未提供' }}</p>
         <p class="review-hint">模型分析页保留 AI / 规则原始计算；人工修订不会重新计算原始风险分数。</p>
@@ -97,12 +102,14 @@ const level = ref<number | undefined>()
 const conclusion = ref('')
 const error = ref('')
 const busy = computed(() => Boolean(store.reviewPending[props.assessment.id]))
+const isClassification = computed(() => props.assessment.record_mode === 'classification')
 const resolution = computed(() => props.assessment.human_review?.resolution)
 const original = computed(() => props.assessment.human_review?.ai_original)
 const history = computed<ReviewEvent[]>(() => props.assessment.human_review?.history
   ?? (resolution.value ? [resolution.value] : []))
 const reviewable = computed(() => ['completed', 'awaiting_human_review', 'needs_review'].includes(props.assessment.status))
-const canAct = computed(() => auth.canReview && reviewable.value && !props.assessment.confirmed)
+const canAct = computed(() => auth.canReview && reviewable.value && !props.assessment.confirmed
+  && (!isClassification.value || Boolean(props.assessment.hazard_category && props.assessment.classification?.revision)))
 const actionLabel = computed(() => action.value === 'reject' ? '提交拒绝意见'
   : action.value === 'edit' ? '保存修订并定稿' : '批准并定稿')
 
@@ -117,10 +124,12 @@ function reset() {
 watch(() => props.assessment.id, reset, { immediate: true })
 
 function snapshotText(snapshot: ReviewSnapshot) {
-  return `类别：${snapshot.hazard_category || '未提供'}，等级：${snapshot.risk_level ?? '未提供'}`
+  return `类别：${snapshot.hazard_category || '未提供'}，等级：${snapshot.risk_level ?? '未分级'}`
+    + (snapshot.tags ? `，标签：${snapshot.tags.join('、') || '无'}` : '')
 }
 
 function eventLabel(entry: HumanReviewResolution) {
+  if ('action' in entry && entry.action === 'classification_saved') return '保存人工录入'
   return !entry.confirmed ? '拒绝当前结论' : Object.keys(entry.edits || {}).length ? '修订并定稿' : '批准定稿'
 }
 

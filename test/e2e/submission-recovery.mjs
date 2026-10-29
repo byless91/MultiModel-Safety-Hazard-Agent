@@ -76,7 +76,7 @@ try {
   })
   await page.goto(frontendUrl)
   await page.locator('#hazard-description').fill('小区楼道堆放纸箱杂物，堵塞疏散通道，通行明显受阻')
-  await page.getByRole('button', { name: '开始研判' }).click()
+  await page.getByRole('button', { name: '生成分类建议' }).click()
   await lost
   await page.getByRole('button', { name: '查询本次提交', exact: true }).waitFor()
   assert.match(key, /^submission_[a-f0-9]{32}$/)

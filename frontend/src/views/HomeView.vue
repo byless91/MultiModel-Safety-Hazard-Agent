@@ -1,12 +1,16 @@
 <template>
   <section class="page">
-    <h1 class="page-title">现场隐患智能研判</h1>
+    <h1 class="page-title">现场分类与录入</h1>
     <p class="page-subtitle">
-      上传现场照片并描述情况，系统给出隐患类型、风险等级和处置建议。
+      上传照片、获取类别与标签建议，再由人工核实录入。风险等级由人工选填。
     </p>
 
     <el-card v-loading="busy" class="intake-card">
       <form class="intake" @submit.prevent="submit">
+        <el-radio-group v-model="mode" :disabled="store.hasPendingSubmission" aria-label="录入方式">
+          <el-radio-button value="classification">AI 分类助手</el-radio-button>
+          <el-radio-button value="manual">仅人工录入</el-radio-button>
+        </el-radio-group>
         <div class="intake-row">
           <div class="field">
             <label class="field-label">
@@ -51,7 +55,7 @@
             :disabled="!description.trim() || store.hasPendingSubmission"
           >
             <el-icon><UploadFilled /></el-icon>
-            开始研判
+            {{ mode === 'manual' ? '创建人工记录' : '生成分类建议' }}
           </el-button>
           <el-button :disabled="store.loading || store.submissionBusy" @click="resetForm">
             {{ store.hasPendingSubmission ? '新建研判' : '重置' }}
@@ -81,7 +85,7 @@
     <el-alert v-if="error" class="error-alert" :title="error" type="error" :closable="false" show-icon />
     <section v-if="assessment" class="result-panel">
       <div class="result-panel-head">
-        <span class="result-panel-title">研判结果</span>
+        <span class="result-panel-title">{{ assessment.record_mode === 'classification' ? '分类记录' : '研判结果' }}</span>
         <span class="result-id">记录号 {{ assessment.id.slice(0, 8) }}</span>
       </div>
       <AssessmentResult
@@ -102,10 +106,11 @@ import AssessmentResult from '../components/AssessmentResult.vue'
 import { useAssessmentStore } from '../stores/assessment'
 import JobProgress from '../components/JobProgress.vue'
 import { useAssessmentSession } from '../composables/useAssessmentSession'
-import type { Assessment } from '../types'
+import type { Assessment, EntryMode } from '../types'
 
 const store = useAssessmentStore()
 const description = ref('')
+const mode = ref<EntryMode>('classification')
 const fileList = ref<UploadFile[]>([])
 const session = useAssessmentSession()
 const { assessment, job, busy, working, waiting, notice, error } = session
@@ -115,7 +120,9 @@ async function submit() {
   const files = fileList.value
     .map((item) => (item.raw ? item.raw : (item as unknown as File)))
     .filter((item) => item instanceof File)
-  await session.run((signal) => store.create(description.value.trim(), files, { wait: false, signal }))
+  await session.run((signal) => store.create(description.value.trim(), files, {
+    wait: false, signal, entryMode: mode.value,
+  }))
 }
 
 async function resumeSubmission(retry: boolean) {

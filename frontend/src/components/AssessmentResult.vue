@@ -1,7 +1,9 @@
 <template>
   <div v-loading="loading" class="result-wrap">
+    <ClassificationPanel v-if="assessment.record_mode === 'classification'" :assessment="assessment"
+      :loading="loading" @updated="emit('updated', $event)" @download="onDownload" />
     <el-alert
-      v-if="assessment.status === 'needs_more_info'"
+      v-else-if="assessment.status === 'needs_more_info'"
       title="还需要补充现场情况"
       type="warning"
       :closable="false"
@@ -242,6 +244,7 @@ import { useAssessmentStore } from '../stores/assessment'
 import type { Assessment, FindingLocation } from '../types'
 import { rectStatusLabel } from '../constants/rectification'
 import HumanReviewPanel from './HumanReviewPanel.vue'
+import ClassificationPanel from './ClassificationPanel.vue'
 import { extractError } from '../utils/errors'
 import EvidenceChain from './EvidenceChain.vue'
 import RectificationPanel from './RectificationPanel.vue'

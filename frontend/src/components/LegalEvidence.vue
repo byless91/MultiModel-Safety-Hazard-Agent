@@ -1,8 +1,8 @@
 <template>
   <div class="legal-evidence">
     <div class="legal-overview">
-      <span class="legal-count">法规证据 {{ evidenceList.length }} 条</span>
-      <span class="legal-count">已采用为证据 {{ usedCount }} 条</span>
+      <span class="legal-count">{{ assessment.record_mode === 'classification' ? '参考条款' : '法规证据' }} {{ evidenceList.length }} 条</span>
+      <span v-if="assessment.record_mode !== 'classification'" class="legal-count">已采用为证据 {{ usedCount }} 条</span>
       <el-tag
         v-if="judgeInfo"
         :type="judgeInfo.supported ? 'success' : 'warning'"
@@ -85,6 +85,7 @@ const usedCount = computed(
 
 function statusLabel(item: EvidenceItem) {
   if (item.is_demo) return '演示数据'
+  if (props.assessment.record_mode === 'classification') return '待核对适用性'
   if (item.id && usedIds.value.has(item.id)) return '已采用为证据'
   return '检索未采用'
 }

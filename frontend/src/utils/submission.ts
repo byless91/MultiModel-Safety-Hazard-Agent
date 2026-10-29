@@ -1,3 +1,5 @@
+import type { EntryMode } from '../types'
+
 /** Persist only recovery metadata; descriptions and files stay in memory. */
 export interface SubmissionAttempt {
   key: string
@@ -8,6 +10,7 @@ export interface SubmissionAttempt {
 export interface SubmissionPayload {
   description: string
   files: File[]
+  mode: EntryMode
 }
 
 const STORAGE_KEY = 'safety_hazard_submission_v1'

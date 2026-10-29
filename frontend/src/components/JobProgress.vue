@@ -2,7 +2,8 @@
   <section v-if="assessment && (job || waiting || pending || assessment.status === 'failed')" class="job-progress"
     role="status" aria-live="polite">
     <h2>{{ title }}</h2>
-    <p v-if="job && working && !waiting">{{ steps[job.progress_step] || '正在处理研判任务' }}</p>
+    <p v-if="job && working && !waiting">{{ assessment.record_mode === 'classification' && job.progress_step === 'analyze'
+      ? '正在生成类别与标签建议' : steps[job.progress_step] || '正在处理任务' }}</p>
     <p v-else-if="job?.status === 'succeeded' && assessment">当前状态：{{ statuses[assessment.status] || '记录已更新' }}</p>
     <p v-if="notice">{{ notice }}</p>
     <p v-if="job?.status === 'failed'">{{ job.error || '任务执行失败，原记录已保留。' }}</p>

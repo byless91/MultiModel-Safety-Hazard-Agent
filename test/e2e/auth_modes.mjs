@@ -85,7 +85,7 @@ try {
       await page.getByRole('button', { name: '登 录' }).click()
     }
     await page.waitForURL(`${frontendUrl}/`)
-    await page.getByRole('button', { name: '开始研判' }).waitFor()
+    await page.getByRole('button', { name: '生成分类建议' }).waitFor()
     if (mode === 'token') {
       await page.evaluate(async () => {
         const { api } = await import('/src/api/client.ts')
@@ -98,7 +98,7 @@ try {
     }
     if (mode === 'jwt') {
       await page.reload()
-      await page.getByRole('button', { name: '开始研判' }).waitFor()
+      await page.getByRole('button', { name: '生成分类建议' }).waitFor()
       assert.ok(requests.some((url) => url.endsWith('/auth/me')))
       assert.equal(page.url(), `${frontendUrl}/`)
     }

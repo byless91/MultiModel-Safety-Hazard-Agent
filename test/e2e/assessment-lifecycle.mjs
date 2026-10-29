@@ -19,15 +19,18 @@ try {
   const admin = await actor('admin')
   const inspectorToken = await app.token('browser-inspector')
   const statuses = []
-  await inspector.locator('input[type=file]').setInputFiles(path.join(root, 'test/evaluation/images/fire-hazard.png'))
-  await inspector.locator('#hazard-description').fill('现场情况不清楚')
-  const accepted = inspector.waitForResponse((response) => response.url().endsWith('/api/v1/assessments')
-    && response.request().method() === 'POST')
-  await inspector.getByRole('button', { name: '开始研判', exact: true }).click()
-  const response = await accepted
-  assert.equal(response.status(), 202)
+  // Keep exercising the historical follow-up/rectification flow via its compatible API.
+  // The default homepage classification upload is covered by classification.mjs.
+  const initial = new FormData()
+  initial.append('description', '现场情况不清楚')
+  initial.append('mode', 'assessment')
+  initial.append('files', new Blob([await readFile(path.join(root, 'test/evaluation/images/fire-hazard.png'))],
+    { type: 'image/png' }), 'fire-hazard.png')
+  const response = await app.request('POST', '/assessments', inspectorToken, initial)
+  assert.equal(response.status, 202)
   const initialJob = await response.json()
   const id = initialJob.assessment_id
+  await inspector.goto(`${app.frontendUrl}/assessments/${id}`)
   const endpoint = `/assessments/${id}`
   const fetchItem = async () => (await app.request('GET', endpoint, app.admin)).json()
   await inspector.getByRole('button', { name: '提交补充信息', exact: true }).waitFor({ timeout: 30000 })

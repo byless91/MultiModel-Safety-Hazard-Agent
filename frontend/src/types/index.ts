@@ -200,6 +200,8 @@ export interface ReviewRequest {
 }
 
 export interface ReviewSnapshot {
+  tags?: string[]
+  classification?: ClassificationData
   hazard_category?: string | null
   risk_level?: number | null
   conclusion?: string | null
@@ -208,6 +210,7 @@ export interface ReviewSnapshot {
 }
 
 export interface ReviewEvent extends HumanReviewResolution {
+  action?: string
   event_id?: string
   before?: ReviewSnapshot
   after?: ReviewSnapshot
@@ -258,13 +261,45 @@ export interface RectificationHistoryEntry {
   created_at: string
 }
 
+export type EntryMode = 'assessment' | 'classification' | 'manual'
+
+export interface ClassificationData {
+  taxonomy_version: string
+  suggestion_status: 'pending' | 'suggested' | 'unknown' | 'failed' | 'manual'
+  suggested_category: string | null
+  suggested_tags: string[]
+  final_tags: string[]
+  warnings: string[]
+  is_demo: boolean
+  provider?: string | null
+  model?: string | null
+  revision: number
+}
+
+export interface ClassificationTaxonomy {
+  version: string
+  categories: string[]
+  tags: string[]
+}
+
+export interface ClassificationSaveRequest {
+  category: string
+  tags: string[]
+  risk_level: number | null
+  note: string
+  taxonomy_version: string
+  revision: number
+}
+
 export interface Assessment {
   id: string
   description: string
   status: AssessmentStatus
+  record_mode?: 'assessment' | 'classification'
+  classification?: ClassificationData | null
   scene_summary?: string
   hazard_category?: string
-  risk_level?: number
+  risk_level?: number | null
   confidence?: number
   conclusion?: string
   evidence: EvidenceItem[]

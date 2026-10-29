@@ -9,6 +9,8 @@ import {
 } from '../utils/submission'
 import type {
   Assessment,
+  ClassificationSaveRequest,
+  EntryMode,
   JobOut,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
@@ -33,12 +35,12 @@ export const useAssessmentStore = defineStore('assessment', {
     ),
   },
   actions: {
-    async create(description: string, files: File[], options?: TaskOptions): Promise<Assessment> {
+    async create(description: string, files: File[], options?: TaskOptions & { entryMode?: EntryMode }): Promise<Assessment> {
       if (this.submissionBusy || this.hasPendingSubmission) {
         throw new Error('已有尚未确认的提交，请先查询本次提交或明确新建研判')
       }
       this.activeJob = null
-      this.submissionPayload = { description, files: [...files] }
+      this.submissionPayload = { description, files: [...files], mode: options?.entryMode ?? 'assessment' }
       this.setSubmission(newSubmission())
       return this.runSubmission(() => this.postSubmission(options), true)
     },
@@ -81,6 +83,7 @@ export const useAssessmentStore = defineStore('assessment', {
       if (!this.submission || !this.submissionPayload) throw new Error('原照片未保留，请先查询原提交或明确新建研判')
       const form = new FormData()
       form.append('description', this.submissionPayload.description)
+      form.append('mode', this.submissionPayload.mode)
       for (const file of this.submissionPayload.files) form.append('files', file)
       const { data } = await api.post<Assessment | JobOut>('/assessments', form, {
         headers: { 'Idempotency-Key': this.submission.key },
@@ -194,12 +197,18 @@ export const useAssessmentStore = defineStore('assessment', {
       }
     },
     async confirm(id: string, payload: ReviewRequest): Promise<Assessment> {
+      return this.saveReview(id, 'confirm', payload)
+    },
+    async saveClassification(id: string, payload: ClassificationSaveRequest): Promise<Assessment> {
+      return this.saveReview(id, 'classification', payload)
+    },
+    async saveReview(id: string, action: 'confirm' | 'classification', payload: ReviewRequest | ClassificationSaveRequest): Promise<Assessment> {
       if (this.reviewPending[id]) throw new Error('这条研判正在保存复核结果，请等待完成')
       this.reviewPending[id] = true
       this.loading = true
       this.error = ''
       try {
-        const { data } = await api.post<Assessment>(`/assessments/${id}/confirm`, payload)
+        const { data } = await api.post<Assessment>(`/assessments/${id}/${action}`, payload)
         return data
       } catch (err) {
         this.error = extractError(err)

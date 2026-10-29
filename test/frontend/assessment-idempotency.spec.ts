@@ -227,6 +227,8 @@ describe('HomeView submission and recovery', () => {
     return shallowMount(HomeView, { global: {
       directives: { loading: () => undefined },
       stubs: {
+        ElRadioGroup: { template: '<div><slot /></div>' },
+        ElRadioButton: { template: '<span><slot /></span>' },
         ElCard: { template: '<section><slot /></section>' },
         ElButton: { props: ['disabled'], emits: ['click'],
           template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>' },
@@ -277,7 +279,7 @@ describe('HomeView submission and recovery', () => {
     expect(wrapper.text()).not.toContain('重试原内容')
     const link = wrapper.findAllComponents(RouterLinkStub).find((item) => item.text() === '查看研判记录')!
     expect(link.props('to')).toBe('/assessments/failed-record')
-    const submit = wrapper.findAll('button').find((item) => item.text().includes('开始研判'))!
+    const submit = wrapper.findAll('button').find((item) => item.text().includes('生成分类建议'))!
     expect(submit.attributes('disabled')).toBeDefined()
     wrapper.unmount()
   })
